@@ -209,6 +209,12 @@ ls $DATA_ROOT/processed/eda_figures/err_*.png | head
 ```
 **Pass khi**: notebook chạy hết, sinh figure lỗi theo độ dài + top-N lỗi mẫu.
 
+> **Đã nghiệm thu**: 7 test pass; notebook đã execute & commit kèm output (9 cell, **0 lỗi**),
+> sinh 3 hình `err_by_length.png`, `err_top_samples.png`, `err_char_confusions.png`
+> (`acc=0.0, CER=1.12` trên 236 mẫu US+VN với ckpt chưa train).
+> - Không cần GPU; đọc trực tiếp `reports/<model>_<domain>.csv`.
+> - Nếu `reports/` rỗng, notebook vẫn chạy hết và in cảnh báo (không crash).
+
 ## 14-demo-report — demo + báo cáo
 
 ```bash

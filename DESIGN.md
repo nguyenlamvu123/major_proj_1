@@ -861,3 +861,35 @@ theo delta tăng dần** (sụt nặng nhất lên đầu).
 `read_accuracy` (ưu tiên `correct`, fallback `pred/gt`); `discover` bỏ file lạ/`*.json`/
 `domain_shift.csv`; `build_rows` tính delta + bỏ model thiếu domain; `run` ghi đủ cột +
 sort; mọi report rỗng → chỉ header; CLI `--help` exit 0.
+
+## 13-error-analysis — phân tích lỗi
+
+`src/trademark_ocr/error_analysis.py` đọc báo cáo nhánh 10 (`reports/<model>_<domain>.csv`)
+và sinh 3 hình vào `$DATA_ROOT/processed/eda_figures/`:
+
+| Hàm thuần | Ý nghĩa |
+|---|---|
+| `discover_reports(dir)` | các CSV `<model>_<domain>.csv` (bỏ `domain_shift.csv`) |
+| `load_pairs(paths)` | list `(pred, gt)` |
+| `by_length(pairs, bins)` | `n, acc, char_acc` theo độ dài **gt** |
+| `top_errors(pairs, k)` | k mẫu sai nặng nhất (edit distance giảm dần) |
+| `char_confusions(pairs)` | cặp `(gt_char, pred_char)` hay thay thế (difflib op `replace`) |
+
+Vẽ hình: `plot_by_length` → `err_by_length.png`; `plot_top_errors` → `err_top_samples.png`;
+`plot_confusions` → `err_char_confusions.png`. `analyze(...)` gom tất cả + trả dict.
+Backend `Agg` (headless). ⚠️ **Không dùng font monospace** cho text có dấu — DejaVu Sans
+Mono thiếu glyph tiếng Việt (warning + ô vuông); DejaVu Sans (mặc định) hiển thị đủ.
+
+`notebooks/02_error_analysis.ipynb` (đã execute & commit kèm output, 9 cell): in danh sách
+báo cáo, metrics tổng, bảng theo độ dài / top lỗi / cặp thay thế, và hiển thị 3 hình inline.
+Notebook tự thêm `src/` vào `sys.path` và chịu được trường hợp `reports/` rỗng (in cảnh báo).
+
+### Số liệu thực đo (ckpt crnn chưa train, US+vn 236 mẫu)
+
+`acc=0.0000 CER=1.1203`, 12 top lỗi, 15 cặp thay thế; 3 hình PNG (~27–74 KB).
+
+### `tests/test_error_analysis.py` (7 test, offline)
+
+`discover`/`load`; `by_length` chia bucket đúng (acc 0.0 bucket 3–9 vì cả 2 sai);
+`top_errors` sort + lọc mẫu đúng; `char_confusions` đếm đúng (`A→X` = 2); `analyze` sinh
+đủ 3 file `err_*.png`; thư mục rỗng → `{"n":0,...}`; CLI `--help` exit 0.
