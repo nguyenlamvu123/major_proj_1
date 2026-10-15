@@ -22,7 +22,7 @@ major_proj_1/
 ├── configs/                # charset + hydra experiment configs
 │   ├── charset_vi.yaml     # bảng ký tự VN (tự sinh từ src/trademark_ocr/charset.py)
 │   └── hydra/              # config huấn luyện (crnn/trba/parseq/svtrctc)
-├── scripts/                # pipeline shell (01..08) + Colab helper
+├── scripts/                # pipeline shell (01→06) + Colab helper
 ├── notebooks/              # EDA, error analysis
 ├── docs/colab/             # notebook/cell Colab copy-paste
 ├── tests/                  # pytest

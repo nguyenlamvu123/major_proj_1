@@ -920,6 +920,16 @@ Notebook tự thêm `src/` vào `sys.path` và chịu được trường hợp `
 `demo_images/demo_us.png` + `demo_images/demo_vn.png` (ảnh mẫu commit sẵn) để lệnh
 ACCEPTANCE `--image demo_images/*.png` chạy ngay.
 
+### `scripts/06_eval.sh` (đánh giá end-to-end)
+
+Tiện ích: với mỗi model có checkpoint trong `$DATA_ROOT/runs/<model>/*/checkpoints/last.ckpt`
+→ `evaluate` trên `test_us` + `test_vn` → `eval_domain_shift` → `error_analysis` →
+`report`. Cờ: `--only crnn,trba`, `--limit N`, `--device`, `--batch-size`, `--num-workers`
+(mặc định CPU + limit 0). Cần `PYTHONPATH=src:third_party/parseq` (script tự export).
+
+    bash scripts/06_eval.sh --only crnn --limit 32 --batch-size 8 --num-workers 0
+
+
 ### Số liệu thực đo
 
 `demo_app --help` → `CLI_OK`; `--ckpt <parseq> --image demo_images/*.png` chạy (ckpt chưa
