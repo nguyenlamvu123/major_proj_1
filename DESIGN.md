@@ -740,3 +740,47 @@ Thiếu nó ⇒ Lightning báo *"No `training_step()` method defined"*. → `SVT
 `isinstance(CTCSystem)` + `blank_id` khớp; forward shape `(2, 64, >217)`; `seq_len ≥ max_label_length`;
 loss hữu hạn `≥0`, `numel==N`; decode ký tự thuộc charset; số tham số trong khoảng hợp lý;
 `training_step` có trên class; và **test overfit** (`SVTRNet` + AdamW 40 step → loss giảm > 30%).
+
+## Nhánh 10-eval-metrics — `src/trademark_ocr/metrics.py` + `evaluate.py`
+
+### Metric (`metrics.py`) — thuần Python, không phụ thuộc ngoài
+
+| Metric | Công thức |
+|---|---|
+| `accuracy` | tỉ lệ `pred == gt` (phân biệt hoa/thường & dấu) |
+| `ned` | trung bình `levenshtein(pred, gt) / max(\|pred\|, \|gt\|)` (chuẩn ICDAR) |
+| `one_minus_ned` | `1 − ned` |
+| `cer` | mức corpus: `Σ edit / Σ \|gt\|` |
+| `char_accuracy` | `1 − cer` |
+
+`edit_distance` viết tay (DP 2 hàng) → **không cần `python-Levenshtein`** (chạy offline/Colab).
+Hàm: `evaluate_metrics(preds, gts) -> dict`, `per_sample(pred, gt) -> dict` (khớp
+`REPORT_COLUMNS = idx, pred, gt, correct, ned, char_err, pred_len, gt_len`), `format_summary`.
+⚠️ CER **không bị chặn** ở 1 → `char_accuracy` có thể **âm** khi model chưa train
+(pred dài hơn gt). Đúng về toán, đã thấy thực tế (`char_acc=-0.13` với ckpt 2 batch).
+
+### `evaluate.py`
+
+| Hàm | Việc |
+|---|---|
+| `lmdb_dir(root, subset)` | `val → lmdb/val`, `test_* → lmdb/test/<subset>` |
+| `load_model(ckpt, device)` | parseq `_get_model_class(...).load_from_checkpoint` (crnn/trba/parseq/...) hoặc fallback `SVTRCTC.load_from_checkpoint` (model tự viết) |
+| `build_loader(subset, ...)` | `LmdbDataset` + `SceneTextDataModule.get_transform((32,128), augment=False)` (không augment, có tensor) |
+| `iter_predictions` | `model(images) → softmax → tokenizer.decode → charset_adapter(pred)` (giống parseq `_eval_step`) |
+| `run(...)` | ghi CSV từng mẫu + `<out>.summary.json`, in `format_summary` |
+
+Chuẩn tên báo cáo: `reports/<model>_<domain>.csv` (`crnn_us.csv`, `crnn_vn.csv`, ...) —
+nhánh 12 ghép cặp theo `<model>`. `reports/*.csv|*.json` đã **gitignore**.
+
+### Số liệu thực đo (ckpt crnn mới train 2 batch → cố ý kém)
+
+`--ckpt .../crnn/.../last.ckpt --subset test_us --out reports/crnn_us.csv` →
+`n=200 acc=0.0000 1-NED=0.0233 char_acc=-0.1266 CER=1.1266`; CSV có đủ cột
+`idx,pred,gt,correct,ned,char_err,pred_len,gt_len`. `--help` trả exit 0.
+
+### `tests/test_metrics.py` (19 test)
+
+`edit_distance` 10 ví dụ kinh điển (kể cả `kitten/sitting=3`, `ĐÔNG Á/DONG A=3`, đối xứng);
+`ned`/`cer` canonical; aggregate (perfect, known values, rỗng, lệch độ dài → `ValueError`);
+`per_sample` khớp cột; CLI `--help` exit 0; mapping `lmdb_dir`; và **end-to-end trên LMDB
+thật** (val, 32 mẫu) → CSV đúng cột.
