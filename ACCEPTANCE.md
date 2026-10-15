@@ -146,6 +146,14 @@ pytest tests/test_svtr.py -q
 ```
 **Pass khi**: test forward shape `(N, L, C)` đúng, dry-run OK.
 
+> **Đã nghiệm thu**: `SVTRCTC` = **2.330.042** tham số, `seq_len=64 ≥ 25`, dry-run loss 35.25,
+> `[dry-run] OK`; 9 test pass (gồm test overfit: loss giảm >30%). Smoke train 2 batch CPU
+> **exit 0** → `runs/svtrctc/<ts>/checkpoints/last.ckpt`.
+>
+> - Đây là bản **tự viết** (SVTR-Lite) đóng vai `CTCSystem` → dùng chung metric/decode của parseq.
+> - `SVTRCTC` phải tự có `training_step` (CTCSystem không có) — nếu thiếu, Lightning báo
+>   "No `training_step()` method defined".
+
 ## 10-eval-metrics — metrics + evaluate
 
 ```bash

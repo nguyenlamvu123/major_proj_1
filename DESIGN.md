@@ -698,3 +698,45 @@ Lưu ý kỹ thuật: `tokenizer.decode` trả `(preds, probs)` với `probs` l�
 ⚠️ **OOM với `--batch-size 64` trên máy 7.6 GB RAM** (exit 137, bị OOM-killer).
 - Local smoke: luôn kèm `--batch-size 8 --num-workers 0` (worker copy thêm RAM).
 - Colab (T4, ~12 GB): batch 64 bình thường; nếu OOM → hạ `model.batch_size`.
+
+## Nhánh 09-train-svtrv2 — SVTR-CTC tự viết (`src/trademark_ocr/svtr_ctc.py`)
+
+Model so sánh **thứ 4** — cài đặt như `strhub.models.base.CTCSystem` (không sửa parseq)
+nên dùng lại y nguyên vòng train/eval/metric + decode CTC của parseq.
+
+### Kiến trúc `SVTRNet` (bản "SVTR-Lite" tự viết)
+
+| Thành phần | Chi tiết |
+|---|---|
+| `PatchEmbed` | 2× `Conv3×3 s2 + BN + GELU` → giảm 4× (từ `[32,128]` → `8×32`) |
+| `MixingBlock` | `LayerNorm → LocalMixing (depthwise conv 3×3) + GlobalMixing (MultiheadAttention) → LayerNorm → MLP`, có residual + DropPath |
+| `Merging` | `Conv3×3 s2 + BN` → giảm 2× (→ `4×16`) |
+| Head | `LayerNorm → Linear(dim, num_classes)` theo từng vị trí (CTC) |
+
+Cấu hình: `embed_dim=192`, `depths=[2,2]`, `num_heads=6`, `mlp_ratio=4`,
+`drop_path_rate=0.1`, `num_classes = len(tokenizer) = 218`.
+
+**Bất biến sống còn của CTC**: số timestep `L` phải `≥ max_label_length` (25). Với
+`img_size=[32,128]` ⇒ `L = 4×16 = 64`. Class **tự kiểm tra** lúc `__init__` bằng 1 forward
+dummy và `assert L >= max_label_length` (báo lỗi rõ nếu vi phạm), đồng thời lưu `self.seq_len`.
+
+### Bẫy đã bắt được
+
+`CTCSystem`/`BaseSystem` **không** định nghĩa `training_step` (CRNN và TRBA tự khai báo).
+Thiếu nó ⇒ Lightning báo *"No `training_step()` method defined"*. → `SVTRCTC.training_step`
+được viết giống CRNN: `loss = forward_logits_loss(images, labels)[1]; self.log('loss', loss)`.
+
+### Số liệu thực đo
+
+| | |
+|---|---|
+| Tham số | **2 330 042** (~2.3 M — nhẹ hơn CRNN 8.4 M) |
+| `seq_len` | 64 |
+| dry-run loss (16 ảnh, eval) | 35.25, grad OK, decode trả ký tự trong charset |
+| smoke train 2 batch CPU | **exit 0**, peak RSS 1.21 GB, ~18 s → `runs/svtrctc/<ts>/checkpoints/last.ckpt` |
+
+### `tests/test_svtr.py` (9 test)
+
+`isinstance(CTCSystem)` + `blank_id` khớp; forward shape `(2, 64, >217)`; `seq_len ≥ max_label_length`;
+loss hữu hạn `≥0`, `numel==N`; decode ký tự thuộc charset; số tham số trong khoảng hợp lý;
+`training_step` có trên class; và **test overfit** (`SVTRNet` + AdamW 40 step → loss giảm > 30%).
