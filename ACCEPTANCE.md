@@ -181,6 +181,13 @@ python -m trademark_ocr.fetch_vn --verify
 ```
 **Pass khi**: ≥95% ảnh mở được, `processed/test_vn.txt` ≥ 48/50 dòng, label NFC.
 
+> **Đã nghiệm thu**: `bash scripts/03_get_vn.sh --limit 50` → 50 nhãn, `--verify` báo
+> **50/50 ảnh mở được (100%)**, `all NFC: True`. `build_lmdb --subset test_vn` → 50 mẫu.
+> - Nguồn là WIPO Publish (Wicket) → `verify=False`; form id **đổi theo phiên** nên được
+>   parse tự động (không hard-code).
+> - `--limit N` lấy đúng N nhãn *có chữ + có ảnh* (bỏ qua nhãn chỉ có hình).
+> - `processed/test_vn.txt` mỗi dòng 1 nhãn (dấu tiếng Việt giữ nguyên, NFC).
+
 ## 12-eval_domain_shift — bảng sụt giảm US→VN
 
 ```bash
