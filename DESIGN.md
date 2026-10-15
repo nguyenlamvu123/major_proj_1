@@ -250,3 +250,126 @@ resolve được thì file phải nằm trong `<search_path>/charset/` (xem §8)
 **Test** (`tests/test_charset.py`, 13 test): unique/deterministic, NFC ổn định,
 đủ chữ Việt, roundtrip encode↔decode trên câu có dấu, CTC best-path decode
 (gộp lặp + bỏ blank), nội dung yaml sinh ra, thống kê hợp lý.
+
+## Nhánh 02-fetch-uspto-meta — `src/trademark_ocr/fetch_meta.py`
+
+**Trách nhiệm**: thu thập **metadata** (nhãn chữ, serial, ngày công bố, loại hình,
+class, chủ sở hữu) của các nhãn hiệu Mỹ → `$DATA_ROOT/raw/meta/us_marks.csv`.
+Không tải ảnh (nhánh 03).
+
+### Nguồn dữ liệu (đã dò & kiểm chứng bằng curl, **không cần API key**)
+
+`bulkdata.uspto.gov` **đã bị khai tử** (NXDOMAIN, kể cả khi hỏi DNS 8.8.8.8) và
+`trademarks.reedtech.com` cũng NXDOMAIN → không dùng được. `api.uspto.gov` (Open Data
+Portal) hiện trả `{"message":"Unauthorized"}` — **cần API key**. Nguồn dùng được:
+
+| Nguồn | URL | Ghi chú |
+|---|---|---|
+| **TMOG EOG search** | `GET  https://tm-eog-service.uspto.gov/eog-rest-service/api/external/search/publications` | list 688 issue gazette, 2013-08-13 → nay |
+| | `POST .../api/external/search/all` | body `{publicationDates:[...], offset, limit}`; **limit tối đa 100** (250→rỗng) |
+| | `GET  .../api/external/single-reg/{regNum}` | tra 1 đăng ký |
+| **Ảnh (CDN)** | `https://cdn.uspto.gov/img/{seriaNum}/{publicationDate}/{size}` | `size ∈ {px160x130, px300x200, original}`; ảnh có từ ~2014 trở đi (2013-08-13 → 404) |
+| **Gazette gốc (backup)** | GCS bucket `tmogdocs` **public-read + listable**: `https://www.googleapis.com/storage/v1/b/tmogdocs/o?prefix=TMOGIssue_` | file `TMOGIssue_YYYYMMDD_entire.{xml,pdf,zip}` (XML ~80–105 MB/issue) |
+
+> ⚠️ Vì sao phải đi qua REST API thay vì tải XML gazette: XML 80–105 MB/issue quá nặng
+> cho mục đích metadata; API phân trang cho đúng trường cần, nhẹ hơn ~1000×.
+
+### Schema EOG đổi theo thời kỳ (đã kiểm chứng)
+
+- **2013–2014**: KHÔNG có `markDrawingTypeCode`/`markDrawingTypeDesc`/`goodsServices`;
+  class nằm ở `gsUsClasses`. Có thêm `docket_no`.
+- **2015+**: có `markDrawingTypeCode` + `markDrawingTypeDesc` + `goodsServices` (list
+  `{classNum,classType,description}`).
+- `markText` thường **có space thừa cuối** (`'GYV '`) → luôn strip + gộp space + NFC.
+- ⇒ Mọi truy cập field dùng `.get()`; `_get_classes()` hợp nhất 2 schema.
+
+### Mã "mark drawing" (USPTO) & cách phân loại
+
+`1` typeset (cũ) · `2` design-only (không chữ) · `3` design có chữ · `4` standard
+character (chữ đánh máy) · `5` chữ cách điệu · `6` không có hình (âm thanh…).
+`classify_drawing()` → `typeset_old / design_only / design_with_words /
+standard_character / stylized_words / no_drawing / unknown / other`.
+Mặc định giữ mã **{1,3,4,5}** (`WORD_BEARING_CODES`), loại {2,6}.
+⚠️ Với task STR ta quan tâm nhất `3` + `5` (chữ cách điệu thật); `4` là ảnh chữ
+"đánh máy" (dễ); `2` không có nhãn.
+
+### Cột CSV đầu ra (`CSV_COLUMNS`, 18 cột)
+
+ACCEPTANCE nhánh 02 yêu cầu tối thiểu **`serial_number, word_mark, image_status`**
+(3 cột đầu); phần còn lại phục vụ các nhánh sau:
+
+| Cột | Ý nghĩa |
+|---|---|
+| `serial_number` | số đơn (8 chữ số, khoá join) |
+| `word_mark` | nhãn chữ đã NFC + gộp space + strip (**có thể rỗng → bị lọc bỏ**) |
+| `image_status` | `pending` khi mới lấy; nhánh 03 đổi thành `ok`/`missing` |
+| `mark_drawing_cd`,`drawing_kind` | mã & nhãn loại hình |
+| `mark_type` | `TRDMK`/`SRVCK`/… |
+| `publication_date`,`publication_id` | issue gazette (dùng cho URL ảnh) |
+| `reg_number`,`filing_date`,`registration_date` | số đăng ký, ngày nộp/đăng ký |
+| `owner`,`us_class`,`intl_class`,`filing_basis`,`pub_reason` | ngữ cảnh (report/EDA) |
+| `image_url` | URL ảnh CDN (`.../original`) |
+| `source` | `tmog` |
+
+### Hàm chính
+
+| Hàm | Vào | Ra |
+|---|---|---|
+| `fetch_publications(session, timeout, endpoint)` | – | `list[dict]` (mới nhất trước) |
+| `iter_issue(session, date, page_size=100, per_issue_limit, sleep)` | – | generator bản ghi thô (phân trang `offset`) |
+| `normalize(rec, pub_date, publication_id)` | bản ghi thô | dict phẳng đúng `CSV_COLUMNS` |
+| `classify_drawing(code)` | mã | nhãn loại hình |
+| `image_url(serial, pub_date, size="original")` | – | URL ảnh CDN |
+| `is_candidate(row, charset, min_len, max_len, allowed_codes)` | dòng | `(ok, reason)` |
+| `select_publications(pubs, since, until, max_issues)` | – | list issue đã lọc/sắp |
+| `run(out, ...)` | – | ghi CSV + `.stats.json`, trả stats |
+| `write_csv`, `load_existing_rows` | – | I/O (atomic tmp→replace) |
+
+`is_candidate` lọc theo thứ tự & lý do rớt: `design_without_word` (mã 2/6) →
+`drawing_excluded` (mã ngoài tập) → `no_text` → `too_short` → `too_long` →
+`unsupported_char` (ký tự ngoài charset VN). ⚠️ Mã rỗng (`""`, thời kỳ 2013–2014)
+**được chấp nhận** nếu có chữ (không có mã để phán).
+
+### CLI & script
+
+```bash
+bash scripts/01_get_meta.sh --limit 5000 --sleep 0.05
+# tương đương:
+python3 -m trademark_ocr.fetch_meta --out $DATA_ROOT/raw/meta/us_marks.csv --limit 5000
+```
+
+Cờ chính: `--limit` (0=∞), `--since/--until` (YYYY-MM-DD), `--max-issues`,
+`--per-issue-limit`, `--page-size` (≤100), `--drawing-codes`, `--min-len/--max-len`,
+`--shuffle --seed` (trộn tất định), `--resume`, `--list-issues`.
+Script dùng `${PYTHON:-$(command -v python3 || command -v python)}` nên chạy được cả
+nơi chỉ có `python3`.
+
+**Ngữ nghĩa `--resume`**: nạp **toàn bộ** CSV cũ vào bộ nhớ, bỏ qua serial đã có, rồi
+ghi lại cả file (atomic) → CSV không mất dòng cũ, không trùng serial.
+Mặc định `resume=False` ⇒ **ghi đè** (idempotent cho ACCEPTANCE smoke).
+
+### File phụ: `us_marks.csv.stats.json`
+
+Lưu `rows, issues_processed, drop_reasons, by_drawing_kind, limit, since, until,
+elapsed_sec` — để nhánh 04/06/12 đọc lại mà không cần chạy lại mạng.
+
+### Số liệu thực đo (2026-10-13)
+
+Một issue ~25.5k bản ghi thô; lấy 5000 dòng trong **41 s** (51 trang × 100).
+Phân bố mẫu 5000 dòng: `standard_character 3414`, `design_with_words 916`,
+`stylized_words 433`, `typeset_old 237`; rớt `too_long 440`, `design_without_word 250`,
+`too_short 56`, `unsupported_char 28`. Ảnh CDN: 4/4 loại trả `200 image/png` (đã spot-check).
+Toàn bộ 688 issue có thể cho vài triệu dòng; ACCEPTANCE chốt mục tiêu thực dụng 50k–150k.
+
+### Nguồn bổ sung (tuỳ chọn, đã dò)
+
+`illeatmyhat/uspto-trademarks` trên HuggingFace = **USPTO Trademark Case Files**
+(14.347.764 đơn, 1870→2026-09-30, parquet, có `serial_no`, `mark_id_char`, `filing_dt`,
+lookups `drawing_codes.csv`...). Truy vấn không cần tải: DuckDB + `hf://datasets/...`.
+Dùng để **mở rộng phủ lịch sử** hoặc tra thêm trạng thái khi cần (không bắt buộc trong
+pipeline vì ảnh trước ~2014 không có trên CDN).
+
+**Test** (`tests/test_fetch_meta.py`, 22 test, offline bằng `FakeSession`): chuẩn hoá 2
+thời kỳ schema, không ném lỗi khi thiếu field, mapping mã drawing, mọi nhánh lý do rớt,
+phân trang/`per_issue_limit`/issue rỗng, lọc issue, `run()` end-to-end (CSV+stats,
+limit, resume, shuffle tất định).

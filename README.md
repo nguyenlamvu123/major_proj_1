@@ -51,6 +51,7 @@ pytest -q
   `export DATA_ROOT=/media/zaibachkhoa/AC84-F995/trademark_data`
   Trên Colab: `DATA_ROOT=/content/drive/MyDrive/trademark_data` (mount Drive).
 - Metadata USPTO (text): `scripts/01_get_meta.sh` → `$DATA_ROOT/raw/meta/`
+  (nguồn TMOG / EOG REST API công khai, **không cần API key** — chi tiết DESIGN.md nhánh 02)
 - Ảnh USPTO: `scripts/02_get_images.sh` → `$DATA_ROOT/raw/images_us/`
 - (Hoặc tải bằng Colab: `docs/colab/01_download_data.ipynb`)
 

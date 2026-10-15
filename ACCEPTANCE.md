@@ -40,12 +40,14 @@ có `charset_train == charset_test` (217 ký tự).
 ## 02-fetch-uspto-meta — metadata wordmark US
 
 ```bash
-bash scripts/01_get_meta.sh --limit 5000        # smoke: 5k dòng
+bash scripts/01_get_meta.sh --limit 5000        # smoke: 5k dòng (~40s, cần mạng)
 wc -l $DATA_ROOT/raw/meta/us_marks.csv          # ≥ 5000 (khi chạy đủ: 50k–150k)
 head -3 $DATA_ROOT/raw/meta/us_marks.csv
 ```
 **Pass khi**: CSV có đủ cột `serial_number,word_mark,image_status`(tên cột chi tiết
 xem DESIGN.md nhánh 02), không có dòng rỗng label.
+> `wc -l` gồm 1 dòng header nên in ra `5001`. Nguồn: USPTO TMOG (EOG REST API), không
+> cần API key; thống kê phụ ở `$DATA_ROOT/raw/meta/us_marks.csv.stats.json`.
 
 ## 03-fetch-uspto-images — ảnh USPTO
 
@@ -159,6 +161,8 @@ python -m trademark_ocr.report --reports reports/ --out reports/final_summary.md
 ---
 
 ## Ghi chú chung
+- Nếu máy không có lệnh `python` (chỉ có `python3`): thay `python` → `python3` trong
+  các lệnh dưới (script trong `scripts/` đã tự dò `python3`/`python`).
 - `<ckpt>`: đường dẫn checkpoint trong `$DATA_ROOT/runs/...` (Colab tải về Drive).
 - Nếu thiếu data thật ở bước smoke → chạy `scripts/01..04` trước,
   hoặc dùng data giả đã tạo trong `tests/fixtures` (pytest tự tạo).
