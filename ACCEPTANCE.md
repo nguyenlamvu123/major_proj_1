@@ -165,6 +165,14 @@ python -m trademark_ocr.evaluate --ckpt runs/crnn/.../last.ckpt --subset test_us
 **Pass khi**: `test_metrics.py` pass (Acc/1−NED/char-acc đúng ví dụ chuẩn),
 `CLI_OK` in ra; chạy thật sinh CSV có cột `pred,gt,correct,ned`.
 
+> **Đã nghiệm thu**: 19 test pass (gồm ví dụ chuẩn `kitten→sitting=3`, `ĐÔNG Á→DONG A=3`,
+> và chạy thật trên `lmdb/val`). `CLI_OK` in ra. Chạy với ckpt crnn (mới 2 batch) →
+> `n=200 acc=0.0000 1-NED=0.0233 char_acc=-0.1266 CER=1.1266`, CSV có
+> `idx,pred,gt,correct,ned,char_err,pred_len,gt_len`.
+> - Không cần `python-Levenshtein` (edit distance viết tay).
+> - Đặt tên báo cáo `reports/<model>_<domain>.csv` để nhánh 12 ghép cặp US↔VN.
+> - `char_accuracy` có thể âm với model chưa train (CER > 1) — đúng về toán.
+
 ## 11-fetch-vn — nhãn hiệu Việt Nam
 
 ```bash
