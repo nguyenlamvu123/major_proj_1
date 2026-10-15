@@ -52,11 +52,13 @@ xem DESIGN.md nhánh 02), không có dòng rỗng label.
 ## 03-fetch-uspto-images — ảnh USPTO
 
 ```bash
-bash scripts/02_get_images.sh --limit 200       # smoke 200 ảnh
+bash scripts/02_get_images.sh --limit 200       # smoke 200 ảnh (~20s)
 python -m trademark_ocr.fetch_images --verify --limit 200
 ```
 **Pass khi**: ≥ 95% ảnh trong index mở được bằng PIL; chạy lại lệnh → **không tải lại**
 (resume, `downloaded: 0 new`).
+> Ảnh lưu ở `$DATA_ROOT/raw/images_us/{serial}.png`, sổ đăng ký `.../index.csv`.
+> Nguồn: CDN công khai USPTO (không cần API key).
 
 ## 04-clean-label — lọc & chuẩn hoá
 
