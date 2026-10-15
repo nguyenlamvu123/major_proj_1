@@ -126,8 +126,17 @@ file `runs/crnn/**/last.ckpt` được tạo (hoặc dry-run báo OK nếu `--dr
 ```bash
 python -m trademark_ocr.train_utils --config tm_trba  --dry-run
 python -m trademark_ocr.train_utils --config tm_parseq --dry-run
+pytest tests/test_forward.py -q
 ```
-**Pass khi**: 2 lệnh trên in `DRY-RUN OK` (compose config + instantiate model + 1 forward).
+**Pass khi**: 2 lệnh trên in `[dry-run] OK` (compose config + instantiate model + 1 forward),
+`test_forward.py` pass (shape `(N,L,C)`, loss ≥ 0, ký tự decode nằm trong charset).
+
+> **Đã nghiệm thu**: `tm_trba` = 49.883.236 tham số (loss 5.39), `tm_parseq` = 23.927.258
+> (loss 5.45); 11 test forward pass. Smoke train 2 batch CPU **exit 0** cho cả 3 model
+> → `runs/{crnn,trba,parseq}/<ts>/checkpoints/last.ckpt`.
+>
+> ⚠️ Local (7.6 GB RAM): smoke phải kèm `--batch-size 8 --num-workers 0`; **batch 64 bị
+> OOM-kill (exit 137)**. Colab batch 64 OK (nếu OOM → hạ `model.batch_size`).
 
 ## 09-train-svtrv2 — SVTR-CTC
 
