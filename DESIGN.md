@@ -836,3 +836,28 @@ fixture (3 hàng, id/word_mark/afnb/image_url); `next_url`; `usable` lọc ảnh
 `to_label` NFC (`A\u0301`→`Á`); `write_outputs` (đúng cột split, txt khớp, report);
 `verify_images` (3 ảnh + 1 file hỏng → ratio 0.75); CLI `--help` exit 0.
 ⚠️ `.gitignore`: `data/` khớp `tests/data/` → đã thêm `!tests/data/**`.
+
+## 12-eval_domain_shift — bảng sụt giảm US→VN
+
+`src/trademark_ocr/eval_domain_shift.py` đọc `reports/<model>_<domain>.csv`
+(do nhánh 10 ghi; `domain ∈ {us, vn}`), ghép theo `<model>` và tính
+``delta = acc_vn − acc_us`` (**âm = sụt độ chính xác**). Độ chính xác lấy từ cột
+``correct``; nếu thiếu thì suy từ ``pred == gt``.
+
+`discover(dir)` → `{model: {domain: path}}` (bỏ `domain_shift.csv`, `*.summary.json`,
+file lạ). `read_accuracy(path) -> (acc, n)`. `build_rows(dir)` bỏ model thiếu 1 domain.
+`run(reports_dir, out_path)` ghi CSV cột `model,acc_us,acc_vn,delta,n_us,n_vn`, **sort
+theo delta tăng dần** (sụt nặng nhất lên đầu).
+
+### Số liệu thực đo (ckpt crnn chưa train)
+
+`crnn` trên `test_us` (n=200, acc 0) và `test_vn` (n=36, acc 0) → `delta=0.0`.
+⚠️ **test_vn: LMDB 50 mẫu nhưng chỉ 36 vào được dataloader** — vì nhãn VN dài hơn
+(mean 19.58 ký tự; vd `KP-Food TINH HOA TỪ BIỂN - TRỌN VỊ QUÊ HƯƠNG` = 45) nên bị
+`max_label_length=25` lọc. Đây là tín hiệu domain shift thật (VN = nhãn dài + có dấu).
+
+### `tests/test_domain_shift.py` (7 test, offline)
+
+`read_accuracy` (ưu tiên `correct`, fallback `pred/gt`); `discover` bỏ file lạ/`*.json`/
+`domain_shift.csv`; `build_rows` tính delta + bỏ model thiếu domain; `run` ghi đủ cột +
+sort; mọi report rỗng → chỉ header; CLI `--help` exit 0.
