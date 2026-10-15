@@ -668,3 +668,33 @@ Smoke `bash scripts/05_train.sh crnn --limit-train-batches 2 --max-epochs 1 --ac
 `$DATA_ROOT/runs/crnn/<ts>/checkpoints/{last.ckpt, epoch=...-val_accuracy=...ckpt}`
 (+ `config/config.yaml`, `events.out.tfevents.*`, `train.log`). TB scalars đọc được:
 `loss, val_loss, val_accuracy, val_NED, hp_metric`.
+
+## Nhánh 08-train-parseq — TRBA + PARSeq
+
+Config `tm_trba` / `tm_parseq` đã có từ nhánh 07; nhánh này **nghiệm thu** và khoá lại
+bằng test forward thật.
+
+### `tests/test_forward.py` (11 test)
+
+Parametrize theo `tm_crnn`, `tm_trba`, `tm_parseq` (model dựng 1 lần, `scope=module`,
+`model.batch_size=2`):
+
+| Test | Kiểm |
+|---|---|
+| `test_forward_logits_shape` | `(N, L, 3)` với `N=2`, `C > len(CHARSET_VI)` |
+| `test_loss_non_negative` | `forward_logits_loss` hữu hạn, `≥ 0`, `numel > 0` |
+| `test_decode_returns_labels_in_charset` | ký tự decode **thuộc** `CHARSET_VI`; xác suất ∈ [0,1] |
+| `test_decode_length_bounded_by_timesteps` | `len(pred) ≤ L` (số timestep của logits) |
+
+Lưu ý kỹ thuật: `tokenizer.decode` trả `(preds, probs)` với `probs` là **list tensor** (không phải tensor).
+
+### Smoke train thật trên CPU (2 batch)
+
+| model | lệnh thêm | kết quả | peak RSS |
+|---|---|---|---|
+| `trba` | `--batch-size 8 --num-workers 0` | exit 0, `runs/trba/<ts>/checkpoints/last.ckpt` | 2.88 GB |
+| `parseq` | `--batch-size 8 --num-workers 0` | exit 0, `runs/parseq/...` | 2.28 GB |
+
+⚠️ **OOM với `--batch-size 64` trên máy 7.6 GB RAM** (exit 137, bị OOM-killer).
+- Local smoke: luôn kèm `--batch-size 8 --num-workers 0` (worker copy thêm RAM).
+- Colab (T4, ~12 GB): batch 64 bình thường; nếu OOM → hạ `model.batch_size`.
