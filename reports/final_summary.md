@@ -1,13 +1,13 @@
 # Tổng hợp kết quả — nhận dạng chữ nhãn hiệu
 
-_Sinh lúc: 2026-10-15 18:41 UTC_
+_Sinh lúc: 2026-10-15 18:46 UTC_
 
 ## Bảng tổng hợp (model × dataset)
 
 | model | dataset | n | accuracy | 1−NED | char-accuracy |
 |---|---|---|---|---|---|
-| crnn | US | 200 | 0.0000 | 0.0233 | -0.1266 |
-| crnn | VN | 36 | 0.0000 | 0.0295 | -0.0862 |
+| crnn | US | 200 | 0.0000 | 0.0009 | -0.2330 |
+| crnn | VN | 36 | 0.0000 | 0.0115 | -0.1906 |
 
 ## Sụt giảm US → VN (domain shift)
 
