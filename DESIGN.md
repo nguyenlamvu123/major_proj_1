@@ -893,3 +893,42 @@ Notebook tự thêm `src/` vào `sys.path` và chịu được trường hợp `
 `discover`/`load`; `by_length` chia bucket đúng (acc 0.0 bucket 3–9 vì cả 2 sai);
 `top_errors` sort + lọc mẫu đúng; `char_confusions` đếm đúng (`A→X` = 2); `analyze` sinh
 đủ 3 file `err_*.png`; thư mục rỗng → `{"n":0,...}`; CLI `--help` exit 0.
+
+## 14-demo-report — demo + báo cáo tổng hợp
+
+### `demo_app.py` (suy luận ảnh → chữ)
+
+| Hàm | Việc |
+|---|---|
+| `load_transform(img_size=(32,128))` | transform như lúc train (`SceneTextDataModule.get_transform`, không augment) |
+| `preprocess(paths)` | list ảnh → tensor `(B,3,H,W)` |
+| `decode_predictions(model, logits)` | softmax → `tokenizer.decode` → `charset_adapter` → `[(pred, conf)]` |
+| `predict(model, paths, device)` | `model.eval()` + `inference_mode` → `[{image,pred,confidence}]` |
+| `run(...)` | nạp ckpt (dùng lại `evaluate.load_model`) rồi `predict` + in kết quả |
+| `build_interface(model)` | Gradio `Interface` (`--serve`, `--share`) |
+
+`--help` chạy được **không cần ckpt**; thiếu `--ckpt`/`--image` thì in hướng dẫn (`SystemExit`).
+
+### `report.py` (báo cáo markdown)
+
+`collect(reports_dir)` tính lại metric từ `pred/gt` (không tin cột sẵn) cho mọi
+`<model>_<domain>.csv`; `read_shift()` đọc `domain_shift.csv`; `list_figures()` gom
+`fig_*.png` + `err_*.png`; `render_markdown()` tạo 3 mục: **bảng model × dataset**
+(n, accuracy, 1−NED, char-accuracy), **bảng sụt giảm US→VN**, **danh sách hình**.
+`run()` ghi `reports/final_summary.md`. ⚠️ đã sửa lỗi thiếu `import sys` ở `__main__`.
+
+`demo_images/demo_us.png` + `demo_images/demo_vn.png` (ảnh mẫu commit sẵn) để lệnh
+ACCEPTANCE `--image demo_images/*.png` chạy ngay.
+
+### Số liệu thực đo
+
+`demo_app --help` → `CLI_OK`; `--ckpt <parseq> --image demo_images/*.png` chạy (ckpt chưa
+train → chuỗi rác, đúng như dự kiến). `report` → `final_summary.md` có bảng
+`crnn | US | 200 | 0.0000 | 0.0233 | -0.1266` và `crnn | VN | 36 | ...`.
+
+### `tests/test_demo_report.py` (8 test, offline)
+
+`demo_app`: `--help` exit 0; `predict` với **stub model** (2 ảnh PNG thật qua PIL);
+`run` thiếu ckpt/ảnh → `SystemExit`; `run` với stub in ra dự đoán.
+`report`: `collect`+`render` (đúng bảng, US/VN, dòng shift), thư mục rỗng vẫn ghi md
+(có câu "Chưa có báo cáo nào"), liệt kê `fig_*`/`err_*` (bỏ `.txt`), CLI `--help` exit 0.

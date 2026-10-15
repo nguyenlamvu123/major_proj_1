@@ -224,6 +224,12 @@ python -m trademark_ocr.report --reports reports/ --out reports/final_summary.md
 ```
 **Pass khi**: `CLI_OK`; `reports/final_summary.md` sinh ra (có bảng tổng hợp model × dataset).
 
+> **Đã nghiệm thu**: 8 test pass (stub model, offline). `--help` → `CLI_OK`;
+> `--ckpt <parseq> --image demo_images/*.png` chạy OK (ckpt chưa train → chuỗi rác, đúng dự kiến);
+> `report` → `final_summary.md` có bảng `model × dataset` + bảng US→VN + danh sách hình.
+> - `demo_images/` đã commit 2 ảnh mẫu (`demo_us.png`, `demo_vn.png`).
+> - Demo không cần GPU (`--device cpu` mặc định); `--serve` mở Gradio nếu muốn.
+
 ---
 
 ## Ghi chú chung
