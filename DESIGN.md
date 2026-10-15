@@ -373,3 +373,76 @@ pipeline vì ảnh trước ~2014 không có trên CDN).
 thời kỳ schema, không ném lỗi khi thiếu field, mapping mã drawing, mọi nhánh lý do rớt,
 phân trang/`per_issue_limit`/issue rỗng, lọc issue, `run()` end-to-end (CSV+stats,
 limit, resume, shuffle tất định).
+
+## Nhánh 03-fetch-uspto-images — `src/trademark_ocr/fetch_images.py`
+
+**Trách nhiệm**: tải ảnh nhãn hiệu về đĩa theo cột ``image_url`` của nhánh 02, có
+**resume**, **song song**, **kiểm tra ảnh bằng PIL**, và cập nhật trạng thái ảnh.
+
+### Nguồn & phạm vi
+
+URL ảnh: ``https://cdn.uspto.gov/img/{serial}/{publicationDate}/{size}`` — **công khai,
+không API key**; ảnh có từ ~2014 (2013-08-13 → 404). ``size`` mặc định ``original``;
+``--size px300x200|px160x130`` dùng bản nhỏ (URL đổi hậu tố cuối, tên file thêm hậu tố
+``__{size}.png`` để không ghi đè bản gốc).
+
+### Đầu ra
+
+| File | Nội dung |
+|---|---|
+| ``$DATA_ROOT/raw/images_us/{serial}.png`` | ảnh (bản ``original``) |
+| ``$DATA_ROOT/raw/images_us/index.csv`` | **sổ đăng ký ảnh** (nguồn sự thật) |
+| ``$DATA_ROOT/raw/images_us/index.csv.stats.json`` | thống kê lần chạy |
+| ``$DATA_ROOT/raw/meta/us_marks.csv`` | cột ``image_status`` đổi ``pending``→``ok``/``missing`` |
+
+`index.csv` (14 cột): `serial_number, file_name, word_mark, mark_drawing_cd,
+drawing_kind, publication_date, status, http_status, width, height, bytes, sha1,
+reason, url`. `status ∈ {ok, missing}`; `reason` ghi mã lỗi
+(`http_404`, `too_small`, `not_image:…`, `corrupt:…`, `error:…`).
+
+### Hàm chính
+
+| Hàm | Vào | Ra |
+|---|---|---|
+| `probe_image(path)` | – | `(ok, w, h, reason)` (PIL `verify()` + mở lại lấy size) |
+| `sha1_file(path)` | – | hex sha1 |
+| `download_one(url, dest, session, timeout, retries, backoff, min_bytes)` | – | dict trạng thái; ghi tmp→replace; **không ném lỗi** |
+| `read_index / write_index` | – | đọc/ghi index (atomic) |
+| `update_meta_status(meta_path, status_by_serial)` | map serial→status | số dòng đổi |
+| `run(..., limit, workers, size, retry_missing, update_meta, fetch_fn)` | – | ghi ảnh + index + stats |
+| `verify(index_path, img_dir, limit, min_ratio=0.95)` | – | `{total, ok, broken, ratio, verdict}` |
+
+**Đặc tính kỹ thuật**:
+- Session **thread-local** (`requests.Session` không thread-safe); tải bằng
+  `ThreadPoolExecutor(max_workers=workers)`.
+- `download_one` coi ảnh không hợp lệ nếu: HTTP≠200, ``< MIN_BYTES`` (100 B), Content-Type
+  không chứa ``image``, hoặc PIL không mở/verify được → xoá file ``.part``.
+- **Resume**: serial đã ``status=ok`` + file tồn tại → bỏ qua; serial từng lỗi chỉ tải lại
+  khi bật ``--retry-missing``.
+- ``--verify`` mở lại ảnh đã tải; in ``VERIFY OK``/``VERIFY FAIL`` (ngưỡng ≥95%) và trả
+  **exit code 1** khi FAIL.
+
+### CLI & script
+
+```bash
+bash scripts/02_get_images.sh --limit 200      # smoke 200 ảnh (~20s)
+python3 -m trademark_ocr.fetch_images --verify --limit 200
+python3 -m trademark_ocr.fetch_images --limit 200 --retry-missing --workers 16
+```
+
+### Số liệu thực đo
+
+200 ảnh / **20 s** (workers=8, ~10 ảnh/s), dung lượng 9 MB → trung bình **~45 KB/ảnh**.
+Chạy lại: ``downloaded: 0 new, skipped: 200 existing``. Verify: **200/200 = 100%**.
+
+### Hạn chế
+
+- Không xác nhận được *bằng mắt* nhãn↔ảnh (môi trường agent không đọc ảnh) — dựa trên
+  giả định ảnh CDN gắn với đúng bản ghi gazette; **cần** kiểm tra tự động ở nhánh 06 (EDA:
+  vài mẫu + nhãn) và nhánh 13 (phân tích lỗi).
+- Chỉ có ảnh cho các nhãn đã công bố trong OG (2013+); nhãn cũ hơn không có ảnh CDN.
+
+**Test** (`tests/test_fetch_images.py`, 16 test, offline): probe ảnh hợp lệ/lỗi, các nhánh
+`download_one` (200/404/too_small/not_image/corrupt), `run()` ghi index + cập nhật meta,
+resume không tải lại, ghi nhận `missing` + cờ `--retry-missing`, `--limit`, biến thể
+`--size`, `verify` đạt/không đạt ngưỡng, index rỗng an toàn, `update_meta_status`.
