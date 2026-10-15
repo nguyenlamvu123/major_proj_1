@@ -207,6 +207,46 @@ Checkpoints lưu tại `$DATA_ROOT/runs/<model>/` (Drive) → giữ qua các phi
 
 ## Nhánh 00-init
 - `pyproject.toml`: package `trademark_ocr` (`src/`-layout), pytest `pythonpath = [src, third_party/parseq]` để test import được cả `strhub` mà không cài.
-- `requirements.txt`: pin theo parseq (`pytorch-lightning==2.2.0.post0`, `timm==0.9.16`) để tránh bất tương thích API với code họ; phần còn lại `>=`.
+- `requirements.txt`: ban đầu pin theo parseq (`pytorch-lightning==2.2.0.post0`, `timm==0.9.16`); sau khi kiểm chứng đã nới pin (xem mục "Kiểm chứng môi trường" ngay dưới).
 - `.gitignore`: loại `third_party/`, `*.lmdb`, `runs/`, `*.ckpt` — dữ liệu không bao giờ vào git.
 - `tests/test_smoke.py`: kiểm tra package import được và `strhub` tìm thấy từ `third_party/parseq`.
+
+**Kiểm chứng môi trường (ghi lại để tra cứu)**: torch 2.14.0 + pytorch-lightning 2.6.6 +
+timm 1.0.30 + hydra 1.3.7 → CRNN/TRBA/PARSeq forward OK (cả train-mode teacher forcing
+của TRBA lẫn eval), `Trainer.fit` 1 batch CPU OK. Vì vậy `requirements.txt` đã nới pin
+thành `pytorch-lightning>=2.2,<3`, `timm>=0.9`. Nếu gặp lỗi API lạ, hạ về đúng pin trong
+`third_party/parseq/requirements/{core,train}.txt` (torch 2.2.1, PL 2.2.0, timm 0.9.16).
+
+## Nhánh 01-charset-vi — `src/trademark_ocr/charset.py`
+
+**Trách nhiệm**: định nghĩa bảng ký tự Unicode tiếng Việt (NFC) + tiện ích
+chuẩn hoá/lọc + sinh config hydra. *Không* thay thế tokenizer của parseq; chỉ
+cung cấp **chuỗi charset** mà parseq dùng để build tokenizer.
+
+**Cấu trúc charset (217 ký tự → 218 class CTC)**:
+| Khối | Nguồn | Ghi chú |
+|---|---|---|
+| 10 chữ số | `_DIGITS` | |
+| 26 Latin thường + 26 Latin hoa | `_ASCII_LOWER/UPPER` | giữ cả 2 case (case-sensitive) |
+| 146 chữ Việt (73 lower + 73 hoa) | sinh tự động: 12 nguyên âm (`a ă â e ê i o ô ơ u ư y`) × 6 thanh (`"" \u0301 \u0300 \u0309 \u0303 \u0323`) + `đ` | tổ hợp bằng `unicodedata.normalize('NFC', base+tone)` |
+| 21 dấu câu + space | `_PUNCT = " .,-'’&/()!+*@#%:;=?_"` | ⚠️ KHÔNG gồm `™ © ®` (glyph nhỏ, khó đọc → nhiễu) |
+
+**Hàm chính**:
+| Hàm | Vào | Ra | Ghi chú |
+|---|---|---|---|
+| `build_charset()` | – | `str` | deterministic, loại trùng |
+| `to_nfc(text)` | chuỗi (có thể NFD) | chuỗi NFC | gọi trong mọi khâu nhãn |
+| `collapse_ws(text)` | chuỗi | chuỗi | gộp space, strip |
+| `filter_supported(text, charset)` | chuỗi | chuỗi | bỏ ký tự ngoài charset |
+| `Charset.encode/decode` | – | list id / chuỗi | tham chiếu cho test & EDA (blank id = 0) |
+| `emit_hydra_yaml(path)` | – | `Path` | ghi `configs/hydra/charset/charset_vi.yaml` |
+| `emit_txt(path)` | – | `Path` | ghi `configs/charset_vi.txt` |
+| `stats()` | – | dict | số class, số chữ Việt, NFC-stable… |
+
+**Tại sao `emit_hydra_yaml` nằm ở `configs/hydra/charset/`**: hydra coi mỗi thư mục
+con trong search path là một **config group**; để `defaults: [_self_, charset: charset_vi]`
+resolve được thì file phải nằm trong `<search_path>/charset/` (xem §8).
+
+**Test** (`tests/test_charset.py`, 13 test): unique/deterministic, NFC ổn định,
+đủ chữ Việt, roundtrip encode↔decode trên câu có dấu, CTC best-path decode
+(gộp lặp + bỏ blank), nội dung yaml sinh ra, thống kê hợp lý.
