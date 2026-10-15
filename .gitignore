@@ -1,0 +1,44 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# ---- Virtual env ----
+.venv/
+venv/
+env/
+
+# ---- Third-party (clone, not committed) ----
+third_party/
+
+# ---- Data & artifacts (huge, live outside repo or untracked) ----
+data/
+*.lmdb/
+*.mdb
+*.lock.mdb
+runs/
+outputs/
+multirun/
+lightning_logs/
+checkpoints/
+*.ckpt
+*.pth
+*.pt
+*.onnx
+
+# ---- Logs / reports generated ----
+reports/*.csv
+reports/*.json
+!reports/.gitkeep
+*.log
+
+# ---- OS / editor ----
+.DS_Store
+.idea/
+.vscode/
