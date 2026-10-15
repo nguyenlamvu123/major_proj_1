@@ -83,6 +83,9 @@ pytest tests/test_lmdb.py -q
 ```
 **Pass khi**: test LMDB pass (đọc được `num-samples`, label NFC, ảnh decode được),
 không trùng `serial`/label giữa train và val/test (in ra số 0 trùng).
+> LMDB ở `$DATA_ROOT/lmdb/{train/<name>, val, test/test_us}` đúng layout parseq
+> (`root_dir=$DATA_ROOT/lmdb`, `train_dir=trademark`). Khi chạy tay mọi thứ dùng `strhub`
+> cần `export PYTHONPATH=$PWD/third_party/parseq`.
 
 ## 06-eda — notebook EDA
 

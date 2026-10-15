@@ -503,3 +503,79 @@ min 2 / max 25 / mean 10.65.
 **Test** (`tests/test_clean.py`, 11 test, offline): NFC+gộp space, lần lượt từng nhánh lý
 do rớt, nhánh `missing_image`/`bad_image` (file hỏng), `require_image=False`,
 dedupe bật/tắt, `--limit`, `run()` ghi CSV+report, roundtrip `write_clean_csv`.
+
+## Nhánh 05-split-build_data — `src/trademark_ocr/split.py` + `src/trademark_ocr/build_lmdb.py`
+
+**Trách nhiệm**: chia tập **không rò rỉ nhãn** rồi đóng gói thành LMDB đúng định dạng
+`baudm/parseq` để train/eval.
+
+### 5.1 `split.py` — chia theo nhóm nhãn
+
+Vì nhiều đơn có **cùng chữ** (nhiều "APPLE"), chia theo *dòng* sẽ khiến cùng nhãn nằm ở
+train lẫn test → điểm test ảo. Nên:
+
+1. Gom dòng theo `word_mark` → "nhóm nhãn".
+2. `random.Random(seed).shuffle(labels)` trên danh sách nhãn **đã sort** (ổn định).
+3. Cắt `train_ratio` (0.9) / `val_ratio` (0.05) / phần còn lại `test_us`.
+
+⚠️ Thực tế nhánh 04 đã `--dedupe` nên mỗi nhãn chỉ 1 dòng; cơ chế nhóm vẫn đúng nếu chạy
+`--no-dedupe` (khi đó `n_labels < counts`).
+
+Xuất: `processed/split_{train,val,test_us}.csv` (giữ nguyên `CLEAN_COLUMNS`) +
+`processed/split_report.json` (`counts, n_labels, overlap{...,any_serial}, seed, ratios`).
+Report luôn `overlap = 0` theo thiết kế.
+
+### 5.2 `build_lmdb.py` — LMDB đúng chuẩn parseq
+
+Khoá LMDB (khớp `strhub/data/dataset.py::LmdbDataset`):
+
+| Khoá | Giá trị |
+|---|---|
+| `num-samples` | chuỗi số nguyên |
+| `image-{idx:09d}` | bytes ảnh (ghi thẳng PNG gốc) |
+| `label-{idx:09d}` | **UTF-8**, giữ NFC (config train đặt `normalize_unicode: false`) |
+
+`idx` từ **1**. `map_size = max(1 GiB, tổng_bytes × 1.3 + 1 MiB)`.
+
+**Ánh xạ đường dẫn** = đúng kỳ vọng của `SceneTextDataModule`:
+
+| subset | thư mục LMDB | được đọc bởi |
+|---|---|---|
+| `train` | `<DATA_ROOT>/lmdb/train/<name>/data.mdb` (`name=trademark`) | `root_dir/train/<train_dir>` |
+| `val` | `<DATA_ROOT>/lmdb/val/data.mdb` | `root_dir/val` (glob `**/data.mdb`) |
+| `test_us` | `<DATA_ROOT>/lmdb/test/test_us/data.mdb` | `root_dir/test/<subset>` |
+| `test_vn` | `<DATA_ROOT>/lmdb/test/test_vn/data.mdb` | như trên (nhánh 11) |
+
+⇒ Khi train, đặt `root_dir = $DATA_ROOT/lmdb` và `train_dir = trademark`.
+
+**Lưu ý `PYTHONPATH`**: `strhub` KHÔNG được cài như package (chỉ nằm ở
+`third_party/parseq`); code chạy thật cần `export PYTHONPATH=$REPO_ROOT/third_party/parseq`
+(hoặc `pip install -e third_party/parseq`). pytest tự thêm qua `pythonpath` trong
+`pyproject.toml`.
+
+### Hàm chính
+
+| Module | Hàm |
+|---|---|
+| split | `group_by_label`, `split_rows(rows, ratios, seed)`, `run(...)`, `_overlap` |
+| build_lmdb | `lmdb_path`, `split_csv_path`, `create_lmdb(rows, out_dir, data_root, map_size)`, `iter_lmdb`, `run(subset, ...)` |
+
+### CLI
+
+```bash
+python3 -m trademark_ocr.split --seed 1111
+python3 -m trademark_ocr.build_lmdb --subset train --limit 500
+python3 -m trademark_ocr.build_lmdb --subset val   --limit 200
+python3 -m trademark_ocr.build_lmdb --subset test_us --limit 200
+pytest tests/test_lmdb.py -q
+```
+
+### Số liệu thực đo (4840 dòng clean)
+
+`counts={train:4356, val:242, test_us:242}`, `n_labels={4356,242,242}`,
+`overlap = 0` (mọi khoá). LMDB: train 500 / val 200 / test_us 200 mẫu; nạp lại bằng
+`build_tree_dataset` của parseq → đúng số mẫu, nhãn `'OUSEN HOME'`, ảnh `(600×250)` PIL hợp lệ.
+
+**Test** (`tests/test_lmdb.py`, 8 test): không trùng nhãn/serial, tất định theo seed, ghi
+đủ file + report, roundtrip LMDB (NFC giữ dấu, decode ảnh), đúng layout parseq, `--limit`,
+bỏ ảnh thiếu, và **tích hợp thật** với `strhub.data.dataset.LmdbDataset`.
