@@ -784,3 +784,55 @@ nhánh 12 ghép cặp theo `<model>`. `reports/*.csv|*.json` đã **gitignore**.
 `ned`/`cer` canonical; aggregate (perfect, known values, rỗng, lệch độ dài → `ValueError`);
 `per_sample` khớp cột; CLI `--help` exit 0; mapping `lmdb_dir`; và **end-to-end trên LMDB
 thật** (val, 32 mẫu) → CSV đúng cột.
+
+## 11-fetch-vn — thu nhãn hiệu Việt Nam (WIPO Publish / IP Vietnam)
+
+Nguồn: `https://wipopublish.ipvietnam.gov.vn/wopublish-search` — đây là nền **WIPO
+Publish** (Wicket/AJAX), chứng chỉ TLS tự ký → **phải `verify=False`** (như `curl -k`).
+Kết quả **không** có trong HTML đầu; phải đi qua 4 bước (đã kiểm chứng thực tế):
+
+1. `GET /public/trademarks?query=*:*` → lấy phiên + đọc trong HTML:
+   - `id` form: `"f":"id6"` — **đổi theo phiên** (không hard-code `id12`),
+   - URL hành vi tìm kiếm: `"u":"./trademarks;jsessionid=...?0-1.IBehaviorListener.0-body-basicSearchTab-searchInputPanel-searchForm-searchSubmitLink&query=*:*"`,
+   - `Wicket.Ajax.baseUrl` → dùng cho header `Wicket-Ajax-BaseURL`.
+2. `POST` URL hành vi (header `Wicket-Ajax: true`) với body
+   `<fid>_hf_0=&intelligentSearchInput=&searchSubmitLink=Tra+cuu`
+   → XML `<ajax-response><component id="searchResultPanel">` chứa **50 hàng/trang**.
+3. Phân trang: panel có behavior `navigator-next` (`"u":"...navigator-next..."`, GET lại).
+4. Ảnh: `/public/service/trademarks/application/<id>/thumbnail?noLogo=true&disclaimer=Combined`
+   → **JPEG** (vd `VN4202645978` → 200×47). Field chữ cần cho OCR là **`rs-MK`**.
+
+### Bản đồ field trong 1 hàng `<tr id="VN...">`
+
+`rs-MK` = word_mark · `rs-AFNB_ORI` = số đơn · `rs-AFDT` = ngày nộp · `rs-PBDT` = ngày
+công bố · `rs-RENB` = số đăng ký · `rs-APNA` = chủ đơn · `rs-NCL` = nhóm Nice · `rs-STLB` = trạng thái.
+
+### Hàm (offline-testable)
+
+`parse_form(html) -> (fid, submit_url, base_url)`;
+`parse_rows(html) -> list[dict]`; `usable(row)` (có chữ **và** ảnh);
+`next_url(html)`; `to_label(mk)` (unescape HTML → strip tag → **NFC**);
+`VnClient` (`warmup/search/fetch_page/download/iter_rows`); `verify_images(dir)`;
+`write_outputs(rows, data_root)`.
+
+### Sản phẩm (dưới `DATA_ROOT`)
+
+- `raw/vn_marks.csv` — bản ghi thô; `raw/images_vn/<id>.jpg` + `raw/vn_report.json`
+- `processed/split_test_vn.csv` — cột `serial_number,image_path,word_mark,n_chars`
+  (khớp `build_lmdb`, cần `image_path`+`word_mark`)
+- `processed/test_vn.txt` — mỗi dòng 1 nhãn NFC (dùng cho ACCEPTANCE)
+
+### Số liệu thực đo
+
+`bash scripts/03_get_vn.sh --limit 50` → 50 nhãn (trang 1 có 46 hàng usable, lấy thêm
+trang 2), **50/50 ảnh mở được (100%)**, `all NFC: True`, mean label len 19.58.
+`python3 -m trademark_ocr.build_lmdb --subset test_vn` → `num_samples=50`.
+⚠️ Ghi chú: `run()` mặc định `log=print` (từng để no-op khiến CLI im lặng — đã sửa).
+
+### `tests/test_vn.py` (11 test, offline với fixture thật `tests/data/vn_panel_sample.html`)
+
+`parse_form` id thay đổi theo phiên + thiếu form → `RuntimeError`; `parse_rows` trên
+fixture (3 hàng, id/word_mark/afnb/image_url); `next_url`; `usable` lọc ảnh-không-chữ;
+`to_label` NFC (`A\u0301`→`Á`); `write_outputs` (đúng cột split, txt khớp, report);
+`verify_images` (3 ảnh + 1 file hỏng → ratio 0.75); CLI `--help` exit 0.
+⚠️ `.gitignore`: `data/` khớp `tests/data/` → đã thêm `!tests/data/**`.
