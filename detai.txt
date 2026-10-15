@@ -1,0 +1,1 @@
+Nhận diện chữ trong nhãn hiệu sản phẩm sử dụng học có giám sát với các mô hình học sâu: + Thu thập nhãn hiệu sản phẩm và nhãn chữ tương ứng (nhãn hiệu đăng kí tại Mĩ). + Huấn luyện và đánh giá mô hình nhận diễn chữ trong nhãn hiệu. Đánh giá trên tập dữ liệu mới (nhãn hiệu đăng kí tại Việt Nam)
