@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trademark-ocr"
+version = "0.1.0"
+description = "Recognizing text in product trademarks (wordmark STR) trained on USPTO marks, evaluated on Vietnamese marks"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "third_party/parseq"]
