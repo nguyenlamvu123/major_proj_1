@@ -1,0 +1,59 @@
+# CRNN + CTC — baseline cho tập nhãn hiệu (nhãn hiệu). SELF-CONTAINED (không cần group model/).
+# Chạy train thật:  python3 third_party/parseq/train.py --config-dir configs/hydra --config-name tm_crnn
+# Dry-run kiểm chứng: python3 -m trademark_ocr.train_utils --config tm_crnn --dry-run
+defaults:
+  - _self_
+  - charset: charset_vi   # # @package _global_ -> nạp charset_train/charset_test (tiếng Việt NFC)
+
+model:
+  _convert_: all
+  name: crnn
+  _target_: strhub.models.crnn.system.CRNN
+  img_size: [32, 128]          # [H, W]
+  max_label_length: 25
+  batch_size: 64
+  weight_decay: 0.0
+  warmup_pct: 0.075
+  # architecture (strhub.models.crnn)
+  hidden_size: 256
+  leaky_relu: false
+  lr: 5.1e-4
+
+data:
+  _target_: strhub.data.module.SceneTextDataModule
+  root_dir: ${oc.env:DATA_ROOT,/media/zaibachkhoa/AC84-F995/trademark_data}/lmdb
+  train_dir: trademark           # == lmdb/train/trademark (nhánh 05)
+  batch_size: ${model.batch_size}
+  img_size: ${model.img_size}
+  charset_train: ${model.charset_train}
+  charset_test: ${model.charset_test}
+  max_label_length: ${model.max_label_length}
+  remove_whitespace: false       # charset có space
+  normalize_unicode: false       # BẮT BUỘC: nếu true sẽ NFKD->ASCII mất dấu tiếng Việt
+  min_image_dim: 0
+  augment: true
+  num_workers: 4
+
+trainer:
+  _target_: pytorch_lightning.Trainer
+  _convert_: all
+  max_epochs: 20
+  val_check_interval: 1.0   # dữ liệu nhỏ: validate mỗi epoch (~68 step/epoch @bs=64)
+  gradient_clip_val: 20
+  limit_train_batches: 1.0    # ghi đè: --limit-train-batches 2  (khi smoke test)
+  limit_val_batches: 1.0
+  max_steps: -1
+  log_every_n_steps: 1    # in loss mỗi step (smoke test 2 batch vẫn thấy loss)
+  accelerator: gpu
+  devices: 1
+
+ckpt_path: null
+pretrained: null
+
+hydra:
+  output_subdir: config
+  run:
+    dir: ${oc.env:DATA_ROOT,/media/zaibachkhoa/AC84-F995/trademark_data}/runs/${model.name}/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: ${oc.env:DATA_ROOT,/media/zaibachkhoa/AC84-F995/trademark_data}/runs/${model.name}/multirun/${now:%Y-%m-%d_%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}

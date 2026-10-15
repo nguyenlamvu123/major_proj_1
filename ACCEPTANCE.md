@@ -105,9 +105,21 @@ ls $DATA_ROOT/processed/eda_figures/*.png | head
 ```bash
 python -m trademark_ocr.train_utils --config tm_crnn --dry-run   # hydra compose OK, 1 batch forward CPU
 bash scripts/05_train.sh crnn --limit-train-batches 2 --max-epochs 1 --accelerator cpu   # dry 2 batch
+pytest tests/test_train_utils.py -q
 ```
 **Pass khi**: in ra summary mô hình (số tham số), loss giảm sau 2 batch (≥0),
 file `runs/crnn/**/last.ckpt` được tạo (hoặc dry-run báo OK nếu `--dry-run`).
+
+> **Đã nghiệm thu**: dry-run `tm_crnn` = **8.424.026** tham số, loss 17.37, grad OK;
+> `tm_trba` = 49.883.236 (loss 5.39); `tm_parseq` = 23.927.258 (loss 5.45). Smoke train
+> 2 batch: TB ghi `loss 20.29 → 19.50 → 19.25` và tạo
+> `$DATA_ROOT/runs/crnn/<ts>/checkpoints/last.ckpt`. 7 test pass.
+>
+> - Config ở `configs/hydra/tm_*.yaml` chạy qua entrypoint của parseq
+>   (`third_party/parseq/train.py --config-dir configs/hydra --config-name ...`) → **không sửa** parseq.
+> - `augment=true` cần shim NumPy-2 (`np.sctypes` đã bị xóa) → `scripts/05_train.sh` tự đặt
+>   `PYTHONPATH=.../compat` để `sitecustomize.py` chạy; chạy tay `parseq/train.py` phải tự set `PYTHONPATH`.
+> - Dry-run phải ở `model.eval()` (TRBA `forward` chỉ hợp lệ khi eval — xem DESIGN mục 07).
 
 ## 08-train-parseq — TRBA + PARSeq
 
