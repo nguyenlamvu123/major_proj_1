@@ -22,6 +22,10 @@ hydra-core>=1.3.2
 omegaconf>=2.3
 nltk>=3.8.1
 
+# --- parseq train extras (nhánh 07) ---
+tensorboard>=2.14      # TensorBoardLogger của parseq
+imgaug>=0.4            # RandAugment của parseq (cần shim NumPy-2 -> trademark_ocr._numpy2_compat)
+
 # --- data / storage ---
 lmdb>=1.4.1
 pandas>=2.0
@@ -46,3 +50,7 @@ gradio>=4.0
 
 # --- tests ---
 pytest>=8.0
+
+# --- optional: đọc USPTO Case Files trên HF qua duckdb (nhánh 02) ---
+duckdb>=1.1
+pyarrow>=15

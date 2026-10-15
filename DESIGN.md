@@ -600,3 +600,71 @@ việc này tách sang nhánh 13 (error analysis) + kiểm tra thủ công vài 
 **Số liệu thực đo**: 4840 dòng; `standard_character 3341 / design_with_words 853 /
 stylized_words 410 / typeset_old 236`; mean words/label `1.692`; median ảnh `600×250`;
 top ký tự `E,A,O,I,' ',R,...`; 1 ký tự có dấu tiếng Việt trong nhãn US.
+
+## Nhánh 07-train-crnn — `train_utils.py` + `configs/hydra/tm_*.yaml` + `scripts/05_train.sh`
+
+**Triết lý**: KHÔNG viết lại vòng train. Dùng đúng `third_party/parseq/train.py`
+(`@hydra.main(config_path='configs', config_name='main')`), chỉ cung cấp config riêng qua
+`--config-dir configs/hydra --config-name tm_crnn` (đã kiểm chứng CLI của parseq chấp nhận).
+
+### Cấu trúc config (tự chứa, KHÔNG group `model/`)
+
+`configs/hydra/tm_{crnn,trba,parseq,svtrctc}.yaml` (nút `svtr` → `tm_svtrctc`, nhánh 09) — mỗi file có đủ `model` / `data` /
+`trainer` / `ckpt_path` / `pretrained` / `hydra`; chỉ dùng group **một** lần:
+`defaults: [- _self_, - charset: charset_vi]` (charset group `@package _global_` nạp
+`model.charset_train/test` — thứ tự quan trọng, `_self_` đứng trước).
+
+| Khóa | Giá trị & lý do |
+|---|---|
+| `model.charset_*` | 217 ký tự tiếng Việt NFC (từ `charset/charset_vi.yaml`, nhánh 01) |
+| `data.normalize_unicode` | **false** — đúng/NFKD-ASCII thì mất dấu |
+| `data.remove_whitespace` | **false** — charset có space |
+| `data.root_dir` | `${oc.env:DATA_ROOT,...}/lmdb` |
+| `data.train_dir` | `trademark` (== `lmdb/train/trademark`, nhánh 05) |
+| `data.augment` | `true` (RandAugment của parseq) |
+| `trainer.val_check_interval` | `1.0` — 4356 mẫu / bs 64 ≈ 68 step/epoch (mặc định parseq 1000 → chậm) |
+| `trainer.limit_train_batches` / `limit_val_batches` / `max_steps` / `log_every_n_steps` | khai báo sẵn để script **ghi đè không cần `+`**; `log_every_n_steps=1` để loss hiện cả khi smoke-test 2 batch |
+| `trainer.accelerator/devices` | `gpu`/`1` (Colab); local đổi bằng `--accelerator cpu` |
+| `hydra.run.dir` | `$DATA_ROOT/runs/${model.name}/${now:...}` → checkpoint + tb events + `config/config.yaml` |
+
+### Shim NumPy-2 cho `imgaug` (quan trọng)
+
+`imgaug==0.4.0` dùng `np.sctypes` **bị xóa ở NumPy 2.0** → RandAugment của parseq chết.
+Không hạ `numpy<2` (vỡ torch/pyarrow) và không sửa parseq → khôi phục biến thể đó:
+
+- `src/trademark_ocr/_numpy2_compat.py` — `apply_numpy2_compat()` (idempotent).
+- `compat/sitecustomize.py` — `site` tự import lúc khởi động **nếu** `compat/` nằm trong
+  `PYTHONPATH` → `scripts/05_train.sh` set sẵn; `train_utils` cũng tự gọi khi import.
+
+### `train_utils.py` — compose + dry-run
+
+| Hàm | Việc |
+|---|---|
+| `compose_config(name, overrides)` | hydra `initialize_config_dir('configs/hydra')` + `compose` |
+| `dry_run(cfg, num_batches, num_images, device)` | instantiate model+datamodule, 1 batch, `forward_logits_loss` + `backward`, decode thử |
+| `train_command(config, extra)` | in lệnh train thật (parseq entrypoint) |
+| `available_configs()` | liệt kê `configs/hydra/tm_*.yaml` |
+
+⚠️ **Dry-run phải chạy ở `model.eval()`**: với TRBA, nhánh `training` của
+`trba/prediction.py:Attention.forward` đòi `text` 2D nhưng `TRBA.forward` tạo `text` 1D
+→ chỉ hợp lệ khi eval (đúng đường parseq dùng lúc validate). Đây là bẫy có thật đã bắt được.
+
+### `scripts/05_train.sh <model> [flag...]`
+
+Dịch flag argparse → hydra override: `--limit-train-batches/--limit-val-batches/
+--max-epochs/--max-steps/--accelerator/--devices/--batch-size/--lr/--num-workers`;
+`crnn|trba|parseq|svtr` → config `tm_*`; set `PYTHONPATH=compat:src:third_party/parseq`.
+
+### Số liệu thực đo
+
+| Config | Tham số | dry-run loss (16 ảnh, eval) | train loss 2 batch |
+|---|---|---|---|
+| `tm_crnn` | 8 424 026 | 17.37 | **20.29 → 19.50 → 19.25** (giảm) |
+| `tm_trba` | 49 883 236 | 5.39 | — |
+| `tm_parseq` | 23 927 258 | 5.45 | — |
+
+Smoke `bash scripts/05_train.sh crnn --limit-train-batches 2 --max-epochs 1 --accelerator cpu`
+→ exit 0, in model summary, chạy val, tạo
+`$DATA_ROOT/runs/crnn/<ts>/checkpoints/{last.ckpt, epoch=...-val_accuracy=...ckpt}`
+(+ `config/config.yaml`, `events.out.tfevents.*`, `train.log`). TB scalars đọc được:
+`loss, val_loss, val_accuracy, val_NED, hp_metric`.
