@@ -28,12 +28,14 @@ test -f DESIGN.md && test -f ACCEPTANCE.md && echo DOCS_OK
 ## 01-charset-vi — bảng ký tự tiếng Việt NFC
 
 ```bash
+python -m trademark_ocr.charset --check          # thống kê + xác nhận unique/NFC
+python -m trademark_ocr.charset --emit-yaml      # -> configs/hydra/charset/charset_vi.yaml
+python -m trademark_ocr.charset --emit-txt       # -> configs/charset_vi.txt
 pytest tests/test_charset.py -q
-python -m trademark_ocr.charset --check          # in thống kê + xác nhận NFC
-test -f configs/charset_vi.yaml && echo CHARSET_YAML_OK
 ```
-**Pass khi**: test roundtrip encode/decode; `configs/charset_vi.yaml` tồn tại và
-`grep -c "normalize_unicode: false" configs/hydra/*.yaml` ≥ 0 (sẽ đủ ở nhánh 05+).
+**Pass khi**: test xanh; `--check` in `charset OK (unique + NFC)` với
+`n_classes_ctc = 218`; file `configs/hydra/charset/charset_vi.yaml` tồn tại và
+có `charset_train == charset_test` (217 ký tự).
 
 ## 02-fetch-uspto-meta — metadata wordmark US
 
