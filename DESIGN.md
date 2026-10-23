@@ -1044,3 +1044,39 @@ Test: `tests/test_evaluate.py` (mới, offline: ckpt SVTR nhỏ thật + run dir
 hydra, LMDB VN có nhãn quá dài và ký tự lạ, `img_size` 32×160 để chứng minh đọc hparams),
 `tests/test_metrics.py` (+5, bỏ test cũ chỉ chạy với LMDB thật và API cũ), `tests/test_lmdb.py`
 (+1 meta), `tests/test_demo_report.py` (+1 resize theo hparams).
+
+### 16.4 Phân tách nguồn gốc độ sụt US→VN + báo cáo theo loại nhãn hiệu (REVIEW §4.2, §4.3, §4.5)
+
+**`eval_domain_shift.py`** — giữ 6 cột cũ (ACCEPTANCE nhánh 12, sort theo `delta`), thêm:
+
+| cột | loại bỏ khỏi so sánh | phần còn lại đo |
+|---|---|---|
+| `delta` | — | quy ước ghi nhãn + ký tự chưa học + hình ảnh |
+| `delta_nocase` (+`_lo/_hi`) | hoa/thường | ký tự chưa học + hình ảnh |
+| `delta_base` | hoa/thường + dấu | hình ảnh (chấm dễ cho chữ có dấu) |
+| `delta_plain_nocase` (+`_lo/_hi`) | chỉ nhóm VN **không dấu**, bỏ hoa/thường | hình ảnh — ước lượng sạch nhất |
+
+Kèm `acc_*` từng mức, `acc_vn_plain_nocase`/`n_vn_plain`, `acc_vn_diac_nocase`/`n_vn_diac`.
+Nhóm rỗng → ô trống. Các cột mới tính lại từ `pred/gt` nên dùng được với CSV cũ.
+
+`bootstrap_delta_ci(k_us, n_us, k_vn, n_vn, n_boot=2000, seed=1111, alpha=0.05)`: CI 95%
+percentile của `acc_vn − acc_us`. Lấy mẫu `Binomial(n, k/n)/n` cho từng phía — tương đương
+chính xác với bootstrap lấy lại n mẫu 0/1 có hoàn lại, nhưng không phải lặp từng mẫu.
+⚠️ Khi accuracy một phía đúng bằng 0 hoặc 1, CI phía đó suy biến (độ rộng 0) — đặc tính của
+percentile bootstrap, không phải lỗi.
+
+**`report.py`** — giữ hai bảng cũ, thêm:
+- *Ba mức so khớp + độ bao phủ*: `coverage` (từ cột `in_scope`; CSV cũ ghi "–", không coi
+  là 100%), accuracy tuyệt đối / bỏ hoa-thường / bỏ cả dấu.
+- *Phân tách nguồn gốc độ sụt*: 4 delta ở trên, CI cạnh delta, `n VN không dấu / có dấu`.
+- *Theo loại nhãn hiệu*: accuracy (bỏ hoa/thường) theo `drawing_kind` — tách
+  `standard_character` (chữ đánh máy, dễ) khỏi `stylized_words`/`design_with_words`.
+
+Phạm vi bài toán (REVIEW §4.3): đồ án vẫn là **nhận dạng một dòng chữ trên cả ảnh nhãn hiệu**,
+không có bước phát hiện vùng chữ. Bảng theo `drawing_kind` là cách đo mức ảnh hưởng của giới
+hạn này; tăng chiều rộng đầu vào làm được bằng override `model.img_size=[32,256]` (evaluate
+và demo đọc `img_size` từ ckpt từ 16.3).
+
+Test: `tests/test_domain_shift.py` (+4: phân tách 4 nguồn, CI bao delta + hẹp lại khi n tăng
++ tất định, cột mới/ô trống, báo cáo chỉ có header), `tests/test_demo_report.py` (+3: bảng
+ba mức + coverage + drawing_kind, CSV cũ, nối `eval_domain_shift` → `report`).

@@ -277,6 +277,17 @@ python -c "import json;s=json.load(open('reports/<model>_vn.summary.json'));prin
 nguyên nhãn gốc; summary có `coverage`, `accuracy_nocase`, `accuracy_base`.
 > LMDB build trước nhánh 16 vẫn chấm được nhưng cột `serial_number`/`drawing_kind` rỗng.
 
+### 16.4 Phân tách độ sụt US→VN + báo cáo theo loại nhãn hiệu
+
+```bash
+pytest -q tests/test_domain_shift.py tests/test_demo_report.py
+python -m trademark_ocr.eval_domain_shift --reports reports/ --out reports/domain_shift.csv
+python -m trademark_ocr.report --reports reports/ --out reports/final_summary.md
+```
+**Pass khi**: test xanh; `domain_shift.csv` có thêm `delta_nocase`, `delta_base`,
+`delta_plain_nocase` và cột `_lo/_hi`; `final_summary.md` có các mục "Ba mức so khớp",
+"Phân tách nguồn gốc độ sụt", "Theo loại nhãn hiệu".
+
 ---
 
 ## Ghi chú chung

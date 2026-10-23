@@ -3,8 +3,12 @@
 Gom ``reports/<model>_<domain>.csv`` (nhánh 10) + ``reports/domain_shift.csv`` (nhánh 12)
 + danh sách hình (nhánh 06/13) thành ``reports/final_summary.md`` với:
 - bảng **model × dataset** (n, accuracy, 1−NED, char-accuracy),
-- bảng sụt giảm US→VN,
+- bảng **ba mức so khớp** + độ bao phủ (nhánh 16),
+- bảng sụt giảm US→VN + bảng **phân tách nguồn gốc độ sụt** kèm CI 95% (nhánh 16),
+- bảng theo **loại nhãn hiệu** (``drawing_kind``, nhánh 16),
 - danh sách hình minh hoạ.
+
+CSV cũ (trước nhánh 16, thiếu ``in_scope``/``drawing_kind``) vẫn đọc được: ô tương ứng ghi "–".
 
 CLI
 ---
@@ -18,6 +22,7 @@ import csv
 import os
 import re
 import sys
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -29,23 +34,38 @@ _REPORT_RE = re.compile(r"^(?P<model>.+)_(?P<domain>us|vn)\.csv$")
 
 
 def collect(reports_dir: "Path | str") -> list[dict[str, Any]]:
-    """Đọc mọi ``<model>_<domain>.csv`` -> list dòng tổng hợp."""
+    """Đọc mọi ``<model>_<domain>.csv`` -> list dòng tổng hợp (metric tính lại từ pred/gt)."""
     rows: list[dict[str, Any]] = []
     for p in sorted(Path(reports_dir).glob("*.csv")):
         m = _REPORT_RE.match(p.name)
         if not m or m.group("model") == "domain_shift":
             continue
-        preds: list[str] = []
-        gts: list[str] = []
         with p.open(encoding="utf-8", newline="") as fh:
-            for row in csv.DictReader(fh):
-                preds.append(row.get("pred", ""))
-                gts.append(row.get("gt", ""))
+            samples = list(csv.DictReader(fh))
+        preds = [r.get("pred", "") for r in samples]
+        gts = [r.get("gt", "") for r in samples]
         met = evaluate_metrics(preds, gts)
+        # in_scope chỉ có từ nhánh 16; CSV cũ -> None (không biết), KHÔNG coi là 100%.
+        scope = [r["in_scope"] for r in samples if r.get("in_scope", "") != ""]
+        coverage = None
+        if scope and len(scope) == len(samples):
+            coverage = sum(int(v) for v in scope) / len(scope)
+        by_kind: dict[str, list[tuple[str, str]]] = defaultdict(list)
+        for r in samples:
+            if r.get("drawing_kind"):
+                by_kind[r["drawing_kind"]].append((r.get("pred", ""), r.get("gt", "")))
         rows.append({
             "model": m.group("model"), "dataset": m.group("domain").upper(),
             "n": len(preds), "accuracy": met["accuracy"],
             "one_minus_ned": met["one_minus_ned"], "char_accuracy": met["char_accuracy"],
+            "accuracy_nocase": met["accuracy_nocase"], "accuracy_base": met["accuracy_base"],
+            "coverage": coverage,
+            "by_kind": {
+                kind: {"n": len(pairs),
+                       "accuracy_nocase": evaluate_metrics([a for a, _ in pairs],
+                                                           [b for _, b in pairs])["accuracy_nocase"]}
+                for kind, pairs in sorted(by_kind.items())
+            },
             "report": p.name,
         })
     return rows
@@ -92,6 +112,22 @@ def render_markdown(rows: list[dict[str, Any]], shift: list[dict[str, str]],
         lines.append("_Chưa có báo cáo nào trong `reports/` (chạy nhánh 10 trước)._")
     lines.append("")
 
+    lines.append("## Ba mức so khớp + độ bao phủ")
+    lines.append("")
+    if rows:
+        lines.append("| model | dataset | n | coverage | accuracy | acc (bỏ hoa/thường) | acc (bỏ cả dấu) |")
+        lines.append("|---|---|---|---|---|---|---|")
+        for r in sorted(rows, key=lambda x: (x["model"], x["dataset"])):
+            cov = "–" if r["coverage"] is None else f"{r['coverage']:.3f}"
+            lines.append(f"| {r['model']} | {r['dataset']} | {r['n']} | {cov} | "
+                         f"{r['accuracy']:.4f} | {r['accuracy_nocase']:.4f} | "
+                         f"{r['accuracy_base']:.4f} |")
+        lines.append("")
+        lines.append("_coverage = tỉ lệ mẫu model CÓ THỂ đúng (nhãn ≤ max_label_length, mọi ký tự "
+                     "thuộc charset); mẫu ngoài phạm vi vẫn tính là sai. Nhãn USPTO luôn VIẾT HOA "
+                     "và gần như không dấu, nên so sánh US↔VN nên đọc ở cột bỏ hoa/thường._")
+    lines.append("")
+
     lines.append("## Sụt giảm US → VN (domain shift)")
     lines.append("")
     if shift:
@@ -103,8 +139,44 @@ def render_markdown(rows: list[dict[str, Any]], shift: list[dict[str, str]],
                          f"{r.get('n_us','')} | {r.get('n_vn','')} |")
         lines.append("")
         lines.append("_delta âm = độ chính xác giảm khi chuyển sang nhãn hiệu Việt Nam._")
+        if "delta_nocase" in shift[0]:
+            lines.append("")
+            lines.append("### Phân tách nguồn gốc độ sụt (CI 95% bootstrap)")
+            lines.append("")
+            lines.append("| model | Δ tuyệt đối | Δ bỏ hoa/thường | Δ bỏ cả dấu | "
+                         "Δ VN không dấu, bỏ hoa/thường | n VN không dấu / có dấu |")
+            lines.append("|---|---|---|---|---|---|")
+            for r in shift:
+                lines.append(
+                    f"| {r['model']} | {_signed(r['delta'])} | "
+                    f"{_signed(r['delta_nocase'])} {_ci(r, 'delta_nocase')} | "
+                    f"{_signed(r['delta_base'])} | "
+                    f"{_signed(r['delta_plain_nocase'])} {_ci(r, 'delta_plain_nocase')} | "
+                    f"{r['n_vn_plain']} / {r['n_vn_diac']} |")
+            lines.append("")
+            lines.append("_Δ bỏ hoa/thường loại phần sai do quy ước ghi nhãn; Δ bỏ cả dấu loại thêm "
+                         "phần sai do chưa học chữ có dấu; Δ trên nhóm VN không dấu là ước lượng "
+                         "sạch nhất của khác biệt **hình ảnh**. CI rộng = n quá nhỏ để kết luận._")
     else:
         lines.append("_Chưa có `domain_shift.csv` (chạy nhánh 12 trước)._")
+    lines.append("")
+
+    lines.append("## Theo loại nhãn hiệu (drawing_kind)")
+    lines.append("")
+    kind_rows = [(r, k, v) for r in sorted(rows, key=lambda x: (x["model"], x["dataset"]))
+                 for k, v in r["by_kind"].items()]
+    if kind_rows:
+        lines.append("| model | dataset | drawing_kind | n | acc (bỏ hoa/thường) |")
+        lines.append("|---|---|---|---|---|")
+        for r, kind, v in kind_rows:
+            lines.append(f"| {r['model']} | {r['dataset']} | {kind} | {v['n']} | "
+                         f"{v['accuracy_nocase']:.4f} |")
+        lines.append("")
+        lines.append("_`standard_character` là chữ đánh máy font chuẩn do USPTO dựng — dễ hơn "
+                     "nhiều so với `stylized_words`/`design_with_words`; accuracy US gộp chung "
+                     "phụ thuộc mạnh vào tỉ lệ loại này._")
+    else:
+        lines.append("_Báo cáo chưa có cột `drawing_kind` (build lại LMDB + evaluate từ nhánh 16)._")
     lines.append("")
 
     lines.append("## Hình minh hoạ")
@@ -116,6 +188,15 @@ def render_markdown(rows: list[dict[str, Any]], shift: list[dict[str, str]],
         lines.append("_Không tìm thấy hình (`processed/eda_figures`)._")
     lines.append("")
     return "\n".join(lines)
+
+
+def _signed(value: str) -> str:
+    return f"{float(value):+.4f}" if value not in ("", None) else "–"
+
+
+def _ci(row: dict[str, str], key: str) -> str:
+    lo, hi = row.get(f"{key}_lo", ""), row.get(f"{key}_hi", "")
+    return f"[{float(lo):+.3f}, {float(hi):+.3f}]" if lo and hi else ""
 
 
 def run(*, reports_dir: "Path | str" = "reports/",
