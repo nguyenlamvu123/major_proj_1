@@ -8,6 +8,7 @@
 
 > Tài liệu kỹ thuật chi tiết (mô tả code cho người/đọc giả/AI): xem **[DESIGN.md](DESIGN.md)**.
 > Lệnh nghiệm thu từng nhánh: xem **[ACCEPTANCE.md](ACCEPTANCE.md)**.
+> Đánh giá phương án & code (vấn đề đã biết, trạng thái xử lý): xem **[REVIEW.md](REVIEW.md)**.
 
 ## Cấu trúc
 
