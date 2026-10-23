@@ -4,13 +4,18 @@ Cài đặt như một `strhub.models.base.CTCSystem` (KHÔNG sửa parseq) đ�
 vẹn vòng train/eval/metric của parseq:
 
 * `forward(images)` -> logits `(N, L, C)`; CTC loss + decode do lớp cha lo.
-* Kiến trúc SVTR-style: **stem conv** (giảm 4×) → các **MixingBlock** (Local Mixing =
-  depthwise conv 3×3, Global Mixing = self-attention) → **merging** (giảm 2×) → head
-  tuyến tính theo từng vị trí (CTC).
+* Kiến trúc SVTR-style: **stem conv** (giảm 4×) + **positional embedding** → các
+  **MixingBlock** (Local Mixing = depthwise conv 3×3, Global Mixing = self-attention) →
+  **merging** (chỉ giảm chiều cao, stride (2,1)) → **gộp chiều cao về 1** → head tuyến tính
+  theo từng cột (CTC).
 
-Ràng buộc thiết kế: số timestep `L` phải **≥ `max_label_length`** (25) — nếu không,
-CTC không thể phát nhãn dài nhất. Với `img_size=[32,128]`: stem → 8×32, merge → 4×16
-⇒ `L = 64`.
+Trục thời gian CTC là **chiều ngang**: mỗi bước thời gian là một cột của feature map, nên
+chuỗi đi trái→phải đúng thứ tự đọc. Với `img_size=[32,128]`: stem → 8×32, merge → 4×32,
+gộp cao → `L = 32` cột. Ràng buộc: `L` (số cột) phải **≥ `max_label_length`** (25), nếu
+không CTC không thể phát nhãn dài nhất — class kiểm tra lúc dựng.
+
+(Bản đầu tiên giảm cả chiều rộng rồi trải phẳng lưới 4×16 theo hàng thành 64 bước: kiểm tra
+`64 ≥ 25` vẫn qua nhưng thực chất chỉ có 16 cột — xem REVIEW.md §4.4.)
 
 Tham chiếu: SVTR (Yu et al., 2022) + PP-OCRv3 "SVTR-Lite" (bỏ bớt global mixing ở
 stage đầu, dùng depthwise conv). Đây là bản **tự viết** phục vụ so sánh, không phải
@@ -19,6 +24,7 @@ bản chính thức của OpenOCR.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Optional, Sequence
 
 import torch
@@ -65,10 +71,13 @@ class PatchEmbed(nn.Module):
 
 
 class Merging(nn.Sequential):
-    """Giảm 2× không gian với conv 3×3 stride 2."""
+    """Giảm 2× **chiều cao**, giữ nguyên chiều rộng (conv 3×3 stride (2, 1)).
+
+    Giữ chiều rộng để số cột — tức số bước thời gian CTC — không bị chia đôi (như SVTR gốc).
+    """
 
     def __init__(self, dim: int, out_dim: int) -> None:
-        super().__init__(nn.Conv2d(dim, out_dim, 3, 2, 1, bias=False), nn.BatchNorm2d(out_dim))
+        super().__init__(nn.Conv2d(dim, out_dim, 3, (2, 1), 1, bias=False), nn.BatchNorm2d(out_dim))
 
 
 class MixingBlock(nn.Module):
@@ -109,6 +118,13 @@ class SVTRNet(nn.Module):
                  global_mix: Sequence[bool] = (True, True)) -> None:
         super().__init__()
         self.patch_embed = PatchEmbed(3, embed_dim)
+        # Mỗi conv 3×3 stride 2 pad 1 cho ra ceil(n/2); hai lần liên tiếp = ceil(n/4).
+        img_h, img_w = img_size
+        grid = (math.ceil(img_h / 4), math.ceil(img_w / 4))
+        # Self-attention bất biến với hoán vị token; positional embedding học được (như SVTR)
+        # cho attention biết thứ tự cột, nhánh depthwise conv chỉ thấy lân cận 3×3.
+        self.pos_embed = nn.Parameter(torch.zeros(1, embed_dim, *grid))
+        nn.init.trunc_normal_(self.pos_embed, std=0.02)
         dpr = torch.linspace(0, drop_path_rate, sum(depths)).tolist() if drop_path_rate > 0 \
             else [0.0] * sum(depths)
         stages = []
@@ -140,12 +156,13 @@ class SVTRNet(nn.Module):
             nn.init.zeros_(m.bias)
 
     def forward(self, x: Tensor) -> Tensor:
-        x = self.patch_embed(x)
-        x = self.stages(x)
-        x = self.norm(x.permute(0, 2, 3, 1))            # (B, H, W, C)
-        b, h, w, c = x.shape
-        x = x.view(b, h * w, c)
-        return self.head(x)                             # (N, L, C) — CTC head
+        x = self.patch_embed(x) + self.pos_embed
+        x = self.stages(x)                              # (B, C, H', W/4)
+        # Gộp chiều cao về 1 ("combing" của SVTR): mỗi cột thành một bước thời gian, nên
+        # chuỗi CTC đi trái→phải theo đúng thứ tự đọc. KHÔNG trải phẳng H'×W theo hàng —
+        # làm vậy biến chuỗi thành H' lần quét lặp lại (REVIEW.md §4.4).
+        x = x.mean(dim=2).transpose(1, 2)               # (B, W/4, C)
+        return self.head(self.norm(x))                  # (N, L=W/4, num_classes) — CTC head
 
 
 class SVTRCTC(CTCSystem):
@@ -185,15 +202,15 @@ class SVTRCTC(CTCSystem):
             drop_path_rate=drop_path_rate,
             global_mix=global_mix,
         )
-        # L = (H/4/2?) * ... ; kiểm tra invariant CTC: L >= max_label_length
+        # Invariant CTC: số cột L (= W/4) phải đủ cho nhãn dài nhất.
         with torch.no_grad():
             self.eval()
             dummy = torch.zeros(1, 3, img_h, img_w)
             L = self.model(dummy).shape[1]
             self.train()
         assert L >= max_label_length, (
-            f"SVTRCTC: số timestep L={L} < max_label_length={max_label_length}; "
-            "giảm max_label_length hoặc tăng img_size/độ phân giải."
+            f"SVTRCTC: số cột/timestep L={L} < max_label_length={max_label_length}; "
+            "giảm max_label_length hoặc tăng chiều rộng img_size."
         )
         self.seq_len = L
 
