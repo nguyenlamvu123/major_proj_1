@@ -1080,3 +1080,37 @@ và demo đọc `img_size` từ ckpt từ 16.3).
 Test: `tests/test_domain_shift.py` (+4: phân tách 4 nguồn, CI bao delta + hẹp lại khi n tăng
 + tất định, cột mới/ô trống, báo cáo chỉ có header), `tests/test_demo_report.py` (+3: bảng
 ba mức + coverage + drawing_kind, CSV cũ, nối `eval_domain_shift` → `report`).
+
+### 16.5 Chất lượng tập VN: crawl, lọc trùng, đơn đã cấp, duyệt tay (REVIEW §4.7)
+
+**`fetch_vn.VnClient.iter_rows(limit, ..., max_empty_pages=5, registered_only=False, dedupe=True)`**
+
+| Bộ lọc (theo thứ tự) | Lý do trong `client.skipped` |
+|---|---|
+| không chữ hoặc không ảnh | `unusable` |
+| `registered_only` và chưa có `registration_no` (mới là đơn) | `unregistered` |
+| trùng `dedupe_key(word_mark)` = bỏ khoảng trắng + HOA (`ENGLISH 1984` ≡ `English1984`) | `duplicate_label` |
+
+Dừng khi đủ `limit` / hết trang / `max_pages` / **`max_empty_pages` trang liên tiếp** không có
+hàng mới. Bản cũ dừng ngay ở trang đầu tiên không có hàng dùng được — một trang toàn nhãn hình
+là chuyện bình thường. `vn_report.json` thêm `skipped`, `registered_only`, `n_registered`.
+CLI: `--registered-only`, `--no-dedupe`. Mặc định vẫn nhận cả đơn chưa cấp (không biết trước
+tỉ lệ đơn đã cấp trong `query=*:*`); số `n_registered` cho biết tập thực tế gồm gì.
+
+Sửa kèm: cột CSV thô `reg_no` → `registration_no` (khớp khoá của `parse_rows`; trước đây
+`DictWriter(extrasaction="ignore")` ghi rỗng số đăng ký cho mọi dòng). Danh sách cột giờ
+sinh từ `_FIELDS` để không lệch lần nữa.
+
+**`vn_review.py`** (mới) — vòng duyệt tay, trạng thái nằm trong CSV:
+
+| Lệnh | Vào | Ra |
+|---|---|---|
+| `make --n 300 [--seed] [--overwrite]` | `processed/split_test_vn.csv` | `processed/review_vn.csv` (`visible_text` điền sẵn = `word_mark`) + `review_vn.html` (ảnh cạnh nhãn, nhãn được escape) |
+| *(người duyệt sửa `visible_text`; để trống = bỏ mẫu)* | | |
+| `apply` | `review_vn.csv` | `split_test_vn_verified.csv` (nhãn NFC đã sửa, bỏ dòng trống) + `review_vn_report.json` (`n_same/n_fixed/n_dropped`, `label_noise_rate`) |
+
+`make` từ chối ghi đè `review_vn.csv` đã có (tránh mất công duyệt dở). Mẫu tất định theo
+`seed` (sắp theo serial trước khi lấy mẫu).
+
+Test: `tests/test_vn.py` (+5: qua trang rỗng đơn lẻ, dừng sau `max_empty_pages`, lọc trùng +
+`registered_only`, `dedupe_key`, giữ số đăng ký), `tests/test_vn_review.py` (mới, 4 test).

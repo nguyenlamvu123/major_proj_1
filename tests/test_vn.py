@@ -179,3 +179,97 @@ def test_client_iter_rows_paginates_and_never_repeats_a_mark(panel):
     ids = [r["serial_number"] for r in rows]
     assert ids == ["VN4202645978", "VN4202645648", "VN4202645228"]
     assert any("navigator-next" in url for _m, url in sess.calls)   # đã đi trang kế
+
+
+# ------------------- chất lượng tập VN (REVIEW.md §4.7) -------------------
+
+def _panel(rows, has_next=True):
+    """Panel WIPO Publish tổng hợp: rows = [(id, word_mark, có_ảnh, số_đăng_ký)]."""
+    trs = []
+    for i, (doc_id, mark, with_img, reg) in enumerate(rows):
+        img = (f"<img src='https://x/public/service/trademarks/application/{doc_id}/"
+               "thumbnail?noLogo=true'/>") if with_img else ""
+        trs.append(f'<tr class="{"even" if i % 2 == 0 else "odd"}" id="{doc_id}"><td>{img}'
+                   f'<span class="rs-MK">{mark}</span><span class="rs-RENB">{reg}</span></td></tr>')
+    nxt = ('"u":"./trademarks?0-1.IBehaviorListener.0-body-navigator-next&amp;query=*:*"'
+           if has_next else "")
+    return "<ajax-response>" + "".join(trs) + nxt + "</ajax-response>"
+
+
+class _PagedSession(_FakeSession):
+    """Trả lần lượt từng panel trong ``pages`` (POST = trang 1, mỗi GET next = trang kế)."""
+
+    def __init__(self, pages):
+        super().__init__(pages[0])
+        self.pages = list(pages)
+
+    def get(self, url, **kw):
+        if "navigator-next" in url:
+            self.calls.append(("GET", url))
+            self.pages.pop(0)
+            return _Resp(self.pages[0])
+        return super().get(url, **kw)
+
+    def post(self, url, data=None, headers=None, **kw):
+        self.calls.append(("POST", url))
+        return _Resp(self.pages[0])
+
+
+def test_iter_rows_keeps_going_past_a_page_without_usable_rows():
+    # ROOT CAUSE:
+    #
+    # iter_rows dừng ngay khi MỘT trang không có mẫu dùng được (`if not nxt or new == 0`),
+    # mà trang toàn nhãn hình (không chữ) là chuyện bình thường → crawl kết thúc sớm.
+    #
+    # Đã sửa: chỉ dừng khi hết trang hoặc `max_empty_pages` trang liên tiếp không có mẫu mới.
+    pages = [
+        _panel([("VN1", "ALPHA", True, "1")]),
+        _panel([("VN2", "", True, "2"), ("VN3", "NO IMAGE", False, "3")]),   # 0 mẫu dùng được
+        _panel([("VN4", "BETA", True, "4")], has_next=False),
+    ]
+    rows = list(fv.VnClient(session=_PagedSession(pages), sleep=0).iter_rows(limit=0))
+    assert [r["serial_number"] for r in rows] == ["VN1", "VN4"]
+
+
+def test_iter_rows_stops_after_max_empty_pages():
+    pages = [_panel([("VN1", "ALPHA", True, "1")])] + [_panel([])] * 10
+    sess = _PagedSession(pages)
+    rows = list(fv.VnClient(session=sess, sleep=0).iter_rows(limit=0, max_empty_pages=3))
+    assert [r["serial_number"] for r in rows] == ["VN1"]
+    assert sum("navigator-next" in url for _m, url in sess.calls) == 3
+
+
+def test_iter_rows_dedupes_labels_and_can_keep_only_registered():
+    pages = [_panel([
+        ("VN1", "ENGLISH1984", True, "11"),
+        ("VN2", "ENGLISH 1984", True, "12"),   # trùng sau khi bỏ khoảng trắng
+        ("VN3", "GASU", True, ""),             # đơn chưa cấp
+        ("VN4", "gasu", True, "14"),           # trùng hoa/thường với VN3
+        ("VN5", "OMEGA", True, ""),            # đơn chưa cấp
+    ], has_next=False)]
+    client = fv.VnClient(session=_PagedSession(pages), sleep=0)
+    assert [r["serial_number"] for r in client.iter_rows(limit=0)] == ["VN1", "VN3", "VN5"]
+    assert client.skipped["duplicate_label"] == 2
+
+    client = fv.VnClient(session=_PagedSession(pages), sleep=0)
+    got = list(client.iter_rows(limit=0, registered_only=True))
+    assert [r["serial_number"] for r in got] == ["VN1", "VN4"]
+    assert client.skipped["unregistered"] == 2
+
+
+def test_dedupe_key_examples():
+    assert fv.dedupe_key("ENGLISH 1984") == fv.dedupe_key("English1984") == "ENGLISH1984"
+    assert fv.dedupe_key("Luân  Hồi") == "LUÂNHỒI"
+
+
+def test_write_outputs_keeps_registration_number(tmp_path, panel):
+    # ROOT CAUSE:
+    #
+    # Cột CSV thô khai "reg_no" nhưng parse_rows lưu khoá "registration_no" → DictWriter
+    # (extrasaction="ignore") ghi ô rỗng cho MỌI dòng; mất thông tin đơn đã cấp hay chưa.
+    rows = [dict(r, image_path="raw/images_vn/x.jpg", registration_no="4-0123456-000")
+            for r in fv.parse_rows(panel)[:1]]
+    fv.write_outputs(rows, data_root=tmp_path)
+    with (tmp_path / "raw" / "vn_marks.csv").open(encoding="utf-8", newline="") as fh:
+        got = next(csv.DictReader(fh))
+    assert got["registration_no"] == "4-0123456-000"

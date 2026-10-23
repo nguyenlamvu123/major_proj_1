@@ -288,6 +288,19 @@ python -m trademark_ocr.report --reports reports/ --out reports/final_summary.md
 `delta_plain_nocase` và cột `_lo/_hi`; `final_summary.md` có các mục "Ba mức so khớp",
 "Phân tách nguồn gốc độ sụt", "Theo loại nhãn hiệu".
 
+### 16.5 Chất lượng tập VN
+
+```bash
+pytest -q tests/test_vn.py tests/test_vn_review.py
+bash scripts/03_get_vn.sh --limit 2000                 # (cần mạng) thêm --registered-only nếu muốn
+python -c "import json,os;r=json.load(open(os.environ['DATA_ROOT']+'/raw/vn_report.json'));print(r['n'],r['n_registered'],r['skipped'])"
+python -m trademark_ocr.vn_review make --n 300         # rồi sửa processed/review_vn.csv bằng tay
+python -m trademark_ocr.vn_review apply
+python -m trademark_ocr.build_lmdb --subset test_vn --split-csv $DATA_ROOT/processed/split_test_vn_verified.csv
+```
+**Pass khi**: test xanh; `vn_report.json` có `skipped` (lý do bỏ) và `n_registered`;
+`review_vn_report.json` có `label_noise_rate` — con số này phải nêu trong báo cáo đồ án.
+
 ---
 
 ## Ghi chú chung
