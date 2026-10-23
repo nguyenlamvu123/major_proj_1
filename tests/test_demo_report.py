@@ -23,8 +23,10 @@ class _StubTokenizer:
 
 
 class _StubModel:
-    def __init__(self):
+    def __init__(self, img_size=(32, 128)):
         self.tokenizer = _StubTokenizer()
+        self.hparams = types.SimpleNamespace(img_size=list(img_size))
+        self.seen_shapes = []
 
     def eval(self):
         return self
@@ -34,6 +36,7 @@ class _StubModel:
 
     def __call__(self, x):
         import torch
+        self.seen_shapes.append(tuple(x.shape))
         return torch.zeros(x.shape[0], 5, 4)
 
     def charset_adapter(self, s):
@@ -61,6 +64,14 @@ def test_demo_predict_with_stub_model(tmp_path):
     assert len(rows) == 2
     assert rows[0]["pred"] == "ABC" and rows[0]["confidence"] == pytest.approx(0.72, abs=1e-6)
     assert rows[0]["image"].endswith("a.png")
+
+
+def test_demo_resizes_to_model_img_size(tmp_path):
+    """Ảnh demo phải resize đúng cỡ model được train (trước đây viết cứng 32×128)."""
+    from trademark_ocr import demo_app
+    model = _StubModel(img_size=(32, 256))
+    demo_app.predict(model, [str(_png(tmp_path))], device="cpu")
+    assert model.seen_shapes == [(1, 3, 32, 256)]
 
 
 def test_demo_run_requires_ckpt(tmp_path):

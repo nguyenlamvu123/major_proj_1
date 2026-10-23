@@ -264,6 +264,19 @@ python -m trademark_ocr.train_utils --config tm_svtrctc --dry-run
 **Pass khi**: test xanh (`seq_len == 32` @ 32×128, 32×64 bị từ chối); dry-run in `[dry-run] OK`.
 > Thay cho số liệu nhánh 09 (`seq_len=64`). Checkpoint SVTR cũ phải train lại.
 
+### 16.3 Đánh giá trung thực
+
+```bash
+pytest -q tests/test_evaluate.py tests/test_metrics.py
+python -m trademark_ocr.build_lmdb --subset test_vn          # build lại để có khoá meta-*
+python -m trademark_ocr.evaluate --ckpt $DATA_ROOT/runs/<model>/<ts>/checkpoints/last.ckpt \
+    --subset test_vn --out reports/<model>_vn.csv
+python -c "import json;s=json.load(open('reports/<model>_vn.summary.json'));print(s['n'],s['coverage'],s['accuracy'],s['accuracy_nocase'],s['accuracy_base'])"
+```
+**Pass khi**: test xanh; số dòng CSV = `num-samples` của LMDB (không bị lọc); cột `gt` giữ
+nguyên nhãn gốc; summary có `coverage`, `accuracy_nocase`, `accuracy_base`.
+> LMDB build trước nhánh 16 vẫn chấm được nhưng cột `serial_number`/`drawing_kind` rỗng.
+
 ---
 
 ## Ghi chú chung

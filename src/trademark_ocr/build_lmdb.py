@@ -6,6 +6,9 @@
 - khoá ``image-{idx:09d}``     : bytes ảnh (PNG) — parseq mở lại bằng ``PIL``.
 - khoá ``label-{idx:09d}``     : chuỗi nhãn **UTF-8** (ta lưu NFC; config sẽ đặt
   ``data.normalize_unicode: false`` để không mất dấu).
+- khoá ``meta-{idx:09d}``      : JSON ``{"serial_number", "drawing_kind"}`` (chỉ trường có
+  giá trị) — **của đồ án**, parseq không đọc; ``evaluate`` dùng để truy ngược mẫu về
+  serial/ảnh gốc và tách kết quả theo ``drawing_kind``. Đọc bằng :func:`read_meta`.
 - ``idx`` bắt đầu từ **1**.
 
 Vị trí (khớp ``strhub/data/module.py::SceneTextDataModule``)
@@ -23,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import os
 import sys
 from pathlib import Path
@@ -44,6 +48,16 @@ def lmdb_path(data_root: Path | str, subset: str, name: str = "trademark") -> Pa
     if subset.startswith("test"):
         return root / "test" / subset
     raise ValueError(f"subset không hợp lệ: {subset!r}")
+
+
+#: cột của split CSV được chép vào khoá ``meta-*`` (xem docstring module)
+META_FIELDS: tuple[str, ...] = ("serial_number", "drawing_kind")
+
+
+def read_meta(txn: Any, idx: int) -> dict[str, str]:
+    """Đọc khoá ``meta-{idx}``; ``{}`` khi LMDB build trước nhánh 16 (chưa có khoá này)."""
+    raw = txn.get(f"meta-{idx:09d}".encode())
+    return json.loads(raw.decode("utf-8")) if raw else {}
 
 
 def split_csv_path(data_root: Path | str, subset: str) -> Path:
@@ -93,6 +107,10 @@ def create_lmdb(
             idx = written + 1
             txn.put(f"image-{idx:09d}".encode(), img.read_bytes())
             txn.put(f"label-{idx:09d}".encode(), row["word_mark"].encode("utf-8"))
+            meta = {k: row[k] for k in META_FIELDS if row.get(k)}
+            if meta:
+                txn.put(f"meta-{idx:09d}".encode(),
+                        json.dumps(meta, ensure_ascii=False).encode("utf-8"))
             written += 1
             if commit_every and written % commit_every == 0:
                 txn.commit()
