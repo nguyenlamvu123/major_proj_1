@@ -232,6 +232,18 @@ python -m trademark_ocr.report --reports reports/ --out reports/final_summary.md
 > - `bash scripts/06_eval.sh` chạy end-to-end (evaluate US+VN → domain shift → phân tích lỗi → báo cáo).
 > - Chỉ số trong `final_summary.md` hiện là của checkpoint **chưa train**; train trên Colab mới có ý nghĩa.
 
+## 15-review-tests — review + test khoá phần đã chạy đúng
+
+```bash
+test -f REVIEW.md && echo REVIEW_OK
+pytest -q tests/test_pipeline_e2e.py tests/test_parseq_contracts.py
+pytest -q
+```
+**Pass khi**: in `REVIEW_OK`; hai file test mới xanh; toàn bộ `pytest -q` xanh.
+
+> **Đã nghiệm thu**: `pytest -q` → 177 pass, 1 skip (test cần LMDB thật), trên venv
+> torch 2.14.1+cpu / PL 2.6.6 / timm 1.0.30. Không cần mạng, không cần `DATA_ROOT`.
+
 ---
 
 ## Ghi chú chung
