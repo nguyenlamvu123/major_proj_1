@@ -88,8 +88,13 @@ def resolve_model_class(ckpt: Path | str, model_class: str | None = None) -> typ
     cfg_path = Path(ckpt).resolve().parent.parent / "config" / "config.yaml"
     if cfg_path.exists():
         import yaml
-        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
-        return _import_class(cfg["model"]["_target_"])
+        from trademark_ocr.pretrained import FINETUNE_TARGET
+        model_cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))["model"]
+        target = model_cfg["_target_"]
+        # Run fine-tune: _target_ là factory, lớp thật nằm ở `target` (DESIGN.md 16.6).
+        if target == FINETUNE_TARGET:
+            target = model_cfg["target"]
+        return _import_class(target)
     from strhub.models.utils import InvalidModelError, _get_model_class
     try:
         return _get_model_class(str(ckpt))
