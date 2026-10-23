@@ -8,22 +8,68 @@
 * **CER** — Character Error Rate ở mức *corpus*: `Σ edit / Σ |gt|`.
 * **char_accuracy** — `1 − CER`.
 
+Ba **mức so khớp** cho accuracy và 1 − NED (REVIEW.md §4.2):
+
+| mức | so sánh sau khi | dùng để |
+|---|---|---|
+| `strict` (không hậu tố) | không đổi gì | số liệu chuẩn, phân biệt hoa/thường và dấu |
+| `nocase` | đưa cả hai về chữ HOA | nhãn US (USPTO) luôn viết hoa, nhãn VN thì không |
+| `base` | chữ HOA + bỏ dấu (`đ`→`d`) | tách lỗi "chưa học chữ có dấu" khỏi lỗi đọc hình |
+
 Tất cả hàm nhận `Sequence[str]` và trả `dict` để tiện ghi CSV/JSON.
 `edit_distance` viết tay (DP 2 hàng) → **không cần** `python-Levenshtein`, chạy offline.
 """
 
 from __future__ import annotations
 
-from typing import Sequence
+import unicodedata
+from typing import Callable, Sequence
 
 METRIC_KEYS: tuple[str, ...] = (
     "n", "accuracy", "ned", "one_minus_ned", "cer", "char_accuracy", "mean_label_len",
+    "mean_pred_len", "accuracy_nocase", "one_minus_ned_nocase",
+    "accuracy_base", "one_minus_ned_base",
 )
 
-#: cột CSV báo cáo từng mẫu (nhánh 10) — giữ ổn định cho nhánh 12/14
-REPORT_COLUMNS: tuple[str, ...] = (
-    "idx", "pred", "gt", "correct", "ned", "char_err", "pred_len", "gt_len",
+#: cột ngữ cảnh của một mẫu — do `evaluate` điền (không tính được từ riêng pred/gt)
+SAMPLE_CONTEXT_COLUMNS: tuple[str, ...] = (
+    "idx", "serial_number", "drawing_kind", "in_scope", "confidence",
 )
+
+#: cột CSV báo cáo từng mẫu (nhánh 10, mở rộng ở 16.3) — nhánh 12/13/14 đọc theo TÊN cột
+REPORT_COLUMNS: tuple[str, ...] = (
+    "idx", "serial_number", "drawing_kind", "pred", "gt",
+    "correct", "correct_nocase", "correct_base", "ned", "char_err",
+    "pred_len", "gt_len", "gt_has_diacritics", "in_scope", "confidence",
+)
+
+
+def strip_diacritics(text: str) -> str:
+    """Bỏ mọi dấu tổ hợp (thanh, mũ, móc, trăng) và đổi ``đ/Đ`` → ``d/D``.
+
+    Before:
+    - "HP Food Đặc sản Hải Phòng"
+    - "LJ LEJET CAFÉ BISTRO"
+
+    After:
+    - "HP Food Dac san Hai Phong"
+    - "LJ LEJET CAFE BISTRO"
+    """
+    # 'đ' là một chữ riêng trong Unicode (không phân rã NFD) nên phải đổi tay.
+    decomposed = unicodedata.normalize("NFD", text.replace("đ", "d").replace("Đ", "D"))
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+
+
+def has_diacritics(text: str) -> bool:
+    """Nhãn có ít nhất một ký tự mang dấu (kể cả ``đ``)."""
+    return strip_diacritics(text) != unicodedata.normalize("NFD", text)
+
+
+#: mức so khớp -> hàm chuẩn hoá áp lên CẢ pred lẫn gt trước khi so
+MATCH_LEVELS: dict[str, Callable[[str], str]] = {
+    "nocase": str.upper,
+    "base": lambda text: strip_diacritics(text).upper(),
+}
 
 
 def edit_distance(a: str, b: str) -> int:
@@ -85,7 +131,7 @@ def evaluate_metrics(preds: Sequence[str], gts: Sequence[str]) -> dict[str, floa
     accuracy = n_correct / n
     ned = sum_ned / n
     cer = (sum_edit / sum_gt_len) if sum_gt_len else 0.0
-    return {
+    out = {
         "n": float(n),
         "accuracy": accuracy,
         "ned": ned,
@@ -95,11 +141,20 @@ def evaluate_metrics(preds: Sequence[str], gts: Sequence[str]) -> dict[str, floa
         "mean_label_len": sum_gt_len / n,
         "mean_pred_len": sum_pred_len / n,
     }
+    for level, fold in MATCH_LEVELS.items():
+        folded = [(fold(p), fold(g)) for p, g in zip(preds, gts)]
+        out[f"accuracy_{level}"] = sum(p == g for p, g in folded) / n
+        out[f"one_minus_ned_{level}"] = 1.0 - sum(
+            normalized_edit_distance(p, g) for p, g in folded) / n
+    return out
 
 
 def per_sample(pred: str, gt: str) -> dict[str, object]:
-    """Hàng CSV cho một mẫu (khớp `REPORT_COLUMNS`)."""
-    return {
+    """Phần của hàng CSV tính được từ ``(pred, gt)``.
+
+    Hàng đầy đủ = kết quả này + ``SAMPLE_CONTEXT_COLUMNS`` (do ``evaluate`` điền).
+    """
+    row: dict[str, object] = {
         "pred": pred,
         "gt": gt,
         "correct": int(pred == gt),
@@ -107,7 +162,11 @@ def per_sample(pred: str, gt: str) -> dict[str, object]:
         "char_err": char_error_rate(pred, gt),
         "pred_len": len(pred),
         "gt_len": len(gt),
+        "gt_has_diacritics": int(has_diacritics(gt)),
     }
+    for level, fold in MATCH_LEVELS.items():
+        row[f"correct_{level}"] = int(fold(pred) == fold(gt))
+    return row
 
 
 def format_summary(metrics: dict[str, float]) -> str:

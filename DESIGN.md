@@ -998,3 +998,49 @@ Checkpoint SVTR cũ (chỉ có bản smoke 2 batch) **không** nạp được v�
 
 Test hồi quy (`tests/test_svtr.py`): `L` theo chiều rộng ở 3 kích thước, từ chối 32×64,
 có `pos_embed`; hai test cũ khoá `seq_len == 64` đổi thành 32.
+
+### 16.3 Đánh giá trung thực: ba mức so khớp, không lọc ngầm, truy ngược được mẫu (REVIEW §4.2, §4.5, §4.8)
+
+**`metrics.py`** — hai mức so khớp thêm cho accuracy và 1 − NED:
+
+| mức | chuẩn hoá áp lên cả pred và gt | khoá |
+|---|---|---|
+| strict | không | `accuracy`, `one_minus_ned` (như cũ) |
+| nocase | `str.upper` | `accuracy_nocase`, `one_minus_ned_nocase` |
+| base | `strip_diacritics(...).upper()` (`đ`→`d`) | `accuracy_base`, `one_minus_ned_base` |
+
+Lý do: nhãn USPTO luôn VIẾT HOA còn nhãn VN thì không, và tập US gần như không có chữ có
+dấu. `nocase` loại phần sai do quy ước ghi nhãn; `base` loại thêm phần sai do chưa từng học
+chữ có dấu — phần còn lại mới là khác biệt hình ảnh. `has_diacritics(gt)` cho phép tách tập
+VN thành nhóm có dấu / không dấu.
+
+`REPORT_COLUMNS` (CSV từng mẫu) giờ là:
+`idx, serial_number, drawing_kind, pred, gt, correct, correct_nocase, correct_base, ned,
+char_err, pred_len, gt_len, gt_has_diacritics, in_scope, confidence`.
+`per_sample(pred, gt)` điền mọi cột trừ `SAMPLE_CONTEXT_COLUMNS` (idx, serial, kind,
+in_scope, confidence — do `evaluate` điền). Bên đọc (nhánh 12/13/14) đọc theo **tên cột**.
+
+**`build_lmdb.py`** — thêm khoá `meta-{idx:09d}` = JSON `{serial_number, drawing_kind}`
+(`META_FIELDS`, chỉ trường có giá trị); `read_meta(txn, idx)` trả `{}` với LMDB cũ. parseq
+không đọc khoá này.
+
+**`evaluate.py`** — viết lại phần nạp dữ liệu và nạp model:
+
+| Trước | Sau |
+|---|---|
+| `LmdbDataset` của parseq: bỏ nhãn > 25 ký tự, xoá ký tự ngoài charset khỏi gt | `LmdbEvalDataset`: **mọi** mẫu, gt gốc (NFC); `in_scope = len(gt) ≤ max_len ∧ set(gt) ⊆ charset` |
+| `idx` = thứ tự sau lọc | `idx` = chỉ số LMDB; `serial_number`, `drawing_kind` từ `meta-*` |
+| `(32,128)` và `25` viết cứng | `model.hparams.img_size / max_label_length / charset_train` |
+| `except Exception` → thử `SVTRCTC`; đoán lớp theo chuỗi con đường dẫn | `resolve_model_class`: `--model-class` → `<run>/config/config.yaml` (`model._target_`) → quy ước tên parseq → `SystemExit` có hướng dẫn |
+
+`summary.json` thêm: `coverage`, `n_too_long`, `n_unsupported_char`, `in_scope{metrics}`,
+`model_class`, `img_size`, `max_label_length`, và các khoá `*_nocase`/`*_base`. Metric chính
+tính trên **toàn bộ** tập (mẫu ngoài phạm vi tính là sai); `in_scope` để so với số liệu kiểu
+parseq.
+
+**`demo_app.py`** — `model_img_size(model)` đọc `hparams.img_size`; bỏ `DEFAULT_IMG_SIZE`.
+
+Test: `tests/test_evaluate.py` (mới, offline: ckpt SVTR nhỏ thật + run dir giả có config
+hydra, LMDB VN có nhãn quá dài và ký tự lạ, `img_size` 32×160 để chứng minh đọc hparams),
+`tests/test_metrics.py` (+5, bỏ test cũ chỉ chạy với LMDB thật và API cũ), `tests/test_lmdb.py`
+(+1 meta), `tests/test_demo_report.py` (+1 resize theo hparams).

@@ -182,3 +182,21 @@ def test_create_lmdb_default_batch_over_1000_readable_by_parseq(tmp_path):
                      remove_whitespace=False, normalize_unicode=False)
     assert len(ds) == 1500
     assert ds.labels[-1] == "MARK01499"
+
+
+def test_create_lmdb_stores_meta_for_traceability(tmp_path):
+    import lmdb
+    from trademark_ocr.build_lmdb import read_meta
+
+    rows = _rows(3)
+    for r in rows:
+        _png(tmp_path / r["image_path"])
+    rows[2]["drawing_kind"] = ""                       # trường rỗng không được ghi
+    out = tmp_path / "lmdb"
+    create_lmdb(rows, out, data_root=tmp_path)
+    env = lmdb.open(str(out), readonly=True, lock=False)
+    with env.begin() as txn:
+        assert read_meta(txn, 1) == {"serial_number": "10000000", "drawing_kind": "stylized_words"}
+        assert read_meta(txn, 3) == {"serial_number": "10000002"}
+        assert read_meta(txn, 4) == {}                 # ngoài phạm vi / LMDB cũ
+    env.close()
