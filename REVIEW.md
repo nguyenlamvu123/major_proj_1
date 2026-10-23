@@ -174,6 +174,39 @@ hình ảnh.
 - Bộ test của dự án được chạy trong một venv tạm (torch 2.14.1+cpu, PL 2.6.6, timm 1.0.30):
   149 pass, 1 skip (`test_evaluate_end_to_end_on_real_lmdb` cần LMDB thật).
 
-## 6. Trạng thái xử lý
+## 6. Trạng thái xử lý (nhánh `16-fix-review`)
 
-*(Cập nhật ở nhánh sửa.)*
+Mỗi mục có test tái hiện viết **trước** khi sửa (đỏ → xanh); chi tiết thiết kế ở DESIGN.md
+mục 16.x, lệnh nghiệm thu ở ACCEPTANCE.md mục 16.x.
+
+| § | Vấn đề | Trạng thái | Ở đâu |
+|---|---|---|---|
+| 4.1 | LMDB ≥ 1.000 mẫu đọc ra 0 | ✅ Đã sửa | 16.1 — `build_lmdb.create_lmdb` quản lý transaction tay; test 7 mẫu/`commit_every=3` và 1.500 mẫu qua parseq |
+| 4.2 | Quy ước nhãn US (HOA) ≠ VN (hoa/thường, có dấu) | ✅ Đã sửa phần đo | 16.3 — metric 3 mức `strict/nocase/base`; 16.4 — `delta_nocase`, `delta_base`, `delta_plain_nocase` (VN không dấu) + CI 95% |
+| 4.3 | Ảnh nguyên, nhiều dòng; 70% `standard_character` | 🟡 Đo được, chưa đổi bài toán | 16.4 — bảng theo `drawing_kind`; 16.3 — `img_size` đọc từ ckpt nên thử `model.img_size=[32,256]` được. **Chưa** có bước phát hiện vùng chữ — giữ phạm vi "nhận dạng 1 dòng trên cả ảnh", cần ghi rõ trong báo cáo |
+| 4.4 | SVTR: 64 bước = 4 × 16 cột | ✅ Đã sửa | 16.2 — merging stride (2,1), gộp chiều cao, `pos_embed`; L = 32 cột; 32×64 bị từ chối |
+| 4.5 | Evaluate lọc ngầm, sửa gt, `idx` không truy ngược được | ✅ Đã sửa | 16.3 — chấm mọi mẫu, gt gốc, `in_scope` + `coverage`, `idx` = chỉ số LMDB + `serial_number`/`drawing_kind`; 16.4 — CI bootstrap |
+| 4.6 | Không nạp được pretrained; `docs/colab/` trống | ✅ Đã sửa phần code | 16.6 — `pretrained.finetune` + `tm_{crnn,trba,parseq}_ft` (kiểm với trọng số thật: parseq nạp 172/175); 16.7 — 4 notebook Colab. **Chưa** train thật trên GPU |
+| 4.7 | Nhãn VN chưa kiểm tra, trùng, lẫn đơn chưa cấp, crawl dừng sớm | ✅ Đã có công cụ | 16.5 — `max_empty_pages`, `dedupe_key`, `--registered-only`, `vn_review make/apply` (tỉ lệ nhãn sai). **Chưa** duyệt tay dữ liệu thật |
+| 4.8 | README/DESIGN lệch, `except` rộng, viết cứng cỡ ảnh, `DATA_ROOT` máy cụ thể, parseq chưa ghim, `aiohttp` | ✅ Đã sửa | 16.3 (`resolve_model_class`, hparams), 16.7 (phần còn lại) |
+
+**Phát hiện thêm khi sửa** (không có trong review ban đầu): `fetch_vn.write_outputs` khai cột
+`reg_no` trong khi parser lưu `registration_no` → số đăng ký bị ghi rỗng ở mọi dòng
+`raw/vn_marks.csv`. Đã sửa ở 16.5 (cột sinh từ `_FIELDS`).
+
+### Việc còn lại — cần dữ liệu / GPU thật, không làm được bằng code trong repo
+
+1. Thu thập đủ dữ liệu: US ≥ 50k mẫu sạch (hiện 4.840), VN ≥ 1–2k (hiện 50) —
+   `docs/colab/01_download_data.ipynb`.
+2. Duyệt tay ≥ 300 nhãn VN bằng `vn_review`, ghi `label_noise_rate` vào báo cáo.
+3. Train trên GPU cả hai chế độ (từ đầu và `*_ft`) để so sánh công bằng —
+   `docs/colab/02_train.ipynb`; SVTR phải train lại (kiến trúc đổi, ckpt smoke cũ không nạp được).
+4. Chạy `06_eval.sh`, viết phần phân tích dựa trên bảng phân tách độ sụt (16.4): đọc ở mức
+   bỏ hoa/thường và ở nhóm VN không dấu, kèm CI.
+5. Build lại LMDB (`build_lmdb`) để có khoá `meta-*` → cột `serial_number`/`drawing_kind`
+   trong báo cáo đánh giá.
+6. Nếu muốn mở rộng phạm vi: thêm bước phát hiện vùng chữ (4.3) — thay đổi lớn, chưa làm.
+
+Kiểm chứng của nhánh: `pytest -q` → 236 pass, 0 skip (venv torch 2.14.1+cpu / PL 2.6.6 /
+timm 1.0.30); smoke train thật 2 batch CPU cho `svtr` và `parseq_ft` qua `scripts/05_train.sh`
+trên LMDB tổng hợp, rồi `evaluate` → `eval_domain_shift` → `report` chạy hết.
