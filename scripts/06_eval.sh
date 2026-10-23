@@ -18,7 +18,7 @@ DATA_ROOT="${DATA_ROOT:-/media/zaibachkhoa/AC84-F995/trademark_data}"
 export DATA_ROOT
 export PYTHONPATH="$REPO_ROOT/src:$REPO_ROOT/third_party/parseq:${PYTHONPATH:-}"
 
-MODELS=(crnn trba parseq svtrctc)
+MODELS=(crnn trba parseq svtrctc crnn_ft trba_ft parseq_ft)
 LIMIT=0; DEVICE=cpu; BATCH=8; WORKERS=0; ONLY=""
 
 while [[ $# -gt 0 ]]; do
