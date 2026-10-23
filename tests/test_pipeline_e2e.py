@@ -7,7 +7,7 @@ Các test module riêng đã kiểm từng bước; file này khoá **hợp đ�
 cột, đường dẫn tương đối theo ``DATA_ROOT``, layout LMDB mà parseq đọc, và nhãn tiếng Việt
 có dấu + khoảng trắng đi qua cả chuỗi mà không bị đổi.
 
-Số mẫu giữ dưới 1.000 vì ``create_lmdb`` chỉ đúng ở dải này (xem REVIEW.md §4.1).
+LMDB lớn (≥ 1.000 mẫu, commit theo lô) được kiểm riêng trong ``tests/test_lmdb.py``.
 """
 
 from __future__ import annotations

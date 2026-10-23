@@ -76,8 +76,17 @@ def create_lmdb(
         map_size = max(1 << 30, int(total * 1.3) + (1 << 20))
     env = lmdb.open(str(out_dir), map_size=map_size, subdir=True, readonly=False)
     written = 0
-    with env.begin(write=True) as txn:
-        for i, row in enumerate(rows, start=1):
+    # NOTICE:
+    # Transaction được quản lý tay, không dùng `with env.begin(write=True) as txn`.
+    # Commit theo lô phải mở transaction mới, nhưng `with` chỉ gọi __exit__ của transaction
+    # ban đầu → lô cuối + `num-samples` không được commit, LMDB ≥ commit_every mẫu đọc ra 0
+    # (REVIEW.md §4.1, tests/test_lmdb.py::test_create_lmdb_commits_tail_after_intermediate_commit).
+    #
+    # `num-samples` được ghi trong lô CUỐI: nếu dừng giữa chừng, các lô trước đã commit nhưng
+    # không có `num-samples` → parseq báo lỗi ngay thay vì đọc một tập thiếu mẫu.
+    txn = env.begin(write=True)
+    try:
+        for row in rows:
             img = _resolve_image(row["image_path"], Path(data_root))
             if not img.exists():
                 continue
@@ -89,8 +98,13 @@ def create_lmdb(
                 txn.commit()
                 txn = env.begin(write=True)
         txn.put("num-samples".encode(), str(written).encode())
-    env.sync()
-    env.close()
+        txn.commit()
+    except BaseException:
+        txn.abort()
+        raise
+    finally:
+        env.sync()
+        env.close()
     return {"out": str(out_dir), "num_samples": written,
             "skipped": len(rows) - written, "map_size": map_size}
 
