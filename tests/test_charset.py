@@ -87,3 +87,38 @@ def test_stats_sane():
     assert s["n_classes_ctc"] == len(CHARSET_VI) + 1
     assert s["n_vietnamese_letters"] >= 80  # ~89 chữ có dấu + đ/Đ
     assert s["has_space"] and s["nfc_stable"]
+
+
+# ------------------------------------------------------------------------
+# Độ phủ bảng chữ tiếng Việt (kiểm theo Unicode, không theo danh sách tự gõ)
+# ------------------------------------------------------------------------
+
+#: Khối "Latin Extended Additional" U+1EA0..U+1EF9 = toàn bộ chữ Việt có thanh dựng sẵn.
+_VN_BLOCK = [chr(cp) for cp in range(0x1EA0, 0x1EFA)]
+#: chữ Việt dựng sẵn nằm ở Latin-1 / Latin Extended-A / B (ngoài khối trên)
+_VN_LATIN = "ÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝàáâãèéêìíòóôõùúýĂăĐđĨĩŨũƠơƯư"
+
+
+def test_charset_covers_whole_vietnamese_unicode_block():
+    missing = [c for c in _VN_BLOCK + list(_VN_LATIN) if c not in CHARSET_VI]
+    assert not missing, f"thiếu {missing}"
+
+
+def test_charset_has_exactly_134_vietnamese_letters_and_no_combining_marks():
+    vn = set(_VN_BLOCK) | set(_VN_LATIN)
+    assert len(vn) == 134                                     # 67 thường + 67 hoa
+    assert sum(1 for c in CHARSET_VI if c in vn) == 134
+    assert not any(unicodedata.combining(c) for c in CHARSET_VI)
+
+
+@pytest.mark.parametrize("label", [
+    # nhãn thật lấy từ tập VN (reports/crnn_vn.csv)
+    "Luân Hồi", "LINH MỘC Y ĐƯỜNG", "NÔNG TRẠI CẨM THẠCH",
+    "HP Food Đặc sản Hải Phòng", "1P's Bakery & Cafe To-Go", "LJ LEJET CAFÉ BISTRO",
+])
+def test_real_vn_labels_fully_supported_after_nfc(label):
+    nfd = unicodedata.normalize("NFD", label)
+    if nfd != label:                             # nhãn có dấu
+        assert not contains_only_supported(nfd)  # dấu rời (NFD) không phải token
+    assert contains_only_supported(to_nfc(nfd))  # → mọi khâu phải NFC trước
+    assert filter_supported(to_nfc(nfd)) == label

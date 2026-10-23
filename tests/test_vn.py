@@ -124,3 +124,58 @@ def test_fetch_vn_cli_help_exits_zero():
     with pytest.raises(SystemExit) as e:
         fv.main(["--help"])
     assert e.value.code == 0
+
+
+# ------------------------- VnClient (luồng phân trang) -------------------------
+
+_SEARCH_HTML = (
+    '<script>Wicket.Ajax.ajax({"f":"id9","u":"./trademarks;jsessionid=S1?0-1.IBehaviorListener.'
+    '0-body-basicSearchTab-searchInputPanel-searchForm-searchSubmitLink&query=*:*"});</script>'
+    '<script>Wicket.Ajax.baseUrl="public/trademarks?0&amp;query=*:*";</script>'
+)
+
+
+class _Resp:
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.status_code = 200
+        self.content = text.encode()
+
+
+class _FakeSession:
+    """Giả lập WIPO Publish: GET trang tìm kiếm → POST tìm → GET 'navigator-next' (lặp lại panel)."""
+
+    def __init__(self, panel: str) -> None:
+        self.panel = panel
+        self.headers: dict[str, str] = {}
+        self.verify = True
+        self.calls: list[tuple[str, str]] = []
+
+    def get(self, url, **_kw):
+        self.calls.append(("GET", url))
+        return _Resp(self.panel if "navigator-next" in url else _SEARCH_HTML)
+
+    def post(self, url, data=None, headers=None, **_kw):
+        self.calls.append(("POST", url))
+        assert data.startswith("id9_hf_0=")                # form id đọc từ HTML, không hard-code
+        assert headers["Wicket-Ajax"] == "true"
+        assert headers["Wicket-Ajax-BaseURL"] == "public/trademarks?0&query=*:*"
+        return _Resp(self.panel)
+
+
+def test_client_iter_rows_respects_limit_without_extra_requests(panel):
+    sess = _FakeSession(panel)
+    client = fv.VnClient(session=sess, sleep=0)
+    rows = list(client.iter_rows(limit=2))
+    assert [r["serial_number"] for r in rows] == ["VN4202645978", "VN4202645648"]
+    assert sess.verify is False                            # chứng chỉ tự ký
+    assert [m for m, _ in sess.calls] == ["GET", "POST"]   # đủ limit → không lật trang
+    assert sess.calls[1][1].startswith(fv.VN_BASE + "/public/trademarks;jsessionid=S1?")
+
+
+def test_client_iter_rows_paginates_and_never_repeats_a_mark(panel):
+    sess = _FakeSession(panel)
+    rows = list(fv.VnClient(session=sess, sleep=0).iter_rows(limit=0))
+    ids = [r["serial_number"] for r in rows]
+    assert ids == ["VN4202645978", "VN4202645648", "VN4202645228"]
+    assert any("navigator-next" in url for _m, url in sess.calls)   # đã đi trang kế

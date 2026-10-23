@@ -942,3 +942,22 @@ train → chuỗi rác, đúng như dự kiến). `report` → `final_summary.md
 `run` thiếu ckpt/ảnh → `SystemExit`; `run` với stub in ra dự đoán.
 `report`: `collect`+`render` (đúng bảng, US/VN, dòng shift), thư mục rỗng vẫn ghi md
 (có câu "Chưa có báo cáo nào"), liệt kê `fig_*`/`err_*` (bỏ `.txt`), CLI `--help` exit 0.
+
+## 15-review-tests — review + test khoá các phần đã chạy đúng
+
+`REVIEW.md` ghi nhận định review (đối chiếu `detai.txt`): mức hoàn thành, điểm mạnh, 8 nhóm
+vấn đề xếp theo mức nghiêm trọng kèm cách tái hiện. Mục §6 của file đó là nơi cập nhật trạng
+thái xử lý.
+
+Nhánh này **không sửa code chạy thật**; chỉ thêm test cho những hành vi đã đúng, để các nhánh
+sửa sau không làm hỏng chúng:
+
+| File | Khoá điều gì |
+|---|---|
+| `tests/test_pipeline_e2e.py` | chuỗi `clean.run → split.run → build_lmdb.run → SceneTextDataModule` (config `tm_crnn` thật) trên dữ liệu giả: đếm đúng từng lý do rớt, số mẫu split = số mẫu LMDB, nhãn có dấu/space/dấu câu đi qua cả chuỗi không đổi, batch `(4,3,32,128)` trong `[-1,1]`, và đường dẫn ảnh tương đối vẫn build được sau khi chuyển `DATA_ROOT` |
+| `tests/test_parseq_contracts.py` | mọi `tm_*.yaml`: khối `model` và `data` khớp nhau (charset, `max_label_length`, `img_size`, `batch_size`), cả hai cờ tiếng Việt tắt, layout LMDB; chứng minh bằng `LmdbDataset` thật vì sao phải tắt (`remove_whitespace` → `ĐÔNGÁ`, `normalize_unicode` → `ONG A`); `CharsetAdapter` giữ hoa/thường; CRNN có ≥ `max_label_length` bước CTC; shim NumPy-2 cho RandAugment |
+| `tests/test_charset.py` (+3) | phủ toàn bộ khối Unicode U+1EA0–U+1EF9 + chữ Việt ở Latin-1/Ext-A; đúng 134 chữ Việt, không có dấu tổ hợp rời; nhãn VN thật chỉ hợp lệ sau NFC |
+| `tests/test_metrics.py` (+4) | `edit_distance` khớp định nghĩa đệ quy trên chuỗi ngẫu nhiên (có chữ Việt), là metric (đối xứng, bất đẳng thức tam giác), NED ∈ [0,1]; accuracy hiện so khớp tuyệt đối |
+| `tests/test_vn.py` (+2) | `VnClient.iter_rows` với session giả: form id đọc từ HTML, header Wicket, `verify=False`, dừng khi đủ `limit` mà không lật trang thừa, phân trang không lặp mẫu |
+
+Số mẫu trong test e2e cố ý < 1.000 (giới hạn của `create_lmdb`, REVIEW.md §4.1).
