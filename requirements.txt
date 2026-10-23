@@ -37,7 +37,6 @@ pyyaml>=6.0
 # --- downloading ---
 requests>=2.31
 tqdm>=4.66
-aiohttp>=3.9        # async crawler (VN trademark fetcher)
 
 # --- analysis / reporting ---
 matplotlib>=3.8

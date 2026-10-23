@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import os
 import re
 import sys
 from collections import defaultdict
@@ -27,9 +26,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from trademark_ocr import DEFAULT_DATA_ROOT
 from trademark_ocr.metrics import evaluate_metrics
 
-DEFAULT_DATA_ROOT = os.environ.get("DATA_ROOT", "/media/zaibachkhoa/AC84-F995/trademark_data")
 _REPORT_RE = re.compile(r"^(?P<model>.+)_(?P<domain>us|vn)\.csv$")
 
 

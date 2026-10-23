@@ -15,17 +15,18 @@
 ```
 major_proj_1/
 ├── DESIGN.md               # mô tả chi tiết code (đọc trước khi sửa)
-├── ACCEPTANCE.md           # lệnh nghiệm thu 15 nhánh
+├── ACCEPTANCE.md           # lệnh nghiệm thu từng nhánh
+├── REVIEW.md               # đánh giá phương án/code + trạng thái xử lý
 ├── README.md               # file này — hướng dẫn chạy
 ├── requirements.txt
 ├── pyproject.toml          # pip install -e .  → package `trademark_ocr`
 ├── src/trademark_ocr/      # toàn bộ code của đồ án
 ├── configs/                # charset + hydra experiment configs
-│   ├── charset_vi.yaml     # bảng ký tự VN (tự sinh từ src/trademark_ocr/charset.py)
-│   └── hydra/              # config huấn luyện (crnn/trba/parseq/svtrctc)
-├── scripts/                # pipeline shell (01→06) + Colab helper
+│   ├── charset_vi.txt      # bảng ký tự VN (tự sinh từ src/trademark_ocr/charset.py)
+│   └── hydra/              # config huấn luyện (crnn/trba/parseq/svtrctc + *_ft) + charset/charset_vi.yaml
+├── scripts/                # pipeline shell (00→06)
 ├── notebooks/              # EDA, error analysis
-├── docs/colab/             # notebook/cell Colab copy-paste
+├── docs/colab/             # notebook Colab: setup → tải dữ liệu → train → eval
 ├── tests/                  # pytest
 ├── reports/                # bảng biểu kết quả (csv/json/figures)
 └── third_party/parseq/     # clone baudm/parseq (gitignored)
@@ -39,8 +40,8 @@ python -m venv .venv && source .venv/bin/activate   # (tuỳ chọn)
 pip install -r requirements.txt
 pip install -e .
 
-# 2) clone khung parseq (nếu chưa có)
-git clone https://github.com/baudm/parseq third_party/parseq
+# 2) lấy khung parseq ở đúng commit đã kiểm chứng (ghim trong script)
+bash scripts/00_get_parseq.sh
 
 # 3) chạy test nhanh
 pytest -q
@@ -48,12 +49,14 @@ pytest -q
 
 ## Nguồn dữ liệu
 
-- **DATA_ROOT** (mặc định ổ đầy đủ dung lượng):
-  `export DATA_ROOT=/media/zaibachkhoa/AC84-F995/trademark_data`
+- **DATA_ROOT**: không đặt thì mặc định `<repo>/data` (gitignore). Đặt sang ổ đủ dung lượng:
+  `export DATA_ROOT=/media/zaibachkhoa/AC84-F995/trademark_data` (máy chủ repo).
   Trên Colab: `DATA_ROOT=/content/drive/MyDrive/trademark_data` (mount Drive).
 - Metadata USPTO (text): `scripts/01_get_meta.sh` → `$DATA_ROOT/raw/meta/`
   (nguồn TMOG / EOG REST API công khai, **không cần API key** — chi tiết DESIGN.md nhánh 02)
 - Ảnh USPTO: `scripts/02_get_images.sh` → `$DATA_ROOT/raw/images_us/`
+- Nhãn hiệu VN (tập test mới): `scripts/03_get_vn.sh` → kiểm tra tay bằng
+  `python -m trademark_ocr.vn_review make|apply` (DESIGN.md 16.5)
 - (Hoặc tải bằng Colab: `docs/colab/01_download_data.ipynb`)
 
 ## Huấn luyện (Google Colab, GPU T4)
@@ -63,9 +66,17 @@ pytest -q
 bash scripts/05_train.sh crnn      # baseline CRNN+CTC
 bash scripts/05_train.sh trba      # TRBA (attention)
 bash scripts/05_train.sh parseq    # PARSeq (transformer)
-bash scripts/05_train.sh svtrctc   # SVTR-CTC (CTC transformer)
+bash scripts/05_train.sh svtrctc   # SVTR-CTC (CTC transformer), tên ngắn: svtr
+# fine-tune từ trọng số pretrained của parseq (khuyến nghị — DESIGN.md 16.6)
+bash scripts/05_train.sh crnn_ft
+bash scripts/05_train.sh trba_ft
+bash scripts/05_train.sh parseq_ft
 bash scripts/06_eval.sh            # đánh giá trên test US + test VN
 ```
+
+Đọc kết quả ở `reports/final_summary.md`: so sánh US↔VN nên đọc ở mức **bỏ hoa/thường**
+(nhãn USPTO luôn viết hoa) và ở nhóm VN **không dấu** (model chưa từng học chữ có dấu) —
+xem REVIEW.md §4.2 và DESIGN.md 16.4.
 
 ## Nhánh Git (merge tuần tự)
 
@@ -73,6 +84,6 @@ bash scripts/06_eval.sh            # đánh giá trên test US + test VN
 04-clean-label → 05-split-build_data → 06-eda → 07-train-crnn →
 08-train-parseq → 09-train-svtrv2 → 10-eval-metrics → 11-fetch-vn →
 12-eval_domain_shift → 13-error-analysis → 14-demo-report →
-15-review-tests`
+15-review-tests → 16-fix-review`
 
 Mỗi nhánh có lệnh nghiệm thu tương ứng trong `ACCEPTANCE.md`.

@@ -29,7 +29,6 @@ import argparse
 import csv
 import hashlib
 import json
-import os
 import sys
 import threading
 import time
@@ -40,9 +39,8 @@ from typing import Any, Callable, Iterable, Sequence
 import requests
 from PIL import Image
 
-DEFAULT_DATA_ROOT: str = os.environ.get(
-    "DATA_ROOT", "/media/zaibachkhoa/AC84-F995/trademark_data"
-)
+from trademark_ocr import DEFAULT_DATA_ROOT
+
 
 #: Dưới ngưỡng này coi như file lỗi (ảnh hợp lệ nhỏ nhất thực tế vài trăm byte).
 MIN_BYTES: int = 100

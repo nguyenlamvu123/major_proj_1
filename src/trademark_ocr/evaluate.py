@@ -36,19 +36,16 @@ import csv
 import importlib
 import io
 import json
-import os
 import sys
 import unicodedata
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
+from trademark_ocr import DEFAULT_DATA_ROOT
 from trademark_ocr.build_lmdb import read_meta
 from trademark_ocr.charset import CHARSET_VI
 from trademark_ocr.metrics import REPORT_COLUMNS, evaluate_metrics, format_summary, per_sample
 
-DEFAULT_DATA_ROOT: str = os.environ.get(
-    "DATA_ROOT", "/media/zaibachkhoa/AC84-F995/trademark_data"
-)
 PARSEQ_ROOT = Path(__file__).resolve().parents[2] / "third_party" / "parseq"
 if str(PARSEQ_ROOT) not in sys.path:
     sys.path.insert(0, str(PARSEQ_ROOT))
@@ -242,7 +239,7 @@ def run(*, ckpt: Path | str, subset: str, out: Path | str,
         out.with_name(out.name + ".summary.json")
     summary_path.write_text(json.dumps(metrics, ensure_ascii=False, indent=2) + "\n",
                             encoding="utf-8")
-    log(f"[evaluate] {Path(ckpt).parent.name or ckpt} / {subset}: {format_summary(metrics)} "
+    log(f"[evaluate] {type(model).__name__} / {subset}: {format_summary(metrics)} "
         f"coverage={metrics['coverage']:.3f} "
         f"(quá dài {metrics['n_too_long']}, ký tự lạ {metrics['n_unsupported_char']})")
     log(f"[evaluate] CSV -> {out}  |  summary -> {summary_path}")

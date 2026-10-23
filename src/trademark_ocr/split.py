@@ -23,18 +23,15 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
 import random
 import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
 
+from trademark_ocr import DEFAULT_DATA_ROOT
 from trademark_ocr.clean import CLEAN_COLUMNS, write_clean_csv
 
-DEFAULT_DATA_ROOT: str = os.environ.get(
-    "DATA_ROOT", "/media/zaibachkhoa/AC84-F995/trademark_data"
-)
 
 SPLIT_NAMES: tuple[str, ...] = ("train", "val", "test_us")
 

@@ -4,7 +4,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export DATA_ROOT="${DATA_ROOT:-/media/zaibachkhoa/AC84-F995/trademark_data}"
+export DATA_ROOT="${DATA_ROOT:-$REPO_ROOT/data}"
 PYTHON_BIN="${PYTHON:-$(command -v python3 || command -v python)}"
 
 cd "$REPO_ROOT"

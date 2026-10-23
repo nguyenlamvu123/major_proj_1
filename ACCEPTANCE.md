@@ -312,6 +312,25 @@ bash scripts/05_train.sh parseq_ft --limit-train-batches 2 --max-epochs 1 --acce
 `[pretrained] parseq: nạp 172 tensor, bỏ 3 lệch kích thước [...]`; tạo `runs/parseq_ft/<ts>/checkpoints/last.ckpt`.
 > Lần đầu cần mạng (~95 MB parseq, ~33 MB crnn, ~200 MB trba vào cache `torch.hub`).
 
+### 16.7 Dọn dẹp + Colab
+
+```bash
+pytest -q tests/test_repo_hygiene.py
+bash scripts/00_get_parseq.sh                      # in: third_party/parseq @ 1902db0
+grep -rn "/media/zaibachkhoa" src scripts configs docs || echo NO_HARDCODED_PATH
+```
+**Pass khi**: test xanh; in `NO_HARDCODED_PATH`; `docs/colab/` có 4 notebook `00`…`03`.
+
+### Toàn nhánh 16
+
+```bash
+pytest -q
+```
+**Pass khi**: toàn bộ xanh, **không còn test bị skip** (test evaluate cần LMDB thật đã được
+thay bằng bản offline). Đã nghiệm thu: 236 pass trên venv torch 2.14.1+cpu / PL 2.6.6 /
+timm 1.0.30; thêm smoke train thật 2 batch CPU cho `svtr` và `parseq_ft` qua
+`scripts/05_train.sh` trên LMDB tổng hợp, rồi `evaluate` → `eval_domain_shift` → `report`.
+
 ---
 
 ## Ghi chú chung
