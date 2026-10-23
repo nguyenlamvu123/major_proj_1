@@ -961,3 +961,20 @@ sửa sau không làm hỏng chúng:
 | `tests/test_vn.py` (+2) | `VnClient.iter_rows` với session giả: form id đọc từ HTML, header Wicket, `verify=False`, dừng khi đủ `limit` mà không lật trang thừa, phân trang không lặp mẫu |
 
 Số mẫu trong test e2e cố ý < 1.000 (giới hạn của `create_lmdb`, REVIEW.md §4.1).
+
+## 16-fix-review — xử lý các vấn đề trong REVIEW.md
+
+Mỗi mục dưới đây ứng với một mục của REVIEW.md §4 và một commit trên nhánh này.
+
+### 16.1 `build_lmdb.create_lmdb` — commit theo lô (REVIEW §4.1)
+
+Transaction được quản lý tay: `txn = env.begin(write=True)` → commit mỗi `commit_every`
+mẫu → lô cuối ghi `num-samples` rồi commit → `abort()` nếu có ngoại lệ → `sync/close` trong
+`finally`. Không dùng `with env.begin(...)`: `with` chỉ đóng transaction ban đầu, nên bản cũ
+mất lô cuối + `num-samples` khi có ≥ `commit_every` (1000) mẫu.
+
+`num-samples` cố ý nằm ở lô cuối: dừng giữa chừng thì LMDB không có khoá này và parseq báo
+lỗi ngay, thay vì âm thầm đọc một tập thiếu mẫu.
+
+Test hồi quy (`tests/test_lmdb.py`): `commit_every=3` với 7 mẫu (đọc lại đủ, đúng thứ tự)
+và 1.500 mẫu với mặc định 1.000, đọc bằng `LmdbDataset` thật của parseq.

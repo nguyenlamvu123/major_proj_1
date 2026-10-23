@@ -244,6 +244,17 @@ pytest -q
 > **Đã nghiệm thu**: `pytest -q` → 177 pass, 1 skip (test cần LMDB thật), trên venv
 > torch 2.14.1+cpu / PL 2.6.6 / timm 1.0.30. Không cần mạng, không cần `DATA_ROOT`.
 
+## 16-fix-review — xử lý các vấn đề trong REVIEW.md
+
+### 16.1 LMDB ≥ 1.000 mẫu
+
+```bash
+pytest -q tests/test_lmdb.py
+python -m trademark_ocr.build_lmdb --subset train          # toàn bộ split, không --limit
+python -c "import lmdb,os;e=lmdb.open(os.environ['DATA_ROOT']+'/lmdb/train/trademark',readonly=True,lock=False);print(e.begin().get(b'num-samples'))"
+```
+**Pass khi**: test xanh; `num-samples` in ra đúng bằng số dòng `split_train.csv` (không phải `None`).
+
 ---
 
 ## Ghi chú chung
