@@ -31,18 +31,15 @@ import argparse
 import csv
 import html
 import json
-import os
 import random
 import sys
 import unicodedata
 from pathlib import Path
 from typing import Any, Callable
 
+from trademark_ocr import DEFAULT_DATA_ROOT
 from trademark_ocr.charset import collapse_ws
 
-DEFAULT_DATA_ROOT: str = os.environ.get(
-    "DATA_ROOT", "/media/zaibachkhoa/AC84-F995/trademark_data"
-)
 
 REVIEW_COLUMNS: tuple[str, ...] = ("serial_number", "image_path", "word_mark", "visible_text")
 #: cột split đã xác minh — khớp ``fetch_vn.SPLIT_COLUMNS`` để build_lmdb đọc như cũ

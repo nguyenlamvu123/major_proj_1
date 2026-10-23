@@ -48,7 +48,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
 import random
 import sys
 import time
@@ -58,6 +57,7 @@ from typing import Any, Callable, Iterable, Iterator, Sequence
 
 import requests
 
+from trademark_ocr import DEFAULT_DATA_ROOT
 from trademark_ocr.charset import (
     CHARSET_VI,
     collapse_ws,
@@ -78,9 +78,6 @@ SEARCH_ENDPOINT: str = f"{TMOG_API}/external/search/all"
 #: API chấp nhận tối đa 100 bản ghi / trang (đã kiểm chứng: limit=250 -> rỗng).
 MAX_PAGE_SIZE: int = 100
 
-DEFAULT_DATA_ROOT: str = os.environ.get(
-    "DATA_ROOT", "/media/zaibachkhoa/AC84-F995/trademark_data"
-)
 
 #: Cột CSV — ACCEPTANCE nhánh 02 yêu cầu tối thiểu
 #: ``serial_number, word_mark, image_status``; phần còn lại phục vụ nhánh sau.

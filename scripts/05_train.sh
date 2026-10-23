@@ -6,7 +6,7 @@
 #   bash scripts/05_train.sh crnn --limit-train-batches 2 --max-epochs 1 --accelerator cpu
 #   bash scripts/05_train.sh parseq --max-epochs 20
 #
-# Mô hình: crnn | trba | parseq | svtr  (train từ đầu)
+# Mô hình: crnn | trba | parseq | svtr (= svtrctc)  (train từ đầu)
 #          crnn_ft | trba_ft | parseq_ft  (fine-tune từ trọng số pretrained của parseq, DESIGN 16.6)
 # Checkpoint: $DATA_ROOT/runs/<model>/<timestamp>/*.ckpt
 # =====================================================================
@@ -22,18 +22,18 @@ case "$MODEL" in
   trba)      CONFIG="tm_trba" ;;
   parseq)    CONFIG="tm_parseq" ;;
   crnn_ft|trba_ft|parseq_ft) CONFIG="tm_$MODEL" ;;
-  svtr)      CONFIG="tm_svtrctc" ;;
+  svtr|svtrctc) CONFIG="tm_svtrctc" ;;
   tm_*)      CONFIG="$MODEL" ;;
   *) echo "unknown model '$MODEL' (mô hình: crnn | trba | parseq | svtr | crnn_ft | trba_ft | parseq_ft)" >&2; exit 1 ;;
 esac
 
-DATA_ROOT="${DATA_ROOT:-/media/zaibachkhoa/AC84-F995/trademark_data}"
+DATA_ROOT="${DATA_ROOT:-$REPO_ROOT/data}"
 export DATA_ROOT
 # compat/ -> sitecustomize tự áp shim NumPy-2 cho imgaug (RandAugment)
 export PYTHONPATH="$REPO_ROOT/compat:$REPO_ROOT/src:$REPO_ROOT/third_party/parseq${PYTHONPATH:+:$PYTHONPATH}"
 
 if [ ! -d "$REPO_ROOT/third_party/parseq/strhub" ]; then
-  echo "thiếu third_party/parseq — hãy: git clone https://github.com/baudm/parseq $REPO_ROOT/third_party/parseq" >&2
+  echo "thiếu third_party/parseq — hãy chạy: bash scripts/00_get_parseq.sh" >&2
   exit 1
 fi
 if [ ! -d "$DATA_ROOT/lmdb/train" ]; then

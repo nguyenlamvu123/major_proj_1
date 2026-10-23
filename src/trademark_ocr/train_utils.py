@@ -23,11 +23,11 @@ CLI
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 from typing import Any, Sequence
 
+from trademark_ocr import DEFAULT_DATA_ROOT
 # Shim NumPy-2 cho imgaug (RandAugment) — cần TRƯỚC khi import strhub.data.augment.
 from trademark_ocr._numpy2_compat import apply_numpy2_compat  # noqa: F401
 
@@ -38,16 +38,12 @@ CFG_DIR = REPO_ROOT / "configs" / "hydra"
 if str(PARSEQ_ROOT) not in sys.path:
     sys.path.insert(0, str(PARSEQ_ROOT))
 
-DEFAULT_DATA_ROOT: str = os.environ.get(
-    "DATA_ROOT", "/media/zaibachkhoa/AC84-F995/trademark_data"
-)
 
 
 def _require_strhub() -> None:
     if not (PARSEQ_ROOT / "strhub" / "__init__.py").exists():
         raise SystemExit(
-            "Không thấy third_party/parseq/strhub — hãy:\n"
-            f"  git clone https://github.com/baudm/parseq {PARSEQ_ROOT}"
+            "Không thấy third_party/parseq/strhub — hãy chạy: bash scripts/00_get_parseq.sh"
         )
 
 

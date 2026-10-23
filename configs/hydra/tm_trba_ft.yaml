@@ -26,7 +26,7 @@ model:
 
 data:
   _target_: strhub.data.module.SceneTextDataModule
-  root_dir: ${oc.env:DATA_ROOT,/media/zaibachkhoa/AC84-F995/trademark_data}/lmdb
+  root_dir: ${oc.env:DATA_ROOT,data}/lmdb
   train_dir: trademark           # == lmdb/train/trademark (nhánh 05)
   batch_size: ${model.batch_size}
   img_size: ${model.img_size}
@@ -58,7 +58,7 @@ pretrained: null
 hydra:
   output_subdir: config
   run:
-    dir: ${oc.env:DATA_ROOT,/media/zaibachkhoa/AC84-F995/trademark_data}/runs/${model.name}/${now:%Y-%m-%d_%H-%M-%S}
+    dir: ${oc.env:DATA_ROOT,data}/runs/${model.name}/${now:%Y-%m-%d_%H-%M-%S}
   sweep:
-    dir: ${oc.env:DATA_ROOT,/media/zaibachkhoa/AC84-F995/trademark_data}/runs/${model.name}/multirun/${now:%Y-%m-%d_%H-%M-%S}
+    dir: ${oc.env:DATA_ROOT,data}/runs/${model.name}/multirun/${now:%Y-%m-%d_%H-%M-%S}
     subdir: ${hydra.job.override_dirname}
