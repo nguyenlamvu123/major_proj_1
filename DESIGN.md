@@ -1163,7 +1163,7 @@ ckpt Lightning, từ chối file không khớp, `tm_parseq_ft` instantiate đư�
 | `requirements.txt` | có `aiohttp` (không dùng) | bỏ |
 | DESIGN bảng module / model zoo | `models_svtr.py` | `svtr_ctc.py` |
 | log `evaluate` | `[evaluate] checkpoints / …` (tên thư mục) | `[evaluate] <lớp model> / …` |
-| `docs/colab/` | chỉ `.gitkeep` | `00_setup` (clone repo + `00_get_parseq` + test nhanh), `01_download_data` (US → LMDB, VN → duyệt tay → LMDB), `02_train` (chép LMDB ra đĩa máy ảo, `05_train.sh <MODEL>`), `03_eval` (`06_eval.sh` → `final_summary.md`) |
+| `docs/colab/` | chỉ `.gitkeep` | `00_setup` (clone repo + `00_get_parseq` + test nhanh), `01_download_data` (runtime CPU; ảnh US tải về ổ máy ảo, chỉ chép `raw/meta`, `raw/images_us.tar`, `processed/`, `lmdb/` lên Drive vì thư mục Drive nhiều file dễ timeout; VN làm thẳng trên Drive → duyệt tay → LMDB; bản cũ ghi thẳng vào Drive giữ ở `01_download_data_old.ipynb`), `02_train` (chép LMDB ra đĩa máy ảo, `05_train.sh <MODEL>`), `03_eval` (`06_eval.sh` → `final_summary.md`) |
 
 ⚠️ Đổi mặc định `DATA_ROOT`: máy nào trước đây dựa vào mặc định `/media/...` mà không
 `export DATA_ROOT` thì giờ sẽ đọc/ghi `<repo>/data` — ACCEPTANCE đã `export` ở bước cài đặt.

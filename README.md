@@ -40,38 +40,76 @@ python -m venv .venv && source .venv/bin/activate   # (tuỳ chọn)
 pip install -r requirements.txt
 pip install -e .
 
-# 2) lấy khung parseq ở đúng commit đã kiểm chứng (ghim trong script)
-bash scripts/00_get_parseq.sh
-
-# 3) chạy test nhanh
+# 2) chạy test nhanh
 pytest -q
 ```
 
+| Script | Lệnh tương đương |
+|---|---|
+| `bash scripts/00_get_parseq.sh` | `git clone https://github.com/baudm/parseq third_party/parseq` (bỏ qua nếu đã có)<br>`git -C third_party/parseq fetch --depth 1 origin 1902db043c029a7e03a3818c616c06600af574be`<br>`git -C third_party/parseq checkout 1902db043c029a7e03a3818c616c06600af574be` |
+
 ## Nguồn dữ liệu
 
-- **DATA_ROOT**: không đặt thì mặc định `<repo>/data` (gitignore). Đặt sang ổ đủ dung lượng:
-  `export DATA_ROOT=/media/zaibachkhoa/AC84-F995/trademark_data` (máy chủ repo).
-  Trên Colab: `DATA_ROOT=/content/drive/MyDrive/trademark_data` (mount Drive).
-- Metadata USPTO (text): `scripts/01_get_meta.sh` → `$DATA_ROOT/raw/meta/`
-  (nguồn TMOG / EOG REST API công khai, **không cần API key** — chi tiết DESIGN.md nhánh 02)
-- Ảnh USPTO: `scripts/02_get_images.sh` → `$DATA_ROOT/raw/images_us/`
-- Nhãn hiệu VN (tập test mới): `scripts/03_get_vn.sh` → kiểm tra tay bằng
-  `python -m trademark_ocr.vn_review make|apply` (DESIGN.md 16.5)
-- (Hoặc tải bằng Colab: `docs/colab/01_download_data.ipynb`)
+**DATA_ROOT**: không đặt thì mặc định `<repo>/data` (gitignore). Đặt sang ổ đủ dung lượng:
+
+```bash
+export DATA_ROOT=/media/zaibachkhoa/AC84-F995/trademark_data   # máy chủ repo
+export PYTHONPATH=$PWD/compat:$PWD/src:$PWD/third_party/parseq
+# Colab: export DATA_ROOT=/content/drive/MyDrive/trademark_data (mount Drive)
+```
+
+| Script | Lệnh tương đương | Đầu ra | Ghi chú |
+|---|---|---|---|
+| `bash scripts/01_get_meta.sh --limit 6000` | `python -m trademark_ocr.fetch_meta --limit 6000` | `$DATA_ROOT/raw/meta/us_marks.csv`, `us_marks.csv.stats.json` | `GET .../search/publications` lấy danh sách issue gazette; mỗi issue `POST .../search/all` phân trang `offset/limit` (≤100/trang) trong `iter_issue()`; lọc `is_candidate` rồi dừng khi đủ `--limit`. |
+| `bash scripts/02_get_images.sh` | `python -m trademark_ocr.fetch_images` | `$DATA_ROOT/raw/images_us/{serial}.png`, `raw/images_us/index.csv`; cập nhật `image_status` trong metadata | Đọc `image_url` từ metadata, tải song song bằng `ThreadPoolExecutor`; **resume** (bỏ qua serial đã `ok`), kiểm tra ảnh bằng PIL, ghi `index.csv`; `--verify` mở lại toàn bộ ảnh. |
+| `bash scripts/03_get_vn.sh --limit 2000` | `python -m trademark_ocr.fetch_vn --limit 2000` | `raw/vn_marks.csv`, `raw/images_vn/`, `raw/vn_report.json`, `processed/split_test_vn.csv`, `processed/test_vn.txt` | WIPO Publish: `GET` trang tìm kiếm lấy form/session → `POST` AJAX `searchSubmitLink` → panel 50 hàng/trang, phân trang `navigator-next`; lấy `rs-MK` + ảnh thumbnail; dedupe, `--registered-only`, dừng khi đủ `--limit`. |
+
+Metadata USPTO lấy từ TMOG / EOG REST API công khai, **không cần API key** (chi tiết DESIGN.md
+nhánh 02); ảnh US lấy từ CDN USPTO, ảnh VN từ WIPO Publish. Kiểm tra tay nhãn VN bằng
+`python -m trademark_ocr.vn_review make|apply` (DESIGN.md 16.5). Có thể tải bằng Colab:
+`docs/colab/01_download_data.ipynb`.
 
 ## Huấn luyện (Google Colab, GPU T4)
 
 ```bash
 # clone repo + mount Drive, cài deps  →  docs/colab/00_setup.ipynb
-bash scripts/05_train.sh crnn      # baseline CRNN+CTC
-bash scripts/05_train.sh trba      # TRBA (attention)
-bash scripts/05_train.sh parseq    # PARSeq (transformer)
-bash scripts/05_train.sh svtrctc   # SVTR-CTC (CTC transformer), tên ngắn: svtr
-# fine-tune từ trọng số pretrained của parseq (khuyến nghị — DESIGN.md 16.6)
-bash scripts/05_train.sh crnn_ft
-bash scripts/05_train.sh trba_ft
-bash scripts/05_train.sh parseq_ft
-bash scripts/06_eval.sh            # đánh giá trên test US + test VN
+export DATA_ROOT=/content/drive/MyDrive/trademark_data
+export PYTHONPATH=$PWD/compat:$PWD/src:$PWD/third_party/parseq
+```
+
+| Script | Lệnh tương đương |
+|---|---|
+| `bash scripts/05_train.sh crnn` | `python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_crnn` |
+| `bash scripts/05_train.sh trba` | `python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_trba` |
+| `bash scripts/05_train.sh parseq` | `python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_parseq` |
+| `bash scripts/05_train.sh svtrctc` (hoặc `svtr`) | `python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_svtrctc` |
+| `bash scripts/05_train.sh crnn_ft` | `python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_crnn_ft` |
+| `bash scripts/05_train.sh trba_ft` | `python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_trba_ft` |
+| `bash scripts/05_train.sh parseq_ft` | `python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_parseq_ft` |
+| `bash scripts/06_eval.sh` | Xem khối lệnh đánh giá ngay dưới bảng |
+
+Cờ của `05_train.sh` được thay bằng override Hydra: `--batch-size 64` → `model.batch_size=64`,
+`--max-epochs 20` → `trainer.max_epochs=20`, `--num-workers 0` → `data.num_workers=0`,
+`--limit-train-batches 2` → `trainer.limit_train_batches=2`, `--accelerator cpu` →
+`trainer.accelerator=cpu`. Ví dụ:
+
+```bash
+python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_parseq_ft \
+  model.batch_size=64 trainer.max_epochs=20
+```
+
+`bash scripts/06_eval.sh` tương đương:
+
+```bash
+for m in crnn trba parseq svtrctc crnn_ft trba_ft parseq_ft; do
+  ckpt=$(ls -dt "$DATA_ROOT/runs/$m"/*/checkpoints/last.ckpt 2>/dev/null | head -1)
+  [ -z "$ckpt" ] && continue
+  python -m trademark_ocr.evaluate --ckpt "$ckpt" --subset test_us --out "reports/${m}_us.csv"
+  python -m trademark_ocr.evaluate --ckpt "$ckpt" --subset test_vn --out "reports/${m}_vn.csv"
+done
+python -m trademark_ocr.eval_domain_shift --reports reports/ --out reports/domain_shift.csv
+python -m trademark_ocr.error_analysis --reports reports/ --out-dir "$DATA_ROOT/processed/eda_figures"
+python -m trademark_ocr.report --reports reports/ --out reports/final_summary.md
 ```
 
 Đọc kết quả ở `reports/final_summary.md`: so sánh US↔VN nên đọc ở mức **bỏ hoa/thường**
