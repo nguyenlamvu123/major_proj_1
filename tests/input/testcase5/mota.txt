@@ -1,0 +1,14 @@
+testcase5 — Đã duyệt tay VN: build lại test_vn từ bản verified
+==============================================================
+
+MỤC ĐÍCH
+    Sau khi chạy vn_review apply, LMDB test_vn phải dùng nhãn đã duyệt.
+
+ĐẦU VÀO
+    Đủ dấu; có processed/split_test_vn_verified.csv mới hơn dấu vn_lmdb (split=unverified).
+
+KỲ VỌNG
+    vn_lmdb 'run' với ghi chú 'đã duyệt tay: split_test_vn_verified.csv'; các bước dữ liệu khác 'skip'.
+
+VÌ SAO QUAN TRỌNG
+    Đánh giá trên nhãn chưa duyệt là đo sai; bước này phải tự nhận ra bản verified.

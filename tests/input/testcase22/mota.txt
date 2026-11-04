@@ -1,0 +1,14 @@
+testcase22 — Ngân sách giới hạn số epoch
+========================================
+
+MỤC ĐÍCH
+    Ngân sách nhỏ hơn 10 epoch thì chọn số epoch lớn nhất vừa 85% ngân sách.
+
+ĐẦU VÀO
+    3h; 54000 mẫu train (844 batch), 2700 val (43 batch); 2.0 s/batch train, 0.7 s/batch val.
+
+KỲ VỌNG
+    1 epoch ≈ 1718 s ≈ 28.6 phút; floor(3h × 0.85 / 1718 s) = 5 epoch, ước 2.39 h.
+
+VÌ SAO QUAN TRỌNG
+    Đây là phép tính quyết định model có chạy trọn lịch LR trong đêm hay không.

@@ -1,0 +1,10 @@
+{
+  "kind": "eval_sh",
+  "desc": "Không có checkpoint nào: thoát 1",
+  "args": [],
+  "state": {
+    "files": {
+      "lmdb/test/test_us/data.mdb": 10
+    }
+  }
+}

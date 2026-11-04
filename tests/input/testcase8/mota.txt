@@ -1,0 +1,14 @@
+testcase8 — Nhiều run: lấy run có last.ckpt mới nhất, bỏ thư mục rỗng
+=====================================================================
+
+MỤC ĐÍCH
+    Quyết định train dựa trên run có last.ckpt mới nhất, không bị run cũ đã DONE hay thư mục rỗng đánh lừa.
+
+ĐẦU VÀO
+    crnn_ft: run cũ DONE, run mới hơn chưa DONE (có last.ckpt), thư mục run mới nhất không có checkpoint.
+
+KỲ VỌNG
+    crnn_ft 'resume' từ run 2026-11-04_21-00-00.
+
+VÌ SAO QUAN TRỌNG
+    Bản đầu bỏ qua model chỉ vì có một last.ckpt bất kỳ; thư mục rỗng do hydra tạo không được coi là run.

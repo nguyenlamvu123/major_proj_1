@@ -1,0 +1,14 @@
+testcase1 — Máy trống: mọi bước đều chạy
+========================================
+
+MỤC ĐÍCH
+    Chốt kế hoạch cho lần chạy đầu tiên trên một máy mới (trường hợp tối nay).
+
+ĐẦU VÀO
+    DATA_ROOT và venv trống; --accelerator cpu; tham số mặc định (crnn_ft,parseq_ft, 10 epoch, batch 64).
+
+KỲ VỌNG
+    Mọi bước setup → eval đều 'run'; hai model train từ đầu; dry-run không gọi git/python/mạng và không tạo file nào.
+
+VÌ SAO QUAN TRỌNG
+    Đây là đường chạy chính đêm nay; dry-run tạo file hay gọi mạng là phá lời hứa 'chỉ in kế hoạch'.

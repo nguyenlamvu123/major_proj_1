@@ -1,0 +1,11 @@
+{
+  "kind": "plan",
+  "desc": "--max-hours không phải số: thoát 2",
+  "args": [
+    "--accelerator",
+    "cpu",
+    "--max-hours",
+    "ba"
+  ],
+  "state": {}
+}

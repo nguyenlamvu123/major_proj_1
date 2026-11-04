@@ -190,10 +190,10 @@ Chạy trực tiếp `python -m trademark_ocr.evaluate` (module `src/trademark_o
 **Kết quả hiện tại (từ `reports/final_summary.md`):**
 
 | Model | Dataset | n | accuracy (strict) | 1−NED | char-accuracy | Ghi chú |
-|---|---|---|---tag|---|---|---|
+|---|---|---|---|---|---|---|
 | crnn | US (test_us) | 200 | 0.0000 | 0.0009 | -0.2315 | Trên checkpoint chưa train đủ / quy mô nhỏ |
 | crnn | VN (test_vn) | 36 | 0.0000 | 0.0115 | -0.1906 | Chỉ 36/50 mẫu vào được do giới hạn đánh giá trước đây; nhánh 16 đã sửa để đánh giá toàn bộ |
-| **Domain shift (US→VN)** | crnn | acc_us=0.0, acc_vn=0.0, delta=0.0000 | n_us=200, n_vn=36 | Phân tách độ sít US→VN theo hoa/thường/dấu/hình ảnh đã được bổ sung ở nhánh 16.4 (`eval_domain_shift` nâng cấp) |
+| **Domain shift (US→VN)** | crnn | acc_us=0.0, acc_vn=0.0, delta=0.0000 | n_us=200, n_vn=36 | Phân tách độ sụt US→VN theo hoa/thường/dấu/hình ảnh đã được bổ sung ở nhánh 16.4 (`eval_domain_shift` nâng cấp) |
 
 > **Kết luận về kết quả:** Các con số trên **không phản ánh chất lượng huấn luyện thực tế**. Lý do chính: (1) huấn luyện chỉ với **500/4356** mẫu train, (2) các checkpoint là phiên chạy nhỏ/không đầy đủ, (3) tập VN hiện tại chỉ **50 mẫu** chưa được duyệt tay nhiều. Để có kết quả đúng theo đề tài, cần train với **toàn bộ tập dữ liệu** trên **GPU**.
 

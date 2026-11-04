@@ -1,0 +1,11 @@
+{
+  "kind": "plan",
+  "desc": "--python có sẵn: không dựng venv",
+  "args": [
+    "--accelerator",
+    "cpu",
+    "--python",
+    "/usr/bin/python3"
+  ],
+  "state": {}
+}

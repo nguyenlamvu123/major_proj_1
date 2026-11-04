@@ -1,0 +1,14 @@
+testcase16 — --accelerator auto + có nvidia-smi: dùng GPU, dựng lại torch
+=========================================================================
+
+MỤC ĐÍCH
+    auto chọn GPU khi có nvidia-smi; venv dựng cho CPU phải dựng lại.
+
+ĐẦU VÀO
+    nvidia-smi giả trong PATH; dấu venv 'accelerator=cpu'.
+
+KỲ VỌNG
+    setup 'run' 'torch (gpu)'; train 'gpu'; eval '--device cuda'.
+
+VÌ SAO QUAN TRỌNG
+    Dùng nhầm torch bản CPU trên máy GPU là train chậm hàng chục lần mà không báo lỗi.

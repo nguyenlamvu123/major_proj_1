@@ -1,0 +1,23 @@
+{
+  "kind": "eval_sh",
+  "desc": "Hai model, đủ hai tập test",
+  "args": [],
+  "state": {
+    "runs": [
+      {
+        "model": "parseq_ft",
+        "ts": "2026-11-05_05-00-00",
+        "ckpt_age": 5
+      },
+      {
+        "model": "crnn_ft",
+        "ts": "2026-11-05_03-00-00",
+        "ckpt_age": 10
+      }
+    ],
+    "files": {
+      "lmdb/test/test_us/data.mdb": 10,
+      "lmdb/test/test_vn/data.mdb": 10
+    }
+  }
+}

@@ -1,0 +1,14 @@
+testcase7 — Train dở từ run cũ không có pipeline_train.env
+==========================================================
+
+MỤC ĐÍCH
+    Run tạo trước khi có script (05_train.sh chạy tay) vẫn train tiếp được, nhưng phải nói rõ.
+
+ĐẦU VÀO
+    crnn_ft có last.ckpt, không có pipeline_train.env, không DONE.
+
+KỲ VỌNG
+    crnn_ft 'resume' kèm ghi chú 'run cũ không có pipeline_train.env: dùng 10 epoch, batch 64'.
+
+VÌ SAO QUAN TRỌNG
+    Người dùng cần biết tham số đang dùng là đoán, để tự quyết có --retrain hay không.

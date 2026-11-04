@@ -48,6 +48,11 @@ for m in "${SEL[@]}"; do
   echo "[06_eval] $m -> $ckpt"
   for sub in test_us test_vn; do
     dom="${sub#test_}"   # us | vn
+    # thiếu LMDB một tập (vd crawl VN lỗi) thì bỏ tập đó: domain_shift/report tự bỏ model thiếu domain
+    if [[ ! -f "$DATA_ROOT/lmdb/test/$sub/data.mdb" ]]; then
+      echo "[06_eval]   bỏ qua $m / $sub (không có $DATA_ROOT/lmdb/test/$sub/data.mdb)"
+      continue
+    fi
     echo "[06_eval]   $m / $sub"
     "$PYTHON" -m trademark_ocr.evaluate --ckpt "$ckpt" --subset "$sub" \
       --out "$REPO_ROOT/reports/${m}_${dom}.csv" "${COMMON[@]}"

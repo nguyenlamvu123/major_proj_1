@@ -1,0 +1,10 @@
+{
+  "kind": "plan",
+  "desc": "Cờ lạ: thoát 2",
+  "args": [
+    "--accelerator",
+    "cpu",
+    "--foo"
+  ],
+  "state": {}
+}

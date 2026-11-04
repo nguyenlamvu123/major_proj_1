@@ -1,0 +1,14 @@
+testcase19 — --from và --only cùng lúc: thoát 2
+===============================================
+
+MỤC ĐÍCH
+    Hai cờ chọn bước mâu thuẫn phải bị từ chối.
+
+ĐẦU VÀO
+    --from train --only eval.
+
+KỲ VỌNG
+    Thoát mã 2 với thông báo rõ.
+
+VÌ SAO QUAN TRỌNG
+    Ngữ nghĩa kết hợp không rõ ràng; chọn ngầm một bên là bất ngờ cho người dùng.

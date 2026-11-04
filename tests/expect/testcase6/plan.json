@@ -1,0 +1,13 @@
+[
+  "[plan] setup            | skip   | đã xong (accelerator=cpu)",
+  "[plan] us_meta          | skip   | đã xong (rows=60000)",
+  "[plan] us_images        | skip   | đã xong (-)",
+  "[plan] clean            | skip   | đã xong (-)",
+  "[plan] split            | skip   | đã xong (seed=1111)",
+  "[plan] lmdb             | skip   | đã xong (-)",
+  "[plan] vn               | skip   | đã xong (limit=2000)",
+  "[plan] vn_lmdb          | skip   | đã xong (split=unverified)",
+  "[plan] train:crnn_ft    | resume | tiếp từ runs/crnn_ft/2026-11-04_21-00-00/checkpoints/last.ckpt, giữ 7 epoch, batch 32",
+  "[plan] train:parseq_ft  | skip   | đã xong (runs/parseq_ft/2026-11-04_23-00-00)",
+  "[plan] eval             | run    | 06_eval.sh --device cpu (mọi model có checkpoint) + báo cáo"
+]

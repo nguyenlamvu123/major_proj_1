@@ -44,3 +44,6 @@ reports/*.json
 .DS_Store
 .idea/
 .vscode/
+
+# bộ test golden-file: actual/ sinh ra mỗi lần chạy
+tests/actual/

@@ -1,0 +1,13 @@
+{
+  "kind": "budget",
+  "desc": "Một epoch đã vượt ngân sách",
+  "inputs": {
+    "budget_hours": 1,
+    "max_epochs": 10,
+    "train_samples": 54000,
+    "val_samples": 2700,
+    "batch_size": 64,
+    "sec_per_train_batch": 6.0,
+    "sec_per_val_batch": 2.0
+  }
+}

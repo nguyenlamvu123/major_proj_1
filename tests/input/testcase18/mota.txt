@@ -1,0 +1,14 @@
+testcase18 — Model lạ: thoát 2
+==============================
+
+MỤC ĐÍCH
+    Tên model sai phải báo trước khi tốn giờ tải dữ liệu.
+
+ĐẦU VÀO
+    --models crnn,resnet.
+
+KỲ VỌNG
+    Thoát mã 2, stderr có 'model lạ: resnet'.
+
+VÌ SAO QUAN TRỌNG
+    Không kiểm thì lỗi chỉ lộ ra ở bước train, sau vài giờ tải dữ liệu.

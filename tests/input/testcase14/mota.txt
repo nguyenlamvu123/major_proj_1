@@ -1,0 +1,14 @@
+testcase14 — --retrain: train lại model đã DONE
+===============================================
+
+MỤC ĐÍCH
+    --retrain bỏ qua cả DONE lẫn checkpoint dở, train từ đầu.
+
+ĐẦU VÀO
+    crnn_ft DONE; parseq_ft train dở; --retrain.
+
+KỲ VỌNG
+    Cả hai 'run' 'từ đầu'.
+
+VÌ SAO QUAN TRỌNG
+    Cần khi đổi dữ liệu/tham số và muốn kết quả sạch thay vì train tiếp.

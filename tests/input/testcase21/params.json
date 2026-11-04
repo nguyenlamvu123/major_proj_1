@@ -1,0 +1,13 @@
+{
+  "kind": "budget",
+  "desc": "Ngân sách dư: train đủ max_epochs",
+  "inputs": {
+    "budget_hours": 3,
+    "max_epochs": 10,
+    "train_samples": 4356,
+    "val_samples": 242,
+    "batch_size": 64,
+    "sec_per_train_batch": 0.5,
+    "sec_per_val_batch": 0.2
+  }
+}

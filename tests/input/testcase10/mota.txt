@@ -1,0 +1,14 @@
+testcase10 — --from train: bỏ qua mọi bước trước train
+======================================================
+
+MỤC ĐÍCH
+    --from STEP bỏ qua các bước trước STEP kể cả khi chúng chưa xong.
+
+ĐẦU VÀO
+    DATA_ROOT trống; --from train.
+
+KỲ VỌNG
+    setup → vn_lmdb 'skip' 'không chọn'; train 2 model + eval 'run'.
+
+VÌ SAO QUAN TRỌNG
+    Dùng khi dữ liệu đã chuẩn bị bằng cách khác (vd chép từ máy kia) mà không có dấu .pipeline/.

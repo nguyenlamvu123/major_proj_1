@@ -1,0 +1,47 @@
+{
+  "kind": "plan",
+  "desc": "Venv cũ hơn requirements.txt: dựng lại",
+  "args": [
+    "--accelerator",
+    "cpu"
+  ],
+  "state": {
+    "stamps": {
+      "us_meta": [
+        "rows=60000",
+        600
+      ],
+      "us_images": [
+        "-",
+        500
+      ],
+      "clean": [
+        "-",
+        400
+      ],
+      "split": [
+        "seed=1111",
+        300
+      ],
+      "lmdb": [
+        "-",
+        200
+      ],
+      "vn": [
+        "limit=2000",
+        150
+      ],
+      "vn_lmdb": [
+        "split=unverified",
+        100
+      ]
+    },
+    "venv": {
+      "python": true,
+      "stamp": [
+        "accelerator=cpu",
+        315360000
+      ]
+    }
+  }
+}

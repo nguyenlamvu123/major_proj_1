@@ -1,0 +1,14 @@
+testcase15 — Venv cũ hơn requirements.txt: dựng lại
+===================================================
+
+MỤC ĐÍCH
+    Sửa requirements.txt phải làm bước setup chạy lại.
+
+ĐẦU VÀO
+    Dấu venv có tuổi 10 năm (cũ hơn requirements.txt); các bước dữ liệu đã xong.
+
+KỲ VỌNG
+    setup 'run'; các bước dữ liệu 'skip'.
+
+VÌ SAO QUAN TRỌNG
+    Thiếu thư viện mới thì pipeline chết giữa đêm ở bước cần thư viện đó.

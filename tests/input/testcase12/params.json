@@ -1,0 +1,11 @@
+{
+  "kind": "plan",
+  "desc": "--skip vn,vn_lmdb",
+  "args": [
+    "--accelerator",
+    "cpu",
+    "--skip",
+    "vn,vn_lmdb"
+  ],
+  "state": {}
+}
