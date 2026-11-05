@@ -354,6 +354,19 @@ bash scripts/09_full_pipeline_cpu.sh --dry-run --models parseq_ft --retrain --ma
 sau một lần eval đầy đủ, `reports/` chỉ còn file của model đang có checkpoint dùng được, file cũ nằm
 trong `reports/archive/<giờ>/`, không cột `char-accuracy` nào âm.
 
+### 16.11–16.12 Đồ thị train, train thêm từ run đã xong
+
+```bash
+pytest -q tests/test_golden.py                                         # 70 testcase
+python -m trademark_ocr.train_curves --out-dir reports/figures         # đọc log, không train
+bash scripts/09_full_pipeline_cpu.sh --dry-run --from train --models crnn_ft --continue --max-epochs 20
+```
+**Pass khi**: test xanh; `reports/figures/` có `train_curves_<model>.png` + `train_curves.md` cho
+mỗi model có log, crnn_ft kết luận "chưa thấy overfit" (val_loss 0,4254 ở epoch 8); dry-run in
+`train:crnn_ft | continue | run MỚI nạp trọng số …last.ckpt (đã train 8 epoch), thêm 12 epoch`.
+Sau khi train thật: run mới có `pipeline_train.env` với `continue_from=crnn_ft/2026-11-04_21-58-41`,
+đồ thị crnn_ft nối epoch 1–8 với 9–20.
+
 ---
 
 ## Ghi chú chung

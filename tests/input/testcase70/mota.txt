@@ -1,0 +1,14 @@
+testcase70 — Run con nạp checkpoint SWA: giữ cả điểm SWA của run cha, nối từ epoch 6
+====================================================================================
+
+MỤC ĐÍCH
+    Trường hợp last.ckpt của run cha là model sau SWA.
+
+ĐẦU VÀO
+    Như testcase54 nhưng init_epoch=5 (= max_epochs của run cha), epoch_offset=5.
+
+KỲ VỌNG
+    Run cha giữ epoch 1..5 và điểm SWA (ở hoành độ 5); run con thành epoch 6..8.
+
+VÌ SAO QUAN TRỌNG
+    Run con bắt đầu từ trọng số SWA: bỏ điểm đó thì đồ thị không cho thấy điểm xuất phát thật.

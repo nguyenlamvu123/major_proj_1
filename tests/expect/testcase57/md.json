@@ -1,0 +1,18 @@
+[
+  "# Đường cong huấn luyện",
+  "",
+  "Sinh tự động bởi `python -m trademark_ocr.train_curves` từ log TensorBoard của từng run. `epoch` đánh số từ 1, tính dồn qua các lần train tiếp. Loss train tính trên ảnh đã augment nên thường cao hơn val_loss — so **xu hướng** hai đường, không so độ lớn.",
+  "",
+  "## parseq_ft",
+  "",
+  "Run `parseq_ft/2026-11-05_00-27-27` — **train xong nhưng chưa học được** (`UNDERTRAINED`).",
+  "",
+  "![parseq_ft](train_curves_parseq_ft.png)",
+  "",
+  "| epoch | loss train | val_loss | val_accuracy (%) | val 1−NED (%) | ghi chú |",
+  "|---|---|---|---|---|---|",
+  "| 1 | 5,0000 | 3,8400 | 0,00 | 4,15 |  |",
+  "| 2 | 3,5000 | 3,2600 | 0,00 | 7,03 |  |",
+  "",
+  "**Kết luận:** mới có 2 epoch có val_loss — chưa đủ để kết luận."
+]

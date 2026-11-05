@@ -1,0 +1,14 @@
+testcase66 — --continue cùng --retrain: thoát 2
+===============================================
+
+MỤC ĐÍCH
+    Hai cờ trái nghĩa nhau.
+
+ĐẦU VÀO
+    --continue --retrain.
+
+KỲ VỌNG
+    Thoát 2, stderr nêu hai cờ không dùng cùng nhau; không in kế hoạch.
+
+VÌ SAO QUAN TRỌNG
+    Nếu một cờ âm thầm thắng thì hoặc mất trọng số cũ, hoặc không train lại như người dùng muốn.

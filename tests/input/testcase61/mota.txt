@@ -1,0 +1,14 @@
+testcase61 — --continue kèm --max-hours: đo tốc độ, chọn tối đa 12 epoch còn thiếu
+==================================================================================
+
+MỤC ĐÍCH
+    Máy yếu không chắc chạy kịp 12 epoch: ngân sách giờ phải giới hạn đúng phần CÒN THIẾU.
+
+ĐẦU VÀO
+    Như testcase60 + --max-hours 7.
+
+KỲ VỌNG
+    Dòng 'continue' ghi 'ngân sách 7h: đo tốc độ rồi chọn ≤ 12 epoch'.
+
+VÌ SAO QUAN TRỌNG
+    Nếu ngân sách dùng --max-epochs (20) làm trần thì run mới có thể train quá tổng đã hứa.

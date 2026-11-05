@@ -1,0 +1,14 @@
+testcase62 — Chạy lại cùng lệnh --continue sau khi đã đủ 20 epoch: bỏ qua
+=========================================================================
+
+MỤC ĐÍCH
+    Chạy lại đúng lệnh phải an toàn: không train thêm lần nữa.
+
+ĐẦU VÀO
+    Run cũ 8 epoch + run --continue đã DONE: epoch_offset 8, checkpoint epoch=9,10,11 (epoch 11 = epoch thứ 12 của run mới).
+
+KỲ VỌNG
+    train:crnn_ft 'skip': đã train 20 epoch >= --max-epochs 20; gợi ý tăng --max-epochs.
+
+VÌ SAO QUAN TRỌNG
+    --max-epochs là TỔNG; nếu hiểu là 'thêm N' thì mỗi lần chạy lại lại train thêm một đợt.

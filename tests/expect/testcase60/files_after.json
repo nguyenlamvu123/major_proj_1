@@ -1,0 +1,17 @@
+[
+  "data/.pipeline/clean",
+  "data/.pipeline/lmdb",
+  "data/.pipeline/split",
+  "data/.pipeline/us_images",
+  "data/.pipeline/us_meta",
+  "data/.pipeline/vn",
+  "data/.pipeline/vn_lmdb",
+  "data/runs/crnn_ft/2026-11-04_21-58-41/DONE",
+  "data/runs/crnn_ft/2026-11-04_21-58-41/checkpoints/epoch=5-step=4806-val_accuracy=72.6283-val_NED=89.0782.ckpt",
+  "data/runs/crnn_ft/2026-11-04_21-58-41/checkpoints/epoch=6-step=5607-val_accuracy=73.0499-val_NED=89.3472.ckpt",
+  "data/runs/crnn_ft/2026-11-04_21-58-41/checkpoints/epoch=7-step=6408-val_accuracy=74.0689-val_NED=89.5194.ckpt",
+  "data/runs/crnn_ft/2026-11-04_21-58-41/checkpoints/last.ckpt",
+  "data/runs/crnn_ft/2026-11-04_21-58-41/pipeline_train.env",
+  "venv/.pipeline_setup",
+  "venv/bin/python"
+]

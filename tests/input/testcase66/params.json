@@ -1,0 +1,11 @@
+{
+  "kind": "plan",
+  "desc": "--continue cùng --retrain: thoát 2",
+  "args": [
+    "--models",
+    "crnn_ft",
+    "--continue",
+    "--retrain"
+  ],
+  "state": {}
+}

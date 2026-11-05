@@ -1,0 +1,14 @@
+testcase68 — svtr (train từ đầu, thư mục runs/svtrctc) + --continue
+===================================================================
+
+MỤC ĐÍCH
+    svtr đêm 05/11 có thể chỉ đủ vài epoch; train thêm phải dùng đúng thư mục runs/svtrctc.
+
+ĐẦU VÀO
+    svtrctc DONE 5 epoch (epoch=4); --models svtr --continue --max-epochs 30.
+
+KỲ VỌNG
+    train:svtr 'continue' từ runs/svtrctc/2026-11-06_05-00-00/checkpoints/last.ckpt, đã train 5 epoch, thêm 25.
+
+VÌ SAO QUAN TRỌNG
+    Tên model 'svtr' khác tên thư mục 'svtrctc': tìm sai thư mục là báo 'chưa có run' dù đã train.

@@ -1,0 +1,43 @@
+{
+  "models": {
+    "parseq_ft": {
+      "run": "parseq_ft/2026-11-05_00-27-27",
+      "status": "UNDERTRAINED",
+      "segments": [
+        {
+          "run": "parseq_ft/2026-11-05_00-27-27",
+          "first_epoch": 1,
+          "last_epoch": 2,
+          "continued_from": null
+        }
+      ],
+      "epochs": [
+        {
+          "epoch": 1,
+          "run": "parseq_ft/2026-11-05_00-27-27",
+          "train_loss": 5.0,
+          "val_loss": 3.84,
+          "val_accuracy": 0.0,
+          "val_NED": 4.15,
+          "swa": false
+        },
+        {
+          "epoch": 2,
+          "run": "parseq_ft/2026-11-05_00-27-27",
+          "train_loss": 3.5,
+          "val_loss": 3.26,
+          "val_accuracy": 0.0,
+          "val_NED": 7.03,
+          "swa": false
+        }
+      ],
+      "best": null,
+      "overfit": {
+        "verdict": "chua_du",
+        "text": "mới có 2 epoch có val_loss — chưa đủ để kết luận"
+      },
+      "figure": "train_curves_parseq_ft.png"
+    }
+  },
+  "skipped": {}
+}

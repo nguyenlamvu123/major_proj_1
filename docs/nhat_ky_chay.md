@@ -8,13 +8,17 @@ nằm ở `data/logs/pipeline_<giờ>.log` (không đưa vào git).
 
 | Kiến trúc | Biến thể | Trạng thái | Kết quả |
 |---|---|---|---|
-| CRNN (CTC, 8,4 M) | `crnn_ft` | ✅ xong — CPU, 8 epoch (lần 1) | test US **73,0%**; VN **18,3%** (27,0% bỏ hoa/thường; 0% trên nhãn có dấu) |
+| CRNN (CTC, 8,4 M) | `crnn_ft` | ✅ xong — CPU, 8 epoch (lần 1); chưa overfit, còn học thêm được → ⏳ train thêm lên 20 epoch trên máy khác (mục 4) | test US **73,0%**; VN **18,3%** (27,0% bỏ hoa/thường; 0% trên nhãn có dấu) |
 | PARSeq (24 M) | `parseq_ft` | ❌ lần 1 chỉ 2 epoch, chưa học được (`UNDERTRAINED`) → ⏳ train lại tối 05/11, CPU 9h | — |
 | SVTR-CTC (2,3 M) | `svtr` (từ đầu, không có pretrained) | ⏳ tối 05/11 nếu parseq_ft xong trước ~05:35 | — |
 | TRBA (50 M) | `trba_ft` | ⏳ Colab GPU (mục 3 bên dưới) | — |
 
 Bản train từ đầu `crnn`, `trba`, `parseq` chưa lên kế hoạch (chỉ cần nếu muốn so fine-tune với
 train từ đầu). `reports/final_summary.md` hiện vẫn là bản sai của lần 1; lần eval kế tiếp sinh lại.
+
+Đồ thị train (loss train / val_loss / val_accuracy theo epoch, kết luận overfit) ở
+`reports/figures/`, giải thích trong `BAO_CAO_TONG_KET_DAT_LIEU_HUAN_LUYEN.md` mục 2.5. Mỗi lần
+eval vẽ lại; vẽ riêng: `.venv/bin/python -m trademark_ocr.train_curves --out-dir reports/figures`.
 
 ## Việc tiếp theo
 
@@ -114,13 +118,197 @@ Tải `data/lmdb_trainval.tar` lên Google Drive, vào thư mục `MyDrive/trade
 
 **Mang về máy local:**
 
-1. Từ Drive tải `trademark_data/runs/trba_ft/<giờ>/`, chỉ cần `checkpoints/last.ckpt`, `config/`
-   và `hparams.yaml` (các checkpoint top-3 khác nặng, không cần), đặt vào
-   `data/runs/trba_ft/<giờ>/`.
+1. Từ Drive tải `trademark_data/runs/trba_ft/<giờ>/`: `checkpoints/last.ckpt`, `config/`,
+   `hparams.yaml`, **`events.out.tfevents.*`** (log để vẽ đồ thị train) và **tên** các file
+   `checkpoints/epoch=…ckpt` (cần để `--continue` biết đã train mấy epoch; chép file nặng, hoặc
+   `touch` một file rỗng cùng tên). Đặt vào `data/runs/trba_ft/<giờ>/`.
 2. Nếu `val_accuracy` tốt nhất ≥ 1%: `touch data/runs/trba_ft/<giờ>/DONE`. Thiếu `DONE`, lần
    pipeline sau có `trba_ft` trong `--models` sẽ coi là train dở và train tiếp trên CPU.
 3. Eval lại mọi model trên bộ test local, vào lúc máy rảnh (không chạy song song với train đêm):
    `bash scripts/09_full_pipeline_cpu.sh --only eval`
+
+### 4. Train thêm `crnn_ft` lên 20 epoch trên một máy Ubuntu khác (yếu hơn)
+
+Viết để một người hoặc một AI khác làm theo từng bước, không cần đọc phần còn lại. Nhãn **[vunl]**
+là máy hiện tại (có dữ liệu, checkpoint, các model khác); **[máy B]** là máy Ubuntu yếu hơn sẽ train.
+
+**Vì sao làm.** crnn_ft mới train 8 epoch (giới hạn 3 giờ CPU). Đồ thị
+(`reports/figures/train_curves_crnn_ft.png`, báo cáo mục 2.5) cho thấy val_loss vẫn giảm tới epoch
+cuối và val_accuracy vẫn tăng (74,07% ở epoch 8): **chưa overfit, còn học thêm được**. Train thêm 12
+epoch từ checkpoint epoch 8, xem accuracy còn tăng không và có xuất hiện overfit không.
+
+**Cơ chế** (`09_full_pipeline_cpu.sh --continue`, DESIGN.md 16.12):
+- Tạo run **mới** `data/runs/crnn_ft/<giờ chạy>/`, nạp toàn bộ trọng số từ
+  `data/runs/crnn_ft/2026-11-04_21-58-41/checkpoints/last.ckpt`.
+- Lịch learning rate **mới** cho phần còn thiếu; LR khởi động lại nên 1–2 epoch đầu có thể chững.
+- `--max-epochs 20` là **tổng**, nên run mới train thêm tối đa 12 epoch.
+- Run cũ giữ nguyên, **không xoá**.
+
+#### Bước 1 — [vunl] đóng gói
+
+```bash
+cd /mnt/1864514f-3a41-4b8f-9907-2fbcd9d2815b/airi/doanchuyennganh1
+git status --short                 # code phải đã commit (trừ reports/…)
+git push origin 16-fix-review      # máy B clone code từ GitHub
+ls -la data/lmdb_trainval.tar      # đã có từ 05/11 (lmdb/train + lmdb/val, 2,2 GB); thiếu thì:
+#   tar -C data -cf data/lmdb_trainval.tar lmdb/train lmdb/val
+tar -C data -cf data/crnn_ft_run.tar runs/crnn_ft/2026-11-04_21-58-41     # ~520 MB, CẢ thư mục run
+```
+
+Chép hai file `data/lmdb_trainval.tar` và `data/crnn_ft_run.tar` sang máy B: USB, hoặc
+`scp data/*.tar <user>@<máy B>:~/`, hoặc qua Google Drive. **Không** tải lại dữ liệu trên máy B
+(`01_get_meta`…): danh sách USPTO đổi theo ngày, tập train/val sẽ khác và không so được.
+
+Thư mục run phải mang **đủ**:
+- `checkpoints/last.ckpt`: trọng số để nạp.
+- `checkpoints/epoch=7-…ckpt`: tên file cho biết đã train mấy epoch.
+- `config/`, `pipeline_train.env`, `DONE`.
+- `events.out.tfevents.*`: log để vẽ đồ thị nối 8 epoch cũ với các epoch mới.
+
+#### Bước 2 — [máy B] code, dữ liệu, môi trường
+
+Yêu cầu:
+- Ubuntu có `git`, `python3`, `python3-venv` (`sudo apt install python3-venv`) và mạng (pip, GitHub).
+- Ổ trống ≥ 8 GB: LMDB 2,4 GB, venv ~2,2 GB, mỗi checkpoint ~100 MB.
+- Đặt repo ở đường dẫn **không có dấu cách / tiếng Việt có dấu**: đường dẫn checkpoint đi vào
+  override Hydra.
+
+```bash
+git clone -b 16-fix-review https://github.com/nguyenlamvu123/major_proj_1.git ~/major_proj_1
+cd ~/major_proj_1
+git log --oneline -3          # phải có commit "train curves + --continue" (hoặc mới hơn)
+mkdir -p data
+tar -xf ~/lmdb_trainval.tar -C data        # -> data/lmdb/train/trademark, data/lmdb/val
+tar -xf ~/crnn_ft_run.tar  -C data         # -> data/runs/crnn_ft/2026-11-04_21-58-41
+ls data/lmdb/train/trademark data/lmdb/val                       # thấy data.mdb lock.mdb
+ls data/runs/crnn_ft/2026-11-04_21-58-41/checkpoints             # thấy epoch=7-…ckpt và last.ckpt
+bash scripts/09_full_pipeline_cpu.sh --only setup                # tạo .venv (torch CPU) + parseq, ~10 phút
+.venv/bin/python -m pytest -q tests/test_golden.py               # phải xanh hết
+```
+
+`--only setup` chỉ dựng môi trường. Không chạy `09_full_pipeline_cpu.sh` khi **thiếu**
+`--from train`: máy B không có dấu `data/.pipeline/`, nên script sẽ tải lại dữ liệu từ đầu.
+
+#### Bước 3 — [máy B] chọn batch theo RAM, xem kế hoạch
+
+```bash
+nproc; free -h                      # số luồng CPU, RAM còn trống ("available")
+bash scripts/09_full_pipeline_cpu.sh --dry-run --from train --skip eval \
+  --models crnn_ft --continue --max-epochs 20 --max-hours 8 --batch-size 64 --num-workers 4
+```
+
+Dry-run phải in:
+
+```
+[plan] train:crnn_ft    | continue | run MỚI nạp trọng số runs/crnn_ft/2026-11-04_21-58-41/checkpoints/last.ckpt (đã train 8 epoch), ngân sách 8h: đo tốc độ rồi chọn ≤ 12 epoch (tổng ≤ 20), …
+[plan] eval             | skip   | không chọn
+```
+
+Chọn batch theo RAM còn trống. Các mức dưới đây là ước lượng an toàn, chưa đo trên máy B. Máy
+`vunl` chạy batch 64 với 4 worker trên 31 GB; máy 7,6 GB cũ từng bị OOM với batch 64.
+
+| RAM available | Cờ |
+|---|---|
+| ≥ 12 GB | `--batch-size 64 --num-workers 4` (giống lần 1) |
+| 6–12 GB | `--batch-size 32 --num-workers 2` |
+| < 6 GB | `--batch-size 16 --num-workers 1` |
+
+Đổi batch khi train tiếp vẫn được, vì lịch LR là lịch mới và parseq tự nhân LR theo `batch/256`.
+Tuy vậy, cùng batch 64 thì so với lần 1 sạch hơn: chỉ khác số epoch.
+
+#### Bước 4 — [máy B] train (trong tmux, qua đêm)
+
+```bash
+tmux new -s crnn
+bash scripts/09_full_pipeline_cpu.sh --from train --skip eval \
+  --models crnn_ft --continue --max-epochs 20 --max-hours 8 --batch-size 64 --num-workers 4
+# Ctrl-b d để thoát ra; xem lại: tmux attach -t crnn
+```
+
+- Đầu log có dòng `[PIPELINE] crnn_ft: <x> phút/epoch -> train <N> epoch`. Trên `vunl` là 17,1
+  phút/epoch (i5-10400, batch 64). Máy chậm gấp 2–3 lần thì 8 giờ chỉ đủ khoảng 5–8 epoch, không
+  đủ 12. **Không sao:** đêm sau chạy **lại đúng lệnh đó**. Script thấy mới có tổng 8 + N epoch nên
+  train thêm từ run vừa xong, cho tới khi đủ 20. Mỗi đêm là một đợt LR mới, và đồ thị có một vạch
+  "train tiếp" ở mỗi chỗ nối.
+- `--skip eval`: không đánh giá trên máy B. Eval làm ở `vunl` (bước 6), để mọi model chấm trên cùng
+  một bộ test với cùng code.
+- Theo dõi: `tail -f data/logs/pipeline_*.log`. Checkpoint ở `data/runs/crnn_ft/<giờ chạy>/checkpoints/`;
+  tên file có `val_accuracy=…`.
+- Xong: log có `crnn_ft: xong N epoch` và thư mục run mới có file `DONE`.
+
+**Sự cố:**
+
+| Triệu chứng | Làm gì |
+|---|---|
+| Log có `Killed` / mã thoát 137 (hết RAM) **trong epoch đầu** (run mới chưa có `checkpoints/epoch=…ckpt`) | Chạy lại với batch nhỏ hơn một mức. Script tạo một run mới khác từ checkpoint cũ; run hỏng không có checkpoint nên eval và đồ thị tự bỏ qua. Muốn gọn thì xoá run hỏng đó: thư mục có `continue_from=` trong `pipeline_train.env`, **không bao giờ** xoá `2026-11-04_21-58-41` |
+| Hết RAM / mất điện / tắt máy **sau** khi đã có checkpoint của run mới | Chạy lại **đúng lệnh cũ, giữ nguyên batch**: plan in `resume`, train tiếp run mới từ `last.ckpt` của nó (lịch LR phụ thuộc batch nên không đổi batch giữa chừng) |
+| `[WARN] … chạm trần thời gian` | Như trên: chạy lại đúng lệnh, run train tiếp |
+| Plan in `skip … chưa có run nào có checkpoint để train tiếp` | Chưa giải nén `crnn_ft_run.tar` vào `data/` (bước 2) |
+| Plan in `skip … không biết last.ckpt ở epoch nào` | Thiếu file `checkpoints/epoch=7-…ckpt` (đã chép thiếu) |
+| Plan in `skip … đã train 20 epoch` | Đã xong |
+
+**Không** dùng `--retrain`, vì nó train lại từ trọng số pretrained và bỏ 8 epoch đã có. **Không**
+xoá hay sửa thư mục `2026-11-04_21-58-41`.
+
+#### Bước 5 — [máy B] mang kết quả về
+
+```bash
+ls -d data/runs/crnn_ft/*/              # run cũ + một (hoặc vài, nếu nhiều đêm) run mới
+grep -H continue_from data/runs/crnn_ft/*/pipeline_train.env     # các run mới
+.venv/bin/python -m trademark_ocr.train_curves --models crnn_ft --out-dir /tmp/curves   # xem trước, tuỳ chọn
+tar -C data -cf ~/crnn_ft_continue_result.tar $(cd data && ls -d runs/crnn_ft/*/ | grep -v 2026-11-04_21-58-41)
+```
+
+Chép `~/crnn_ft_continue_result.tar` về `vunl`. Mang **cả thư mục**, không chỉ `last.ckpt`:
+eval cần `config/`, đồ thị cần `events.out.tfevents.*` và `pipeline_train.env`.
+
+#### Bước 6 — [vunl] đánh giá, đồ thị, cập nhật báo cáo
+
+Làm khi `vunl` **không** đang train (không chạy song song với chuỗi đêm):
+`pgrep -af 09_full_pipeline_cpu` phải rỗng.
+
+```bash
+cd /mnt/1864514f-3a41-4b8f-9907-2fbcd9d2815b/airi/doanchuyennganh1
+tar -xf ~/crnn_ft_continue_result.tar -C data       # -> data/runs/crnn_ft/<giờ chạy trên máy B>/
+bash scripts/09_full_pipeline_cpu.sh --only eval    # eval mọi model + vẽ lại reports/figures/
+```
+
+Kiểm:
+- `reports/figures/train_curves.md`, mục crnn_ft: dòng "Nối các lần train" có đủ hai (hoặc nhiều)
+  run, bảng có epoch 1 → 20.
+- `reports/figures/train_curves_crnn_ft.png`: có vạch đứt "train tiếp" ở giữa epoch 8 và 9.
+- `reports/final_summary.md` có dòng crnn_ft với kết quả của run mới (đường dẫn checkpoint trong
+  `reports/crnn_ft_us.summary.json`).
+
+**Cập nhật báo cáo** `BAO_CAO_TONG_KET_DAT_LIEU_HUAN_LUYEN.md`, viết cho người hướng dẫn đọc:
+- **Mục 2.5, phần crnn_ft:**
+  - Đổi tiêu đề thành "… 20 epoch (8 epoch ngày 04/11 + 12 epoch train tiếp ngày …)".
+  - Thay bảng bằng bảng crnn_ft trong `reports/figures/train_curves.md` (chép nguyên, đã có dấu
+    phẩy thập phân).
+  - Viết lại phần "Nhận xét" theo số mới:
+    1. val_accuracy tốt nhất bao nhiêu, ở epoch nào; tăng bao nhiêu so với 74,07%.
+    2. Kết luận overfit: lấy câu "**Kết luận:**" trong `train_curves.md`. Nếu là "có dấu hiệu
+       overfit", nêu epoch val_loss thấp nhất và cho biết checkpoint dùng để test là epoch tốt
+       nhất theo val_accuracy, không phải epoch cuối.
+    3. Các epoch ngay sau chỗ nối (epoch 9–10) có chững hoặc giảm không. Nếu có, giải thích là do
+       learning rate khởi động lại (mục 2.6), không phải overfit.
+    4. Test US / VN mới (`reports/crnn_ft_us.summary.json`, `crnn_ft_vn.summary.json`, hoặc
+       `final_summary.md`) so với 73,0% / 18,3% của bản 8 epoch.
+- **Mục 2.6:** thay đoạn "**Kế hoạch:**" bằng một câu đã làm: máy nào (CPU, số luồng, RAM), batch,
+  bao nhiêu phút/epoch (`benchmark.json` của run mới), mấy đêm.
+- **Không** đổi các số của lần 1 (8 epoch) ở chỗ khác. Đó là lịch sử, giữ để so sánh.
+
+Ghi thêm một mục "Lần 2 — crnn_ft train tiếp trên máy B" ở đầu phần nhật ký bên dưới (trên "Lần 1"),
+cùng khuôn: lệnh, máy, thời gian, kết quả, sự cố. Cập nhật bảng "Tình trạng 4 mô hình" ở đầu file.
+
+Commit trên `vunl`:
+
+```bash
+git add BAO_CAO_TONG_KET_DAT_LIEU_HUAN_LUYEN.md docs/nhat_ky_chay.md reports/figures/
+git commit -m "16-fix-review: crnn_ft train tiếp lên 20 epoch: đồ thị + báo cáo"
+```
+
+**Không** commit `data/` (đã `.gitignore`, chứa checkpoint vài trăm MB) và `reports/*.csv`.
 
 ---
 

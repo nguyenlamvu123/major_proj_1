@@ -1,0 +1,154 @@
+{
+  "kind": "curves",
+  "desc": "Run con nạp checkpoint SWA: giữ cả điểm SWA của run cha, nối từ epoch 6",
+  "runs": [
+    {
+      "model": "crnn_ft",
+      "ts": "2026-11-04_21-58-41",
+      "files": {
+        "DONE": ""
+      },
+      "max_epochs": 5,
+      "env": {
+        "max_epochs": 5,
+        "batch_size": 64
+      },
+      "events": [
+        {
+          "name": "events.out.tfevents.1000.h.1.0",
+          "steps_per_epoch": 2,
+          "epochs": [
+            {
+              "e": 0,
+              "loss": [
+                3,
+                3
+              ],
+              "val": [
+                2.0,
+                10.0,
+                50.0
+              ]
+            },
+            {
+              "e": 1,
+              "loss": [
+                2,
+                2
+              ],
+              "val": [
+                1.0,
+                40.0,
+                75.0
+              ]
+            },
+            {
+              "e": 2,
+              "loss": [
+                1,
+                1
+              ],
+              "val": [
+                0.8,
+                50.0,
+                80.0
+              ]
+            },
+            {
+              "e": 3,
+              "loss": [
+                0.9,
+                0.9
+              ],
+              "val": [
+                0.7,
+                60.0,
+                84.0
+              ]
+            },
+            {
+              "e": 4,
+              "loss": [
+                0.8,
+                0.8
+              ],
+              "val": [
+                0.72,
+                59.0,
+                83.0
+              ]
+            },
+            {
+              "e": 5,
+              "loss": [
+                0.8
+              ],
+              "val": [
+                0.75,
+                58.0,
+                82.0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "model": "crnn_ft",
+      "ts": "2026-11-06_08-00-00",
+      "max_epochs": 3,
+      "env": {
+        "max_epochs": 3,
+        "batch_size": 32,
+        "continue_from": "crnn_ft/2026-11-04_21-58-41",
+        "init_epoch": 5,
+        "epoch_offset": 5,
+        "init_ckpt": "/may-cu/data/runs/crnn_ft/2026-11-04_21-58-41/checkpoints/last.ckpt"
+      },
+      "events": [
+        {
+          "name": "events.out.tfevents.3000.h.3.0",
+          "steps_per_epoch": 2,
+          "epochs": [
+            {
+              "e": 0,
+              "loss": [
+                1.0,
+                0.9
+              ],
+              "val": [
+                0.75,
+                57.0,
+                82.0
+              ]
+            },
+            {
+              "e": 1,
+              "loss": [
+                0.7,
+                0.7
+              ],
+              "val": [
+                0.6,
+                63.0,
+                86.0
+              ]
+            },
+            {
+              "e": 2,
+              "loss": [
+                0.6,
+                0.6
+              ],
+              "val": [
+                0.55,
+                66.0,
+                88.0
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

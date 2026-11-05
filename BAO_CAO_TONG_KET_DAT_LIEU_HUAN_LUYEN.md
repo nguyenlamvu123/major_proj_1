@@ -169,6 +169,11 @@ Checkpoint được lưu tại: `$DATA_ROOT/runs/<model>/<YYYY-MM-DD_HH-MM-SS>/c
 
 ### 2.3 Kết quả huấn luyện hiện tại
 
+> **Lưu ý (05/11/2026):** mục 2.3 và 2.4 mô tả các checkpoint cũ ngày 16/10, train trên 500 mẫu.
+> Từ 04/11 các model được train lại trên toàn bộ 51.230 mẫu: quá trình train và đồ thị ở **mục 2.5**,
+> cách train thêm epoch ở **mục 2.6**, nhật ký từng lần chạy và số liệu test ở
+> [`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md).
+
 Trên máy hiện đang có các checkpoint từ **các lần chạy trước** (ngày 2026-10-16):
 
 | Model | Thư mục run | Checkpoint | Trạng thái |
@@ -196,6 +201,110 @@ Chạy trực tiếp `python -m trademark_ocr.evaluate` (module `src/trademark_o
 | **Domain shift (US→VN)** | crnn | acc_us=0.0, acc_vn=0.0, delta=0.0000 | n_us=200, n_vn=36 | Phân tách độ sụt US→VN theo hoa/thường/dấu/hình ảnh đã được bổ sung ở nhánh 16.4 (`eval_domain_shift` nâng cấp) |
 
 > **Kết luận về kết quả:** Các con số trên **không phản ánh chất lượng huấn luyện thực tế**. Lý do chính: (1) huấn luyện chỉ với **500/4356** mẫu train, (2) các checkpoint là phiên chạy nhỏ/không đầy đủ, (3) tập VN hiện tại chỉ **50 mẫu** chưa được duyệt tay nhiều. Để có kết quả đúng theo đề tài, cần train với **toàn bộ tập dữ liệu** trên **GPU**.
+
+### 2.5 Đường cong huấn luyện và kiểm tra overfit
+
+**Mục đích.** Xem model còn học thêm được hay đã bắt đầu học thuộc tập train (overfit), để quyết
+định có nên train thêm epoch hay không.
+
+**Số liệu lấy từ đâu.** Trong lúc train, `third_party/parseq/train.py` tự ghi log TensorBoard vào
+thư mục run (`runs/<model>/<giờ>/events.out.tfevents.*`). Không cần sửa code train để có đồ thị:
+module `trademark_ocr.train_curves` đọc log đó rồi vẽ. Log gồm:
+
+| Đại lượng | Đo trên | Khi nào | Ghi chú |
+|---|---|---|---|
+| loss train | tập train **đã augment** (xoay, nhiễu, đổi màu…), model ở chế độ train (có dropout) | mỗi batch; đồ thị lấy trung bình theo epoch | thường **cao hơn** val_loss vì ảnh train bị làm khó hơn |
+| val_loss | tập val (2.846 ảnh US, không augment) | cuối mỗi epoch | |
+| val_accuracy | tập val | cuối mỗi epoch | tỉ lệ ảnh đọc đúng **toàn bộ** chuỗi |
+
+Accuracy trên tập **train** không được đo (parseq chỉ ghi loss train). Accuracy trên tập **test**
+cố ý không đo theo epoch: tập val đóng vai trò đó, còn tập test chỉ chấm **một lần** ở cuối. Nếu
+nhìn kết quả test để quyết định dừng train thì con số test không còn khách quan.
+
+**Cách đọc.** Overfit là khi **loss train vẫn giảm nhưng val_loss quay đầu tăng**: model khớp tập
+train ngày càng tốt mà dự đoán trên ảnh chưa thấy lại kém đi. Vì loss train tính trên ảnh đã
+augment, chỉ so **xu hướng** của hai đường, không so độ lớn. Module tự kết luận theo luật: val_loss
+thấp nhất ở epoch k, sau đó ít nhất 2 epoch, epoch cuối cao hơn mức thấp nhất trên 5%, trong khi
+loss train vẫn giảm, thì là "có dấu hiệu overfit".
+
+#### CRNN fine-tune (`crnn_ft`) — 8 epoch trên CPU, 04/11/2026
+
+![Đường cong huấn luyện crnn_ft](reports/figures/train_curves_crnn_ft.png)
+
+| epoch | loss train | val_loss | val_accuracy (%) | val 1−NED (%) | ghi chú |
+|---|---|---|---|---|---|
+| 1 | 6,8885 | 2,5449 | 0,00 | 5,30 | lớp ra vừa khởi tạo lại cho 217 ký tự |
+| 2 | 1,3157 | 0,6365 | 60,93 | 85,74 | |
+| 3 | 0,7338 | 0,5189 | 67,64 | 87,49 | |
+| 4 | 0,6431 | 0,4765 | 70,48 | 88,59 | |
+| 5 | 0,6020 | 0,4575 | 71,61 | 88,86 | |
+| 6 | 0,5769 | 0,4456 | 72,63 | 89,08 | |
+| 7 | 0,5632 | 0,4354 | 73,05 | 89,35 | |
+| 8 | 0,5503 | **0,4254** | **74,07** | 89,52 | tốt nhất, checkpoint dùng để test |
+| 8 (SWA) | — | 0,4445 | 72,59 | 89,10 | model sau khi gộp trọng số SWA |
+
+**Nhận xét:**
+
+1. **Chưa overfit.** val_loss giảm liên tục tới epoch cuối (0,4254 là mức thấp nhất) và
+   val_accuracy vẫn tăng (73,05% → 74,07% ở epoch cuối). Model **chưa bão hoà**: dừng ở 8 epoch là
+   do ngân sách 3 giờ CPU, không phải vì đã học xong. Vì vậy đợt tiếp theo **train thêm** (mục 2.6).
+2. Mức tăng mỗi epoch giảm dần (+6,7 → +2,8 → +1,1 → +1,0 → +0,4 → +1,0 điểm %), nên train thêm có
+   lẽ chỉ được vài điểm %.
+3. Epoch 1 có accuracy 0%: lớp ra được khởi tạo lại cho bảng 217 ký tự tiếng Việt. Từ epoch 2 trở đi
+   phần trọng số pretrained mới phát huy tác dụng.
+4. Điểm "SWA" (Stochastic Weight Averaging, lấy trung bình trọng số 2 epoch cuối) được đo sau khi
+   train xong. Ở đây nó kém epoch 8 (72,59% so với 74,07%), nên checkpoint dùng để test là epoch 8.
+5. Kết quả test của checkpoint này (`docs/nhat_ky_chay.md`, lần 1): test US **73,0%** (sát val 74,1%, tức val đại diện
+   tốt cho test cùng nguồn); test VN 18,3%. Mức sụt US→VN là do khác miền dữ liệu (chữ có dấu,
+   nhãn viết thường, kiểu chữ), **không** phải overfit. Overfit chỉ đo được trên dữ liệu cùng phân
+   bố với tập train.
+
+#### PARSeq fine-tune (`parseq_ft`) — 2 epoch, 05/11/2026
+
+![Đường cong huấn luyện parseq_ft](reports/figures/train_curves_parseq_ft.png)
+
+Ngân sách 3 giờ CPU chỉ đủ 2 epoch (57 phút/epoch). Loss vẫn đang giảm (val_loss 3,84 → 3,26) nhưng
+val_accuracy 0% cả hai epoch: **chưa học được**, chưa đủ điểm để nói về overfit. Đang train lại với
+ngân sách 9 giờ (đêm 05→06/11); đồ thị sẽ tự cập nhật sau lần đánh giá kế tiếp.
+
+**Vẽ lại / cập nhật đồ thị.** `bash scripts/06_eval.sh` (hoặc bước `eval` của
+`09_full_pipeline_cpu.sh`) tự vẽ lại sau mỗi lần đánh giá. Vẽ riêng, không cần đánh giá:
+
+```bash
+.venv/bin/python -m trademark_ocr.train_curves --out-dir reports/figures
+# chỉ vài model:  --models crnn_ft,parseq_ft     thư mục runs khác:  --runs /đường/dẫn/runs
+```
+
+Kết quả: `reports/figures/train_curves_<model>.png`, bảng số theo epoch và kết luận ở
+`reports/figures/train_curves.md` (dán thẳng vào báo cáo được), số liệu máy đọc ở `train_curves.json`.
+
+### 2.6 Train thêm epoch từ checkpoint cũ (không train lại từ đầu)
+
+**Vấn đề.** crnn_ft dừng ở 8 epoch khi vẫn đang tốt lên. Train lại từ đầu với 20 epoch sẽ bỏ phí 8
+epoch đã có (khoảng 2,3 giờ CPU). Cơ chế "train tiếp" sẵn có của Lightning (`ckpt_path=`) chỉ áp
+dụng cho lần train **bị ngắt giữa chừng**. Nó khôi phục cả lịch learning rate OneCycle, mà lịch này
+đã chạy hết số bước của 8 epoch, rồi chuyển sang SWA. Kéo dài thêm epoch theo cách đó sẽ báo lỗi.
+
+**Cách làm** (`scripts/09_full_pipeline_cpu.sh --continue`, DESIGN 16.12):
+
+1. Tạo một run **mới**, nạp **toàn bộ** trọng số từ checkpoint cuối của run cũ (cùng kiến trúc, cùng
+   bảng ký tự: nạp đủ 46/46 tensor của CRNN).
+2. Tạo optimizer và lịch learning rate **mới** cho số epoch còn thiếu. Learning rate tăng lại lên
+   đỉnh rồi giảm dần (kiểu *warm restart*, SGDR — Loshchilov & Hutter 2017). Vì vậy 1–2 epoch đầu
+   của đợt mới val có thể chững hoặc giảm nhẹ rồi mới tăng tiếp.
+3. `--max-epochs` là **tổng** số epoch. crnn_ft đã có 8, nên `--max-epochs 20` train thêm 12. Chạy
+   lại đúng lệnh thì an toàn: đủ 20 thì bỏ qua; nếu bị ngắt giữa chừng thì train tiếp chính run mới.
+4. Run mới ghi lại nó được train tiếp từ run nào và đã có bao nhiêu epoch trước đó. Nhờ vậy đồ thị ở
+   mục 2.5 nối hai run thành một đường epoch 1 → 20, có vạch đứt ở chỗ nối.
+
+```bash
+bash scripts/09_full_pipeline_cpu.sh --from train --models crnn_ft --continue --max-epochs 20 --max-hours 8
+```
+
+**Kế hoạch:** crnn_ft 8 → 20 epoch, chạy trên một máy Ubuntu khác (yếu hơn). Từng bước, gồm cả
+cách mang dữ liệu và checkpoint qua lại giữa hai máy, ở
+[`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md) mục "Việc tiếp theo → 4". Kết quả sẽ được bổ sung vào
+mục 2.5 sau khi train xong.
 
 ## 3. Lệnh tổng kết nhanh
 

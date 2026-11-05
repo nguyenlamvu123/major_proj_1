@@ -1,0 +1,15 @@
+[
+  "data/.pipeline/clean",
+  "data/.pipeline/lmdb",
+  "data/.pipeline/split",
+  "data/.pipeline/us_images",
+  "data/.pipeline/us_meta",
+  "data/.pipeline/vn",
+  "data/.pipeline/vn_lmdb",
+  "data/runs/svtrctc/2026-11-06_05-00-00/DONE",
+  "data/runs/svtrctc/2026-11-06_05-00-00/checkpoints/epoch=4-step=4005-val_accuracy=30.0-val_NED=60.0.ckpt",
+  "data/runs/svtrctc/2026-11-06_05-00-00/checkpoints/last.ckpt",
+  "data/runs/svtrctc/2026-11-06_05-00-00/pipeline_train.env",
+  "venv/.pipeline_setup",
+  "venv/bin/python"
+]

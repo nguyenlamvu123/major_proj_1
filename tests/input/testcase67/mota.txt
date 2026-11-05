@@ -1,0 +1,14 @@
+testcase67 — Run DONE không có file epoch=…ckpt: không đoán epoch, bỏ qua
+=========================================================================
+
+MỤC ĐÍCH
+    Run cũ (16/10) hoặc chép tay chỉ có last.ckpt.
+
+ĐẦU VÀO
+    crnn_ft DONE, checkpoints/ chỉ có last.ckpt.
+
+KỲ VỌNG
+    train:crnn_ft 'skip': không biết last.ckpt ở epoch nào (không có file epoch=…ckpt).
+
+VÌ SAO QUAN TRỌNG
+    Đoán sai epoch thì tổng epoch và đồ thị nối sai; dry-run không được gọi python để đọc checkpoint.

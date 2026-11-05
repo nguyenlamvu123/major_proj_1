@@ -1250,3 +1250,67 @@ trỏ vào thư mục chưa giải nén thì lọt qua và chỉ lỗi trong `tr
 Sửa: dịch cờ trước, rồi kiểm `<root>/train` **và** `<root>/val` với `<root>` = giá trị
 `data.root_dir=` (nhận cả `+`/`++`) nếu có, không thì `$DATA_ROOT/lmdb`; dòng `checkpoint ->` in
 `hydra.run.dir=` nếu có. Test: golden `testcase45..50` (kind `train_sh`, Python giả).
+
+### 16.11 Đồ thị train (kiểm tra overfit): `trademark_ocr.train_curves`
+
+Câu hỏi 05/11: vẽ accuracy train/test theo epoch để xem overfit có phải sửa code train không.
+Không: `third_party/parseq/train.py` đã ghi TensorBoard vào chính thư mục run
+(`events.out.tfevents.*`): `loss` mỗi batch (`log_every_n_steps: 1`), `val_loss`/`val_accuracy`/
+`val_NED` mỗi epoch, `epoch` ở mọi bước. Chỉ thiếu **accuracy trên tập train** (parseq không đo) —
+đo thêm phải can thiệp `validation_step` của parseq, nơi `val_accuracy` quyết định checkpoint, nên
+không làm; overfit đọc từ cặp loss train ↔ val_loss. Accuracy trên tập test theo epoch cố ý không
+đo: tập val giữ vai trò đó, test chỉ chấm một lần ở cuối.
+
+Module mới chỉ đọc log, không đụng code train:
+- Gộp nhiều file events của một run (train tiếp sau khi bị cắt): file sau thắng, điểm của file
+  trước từ `global_step` đầu của file sau trở đi bị bỏ (nhánh đã làm lại).
+- Loss train của epoch = trung bình loss các batch có `epoch` đó; tính trên ảnh đã augment, có
+  dropout, nên thường cao hơn val_loss — đọc xu hướng, không so độ lớn.
+- Điểm validate có `epoch >= trainer.max_epochs` (đọc `config/config.yaml`) là lượt SWA: Lightning
+  chạy thêm một lượt tính lại BatchNorm cho trọng số trung bình (CRNN có BatchNorm) rồi validate.
+  Đánh dấu `swa`, vẽ marker rỗng cùng hoành độ epoch cuối, không tính "tốt nhất"/overfit
+  (crnn_ft 04/11: 72,59% sau SWA, 74,07% ở epoch 8; `last.ckpt` là epoch 8).
+- Nối run `--continue` (16.12) với run cha theo `continue_from` (tương đối `runs/`), cắt run cha ở
+  `init_epoch`, đánh số epoch dồn bằng `epoch_offset`; đường đứt "train tiếp" ở chỗ nối.
+- `overfit_check`: `co_dau_hieu` khi val_loss thấp nhất ở epoch k, sau đó ≥ 2 epoch và epoch cuối
+  cao hơn đáy > 5% trong khi loss train epoch cuối thấp hơn ở k; `chua_thay` khi đáy ở epoch
+  cuối/kế cuối; `di_ngang` còn lại; `chua_du` khi < 3 epoch.
+- Chọn run: mới nhất (theo tên thư mục) có ít nhất một điểm `val_accuracy`; model không có log nào
+  nằm trong `skipped` kèm lý do.
+
+Ra `reports/figures/train_curves_<model>.png` (2 ô: loss — thang log khi max/min > 3; accuracy val),
+`train_curves.json`, `train_curves.md`. `06_eval.sh` gọi ở cuối (lỗi chỉ WARN). `reports/figures/`
+là thư mục con nên bước chuyển báo cáo cũ vào `archive/` (chỉ chuyển file) không đụng tới. Màu
+train/val lấy hai slot đầu của bảng categorical đã kiểm CVD/tương phản. Test: golden
+`testcase51..59`, `70` (kind `curves`: runner tự sinh file events bằng `SummaryWriter`), và
+`06_eval.sh` (`testcase25/26/38–41`) có thêm lệnh `train_curves`.
+
+### 16.12 Train thêm epoch từ một run đã xong: `09_full_pipeline_cpu.sh --continue`
+
+Yêu cầu 05/11: crnn_ft 8 epoch còn đang tốt lên (val_loss giảm tới epoch cuối) — train thêm từ
+checkpoint cũ, không làm lại từ đầu, trên một máy khác yếu hơn. Lightning `ckpt_path=` (cách
+"train tiếp" sẵn có, dùng cho run bị cắt) **không** dùng được cho run đã xong: lịch OneCycleLR khôi
+phục từ checkpoint giữ `total_steps` của 8 epoch (đã chạy hết, bước kế tiếp báo lỗi "Tried to step
+… times"), và SWA đã thay lịch LR bằng SWALR từ epoch 6.
+
+Cách làm: run MỚI, nạp **toàn bộ** trọng số từ `last.ckpt` của run cũ qua factory
+`trademark_ocr.pretrained.finetune` (`init_from` nhận sẵn file `.ckpt`; cùng kiến trúc, cùng charset
+nên nạp đủ — smoke 05/11: "nạp 46 tensor, bỏ 0"), optimizer + lịch OneCycle mới cho phần còn thiếu
+(warm restart: LR khởi động lại tới đỉnh rồi giảm, val có thể chững 1–2 epoch đầu). Config `*_ft`
+chỉ cần `model.init_from=<ckpt>`; config train từ đầu chuyển `model._target_` sang factory,
+`+model.target=<lớp>` (bảng `model_class` trong script; `evaluate.py` đọc `model.target`).
+
+- `--max-epochs` là **tổng** epoch tính dồn; run mới train `max_epochs − đã train` (hoặc ít hơn theo
+  `--max-hours`). Đã train = `epoch_offset` của run cũ + epoch của `last.ckpt` + 1, chặn ở
+  `max_epochs` của run cũ (lượt SWA lọt top-3 thì `last.ckpt` mang epoch = max_epochs). Epoch của
+  `last.ckpt` đọc từ tên file top-k (`epoch=E-…ckpt`, E lớn nhất) — dry-run không gọi Python;
+  `last.ckpt` chỉ được ghi cùng một bản top-k nên đó là bản mới nhất.
+- Chạy lại cùng lệnh: đủ tổng → skip; run mới bị cắt → nhánh "train tiếp" (ckpt_path) như mọi run;
+  run cũ là UNDERTRAINED cũng train tiếp được (parseq_ft 2 epoch).
+- `pipeline_train.env` của run mới: `max_epochs`, `batch_size`, `continue_from` (tương đối
+  `$DATA_ROOT/runs`, để chép run giữa hai máy), `init_epoch`, `epoch_offset`, `init_ckpt`.
+- Đổi `--batch-size` khi train tiếp được: lịch LR mới, và parseq nhân LR theo `batch_size/256`.
+- `--continue` + `--retrain` → thoát 2; model chưa có run nào → skip, không âm thầm train từ đầu.
+
+Test: golden `testcase60..69` (dry-run); phần chạy thật kiểm tay bằng Python giả (override, file
+env) và smoke 2 batch thật cho cả `crnn_ft` lẫn `crnn` (factory) với `init_from` = checkpoint thật.

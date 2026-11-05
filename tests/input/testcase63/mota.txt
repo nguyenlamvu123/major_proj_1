@@ -1,0 +1,14 @@
+testcase63 — Run --continue bị cắt giữa chừng: train tiếp chính run đó, không đẻ run mới
+========================================================================================
+
+MỤC ĐÍCH
+    Máy yếu, mất điện hoặc chạm trần thời gian giữa đợt train tiếp.
+
+ĐẦU VÀO
+    Như testcase62 nhưng run mới chưa có DONE (đang dở).
+
+KỲ VỌNG
+    train:crnn_ft 'resume' từ runs/crnn_ft/2026-11-06_08-00-00/checkpoints/last.ckpt, giữ 12 epoch, batch 64.
+
+VÌ SAO QUAN TRỌNG
+    Nếu tạo thêm run --continue từ run dở thì lịch LR bị khởi động lại lần nữa và đếm epoch sai.

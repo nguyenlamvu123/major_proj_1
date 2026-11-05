@@ -1,0 +1,14 @@
+testcase59 — plot=true: sinh PNG + train_curves.md (số kiểu Việt, ghi chú SWA/tốt nhất)
+=======================================================================================
+
+MỤC ĐÍCH
+    Kiểm đầu ra dùng cho báo cáo: hình và bảng markdown.
+
+ĐẦU VÀO
+    Run có lượt SWA như testcase52, bật vẽ.
+
+KỲ VỌNG
+    out-dir có train_curves.json, train_curves.md, train_curves_crnn_ft.png; md có ảnh, bảng dấu phẩy thập phân, dòng 'tốt nhất' và 'model sau SWA', câu kết luận.
+
+VÌ SAO QUAN TRỌNG
+    train_curves.md là thứ được dán vào BAO_CAO_TONG_KET_DAT_LIEU_HUAN_LUYEN.md cho người hướng dẫn đọc.

@@ -1,0 +1,14 @@
+testcase57 — UNDERTRAINED 2 epoch, 0%: 'chua_du', không có 'tốt nhất'
+=====================================================================
+
+MỤC ĐÍCH
+    Tái hiện parseq_ft 04/11 (2 epoch, 0%).
+
+ĐẦU VÀO
+    2 epoch, val_accuracy 0% cả hai, file UNDERTRAINED.
+
+KỲ VỌNG
+    status 'UNDERTRAINED', best = null, verdict 'chua_du'; bảng md không có dòng 'tốt nhất'.
+
+VÌ SAO QUAN TRỌNG
+    'Tốt nhất 0%' hay 'chưa thấy overfit' trên một model chưa học được là thông tin sai cho người đọc báo cáo.

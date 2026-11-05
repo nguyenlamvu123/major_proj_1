@@ -47,6 +47,7 @@ Mỗi bước dữ liệu xong thì ghi một dấu vào `$DATA_ROOT/.pipeline/<
 - model train đủ epoch mà **chưa học được** (`val_accuracy` tốt nhất < 1%, file
   `runs/<model>/<giờ>/UNDERTRAINED`) → bỏ qua, eval cũng bỏ; muốn train lại thì thêm `--retrain`
   và **tăng `--max-hours`** (cùng ngân sách sẽ ra cùng kết quả);
+- model đã xong mà muốn **train thêm epoch** (giữ trọng số cũ) → `--continue`, xem mục 5;
 - tải ảnh dở → tải tiếp phần còn thiếu.
 
 Lỗi giữa chừng (mất mạng, mất điện) thì cứ chạy lại đúng lệnh cũ.
@@ -72,6 +73,7 @@ Lỗi giữa chừng (mất mạng, mất điện) thì cứ chạy lại đúng
 | `--only a,b` | | chỉ chạy các bước này, ép chạy kể cả khi đã xong |
 | `--skip a,b` | | bỏ qua các bước này |
 | `--retrain` | | train lại từ đầu kể cả model đã `DONE` hoặc `UNDERTRAINED` |
+| `--continue` | | train **thêm** từ `last.ckpt` của run đã `DONE`/`UNDERTRAINED` tới **tổng** `--max-epochs` epoch (run mới, lịch LR mới); không dùng cùng `--retrain` |
 
 Các bước: `setup us_meta us_images clean split lmdb vn vn_lmdb train eval`.
 
@@ -98,6 +100,25 @@ Số đo thật (máy i5-10400, CPU, batch 64, lần chạy 04/11 — `docs/nhat
 | `parseq_ft` | 57,1 phút/epoch (4,17 s/batch) → 3h chỉ đủ 2 epoch, **chưa học được** |
 | eval 2 model + báo cáo | 3 phút |
 
+### Train thêm epoch cho model đã xong (`--continue`)
+
+```bash
+bash scripts/09_full_pipeline_cpu.sh --dry-run --from train --models crnn_ft --continue --max-epochs 20
+bash scripts/09_full_pipeline_cpu.sh --from train --models crnn_ft --continue --max-epochs 20 --max-hours 8
+```
+
+- `--max-epochs` là **tổng** số epoch muốn đạt, tính cả các epoch đã train. crnn_ft đã có 8 → run
+  mới train thêm tối đa 12; có `--max-hours` thì đo tốc độ và chọn số epoch vừa ngân sách (có thể
+  ít hơn 12). Chạy lại đúng lệnh: chưa đủ tổng thì train thêm một đợt nữa từ run mới nhất; đủ rồi
+  thì bỏ qua; run mới bị cắt giữa chừng thì train tiếp chính run đó.
+- Run mới nạp **toàn bộ** trọng số từ `last.ckpt` của run cũ, rồi train với optimizer và lịch LR
+  **mới**. Không nối được lịch cũ: OneCycle đã chạy hết số bước và SWA đã thay lịch LR. LR khởi động
+  lại từ thấp lên đỉnh nên 1–2 epoch đầu val có thể chững hoặc giảm nhẹ rồi mới tăng tiếp.
+- Run cũ giữ nguyên. Run mới ghi `continue_from`, `init_epoch`, `epoch_offset` vào
+  `pipeline_train.env`: đồ thị (`reports/figures/`) nối hai run thành một đường epoch 1 → 20.
+- `--from train` để không chạy lại các bước dữ liệu (máy mới chép LMDB sang thì không có dấu
+  `.pipeline/`, thiếu `--from train` là script đi tải lại dữ liệu từ đầu).
+
 ## 6. Tập VN và duyệt tay
 
 Nhãn VN (`rs-MK` của WIPO Publish) là phần chữ được đăng ký, không phải bản chép lại ảnh. Lần
@@ -117,12 +138,16 @@ Crawl VN lỗi (mạng, site đổi cấu trúc) **không** dừng train: eval c
 <repo>/reports/final_summary.md        báo cáo tổng hợp (3 mức so khớp, phân tách độ sụt US→VN, theo drawing_kind)
 <repo>/reports/<model>_{us,vn}.csv     kết quả từng mẫu
 <repo>/reports/archive/<giờ>/           báo cáo của các lần eval trước (eval đầy đủ chuyển hết vào đây trước khi chạy)
+<repo>/reports/figures/                 đồ thị train: train_curves_<model>.png + train_curves.md/.json (loss train,
+                                        val_loss, val_accuracy theo epoch; kết luận overfit) — eval vẽ lại mỗi lần
 <DATA_ROOT>/runs/<model>/<giờ>/         checkpoints/last.ckpt, config/, pipeline_train.env, benchmark.json,
-                                        verdict.json, DONE hoặc UNDERTRAINED
+                                        verdict.json, DONE hoặc UNDERTRAINED, events.out.tfevents.* (log để vẽ đồ thị)
 <DATA_ROOT>/logs/pipeline_<giờ>.log     log đầy đủ của lần chạy
 ```
 
-Mang model sang máy khác: chép **cả thư mục run** (cần `config/config.yaml` để `evaluate` biết lớp model).
+Mang model sang máy khác: chép **cả thư mục run** (cần `config/config.yaml` để `evaluate` biết lớp model,
+`events.out.tfevents.*` để vẽ đồ thị, `checkpoints/epoch=…ckpt` để `--continue` biết đã train mấy epoch).
+Vẽ lại đồ thị mà không eval: `.venv/bin/python -m trademark_ocr.train_curves --out-dir reports/figures`.
 
 ## 8. Lưu ý
 
