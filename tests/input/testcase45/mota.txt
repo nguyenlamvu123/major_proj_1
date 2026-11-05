@@ -1,0 +1,14 @@
+testcase45 — Colab: LMDB giải nén ra đĩa máy ảo, data.root_dir trỏ tới đó -> train
+==================================================================================
+
+MỤC ĐÍCH
+    Tái hiện lỗi trên Colab 05/11: 'thiếu LMDB ở .../trademark_data/lmdb' dù LMDB đã có ở /content.
+
+ĐẦU VÀO
+    DATA_ROOT (đóng vai Drive) KHÔNG có lmdb/; <WORK>/lmdb_root/lmdb có train/ và val/; data.root_dir trỏ vào đó.
+
+KỲ VỌNG
+    Thoát 0, gọi train.py với tm_trba_ft + các override; log LMDB=<WORK>/lmdb_root/lmdb, checkpoint vẫn ở <DATA_ROOT>/runs/trba_ft/.
+
+VÌ SAO QUAN TRỌNG
+    Đây là cách train trên Colab đúng (đọc LMDB từ đĩa nhanh, checkpoint trên Drive); bản cũ chặn nhầm nên phải đi vòng bằng DATA_ROOT.

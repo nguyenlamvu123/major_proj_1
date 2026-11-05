@@ -1,0 +1,14 @@
+{
+  "kind": "train_sh",
+  "desc": "Override dạng ++data.root_dir= cũng được nhận",
+  "args": [
+    "trba_ft",
+    "++data.root_dir=<WORK>/lmdb_root/lmdb"
+  ],
+  "state": {
+    "files": {
+      "../lmdb_root/lmdb/train/trademark/data.mdb": 10,
+      "../lmdb_root/lmdb/val/data.mdb": 10
+    }
+  }
+}

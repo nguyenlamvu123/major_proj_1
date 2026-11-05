@@ -1,0 +1,12 @@
+{
+  "kind": "train_sh",
+  "desc": "Có train nhưng thiếu val -> thoát 1 trước khi nạp model",
+  "args": [
+    "parseq_ft"
+  ],
+  "state": {
+    "files": {
+      "lmdb/train/trademark/data.mdb": 10
+    }
+  }
+}

@@ -1,0 +1,5 @@
+[
+  "[05_train] model=trba_ft config=tm_trba_ft overrides: ++data.root_dir=<WORK>/lmdb_root/lmdb",
+  "[05_train] PYTHON=<PYTHON>  DATA_ROOT=<DATA_ROOT>  LMDB=<WORK>/lmdb_root/lmdb",
+  "[05_train] checkpoint -> <DATA_ROOT>/runs/trba_ft/<timestamp>/"
+]

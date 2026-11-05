@@ -1,0 +1,5 @@
+[
+  "[05_train] model=parseq_ft config=tm_parseq_ft overrides: trainer.max_epochs=8 hydra.run.dir=<DATA_ROOT>/runs/parseq_ft/2026-11-05_21-00-00 ckpt_path=<DATA_ROOT>/runs/parseq_ft/2026-11-05_21-00-00/checkpoints/last.ckpt",
+  "[05_train] PYTHON=<PYTHON>  DATA_ROOT=<DATA_ROOT>  LMDB=<DATA_ROOT>/lmdb",
+  "[05_train] checkpoint -> <DATA_ROOT>/runs/parseq_ft/2026-11-05_21-00-00/"
+]

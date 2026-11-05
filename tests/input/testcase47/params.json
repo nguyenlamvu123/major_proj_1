@@ -1,0 +1,14 @@
+{
+  "kind": "train_sh",
+  "desc": "data.root_dir trỏ tới thư mục chưa giải nén -> thoát 1, báo đúng đường dẫn",
+  "args": [
+    "trba_ft",
+    "data.root_dir=<WORK>/lmdb_root/lmdb"
+  ],
+  "state": {
+    "files": {
+      "lmdb/train/trademark/data.mdb": 10,
+      "lmdb/val/data.mdb": 10
+    }
+  }
+}

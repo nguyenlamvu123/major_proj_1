@@ -1,0 +1,14 @@
+testcase46 — Mặc định: LMDB ở $DATA_ROOT/lmdb -> train như cũ
+=============================================================
+
+MỤC ĐÍCH
+    Không có override thì hành vi giữ nguyên.
+
+ĐẦU VÀO
+    DATA_ROOT/lmdb có train/ và val/; không có data.root_dir.
+
+KỲ VỌNG
+    Thoát 0; log LMDB=<DATA_ROOT>/lmdb, checkpoint -> <DATA_ROOT>/runs/crnn_ft/<timestamp>/.
+
+VÌ SAO QUAN TRỌNG
+    Đường chạy chính trên máy local và pipeline không được đổi theo bản sửa cho Colab.

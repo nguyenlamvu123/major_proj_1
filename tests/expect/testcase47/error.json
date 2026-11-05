@@ -1,0 +1,4 @@
+{
+  "code": 1,
+  "stderr_contains": "thiếu LMDB ở <WORK>/lmdb_root/lmdb/train"
+}
