@@ -13,6 +13,9 @@ File này chỉ:
    :func:`benchmark` đo giây/batch thật trên máy, :func:`epochs_for_budget` đổi ngân sách ra
    số epoch (để lịch LR OneCycle chạy trọn thay vì bị cắt ngang), :func:`ckpt_progress` đọc
    epoch + thời gian đã train từ ``last.ckpt`` (biết run đã xong hay phải train tiếp).
+5. (nhánh 16.9) :func:`train_verdict` xem run đã train xong có thực sự học được gì không
+   (``val_accuracy`` tốt nhất trong tên checkpoint) — pipeline ghi ``UNDERTRAINED`` thay vì
+   ``DONE`` nếu không, để báo cáo không coi model 0% là kết quả.
 
 Train thật (lặp lại logic của parseq, không sửa code bên thứ ba)::
 
@@ -25,6 +28,7 @@ CLI
     python3 -m trademark_ocr.train_utils --config tm_parseq_ft --benchmark --budget-hours 3 \
         --max-epochs 10 --json-out plan.json -o model.batch_size=64 -o trainer.accelerator=cpu
     python3 -m trademark_ocr.train_utils --ckpt-info runs/crnn_ft/<ts>/checkpoints/last.ckpt
+    python3 -m trademark_ocr.train_utils --train-verdict runs/parseq_ft/<ts>
 """
 
 from __future__ import annotations
@@ -32,6 +36,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 import time
 from pathlib import Path
@@ -47,6 +52,19 @@ CFG_DIR = REPO_ROOT / "configs" / "hydra"
 
 if str(PARSEQ_ROOT) not in sys.path:
     sys.path.insert(0, str(PARSEQ_ROOT))
+
+#: Train xong mà ``val_accuracy`` (%) tốt nhất vẫn dưới mức này = model chưa học được gì.
+#: Lần chạy 04/11: parseq_ft 2 epoch đứng ở 0,0000 cả hai epoch; model học được thì vượt xa
+#: (crnn_ft 60,9% ngay epoch thứ 2), nên 1% tách hai trường hợp mà không cần tinh chỉnh.
+MIN_VAL_ACCURACY = 1.0
+
+#: Ngân sách cho ít hơn số epoch này thì cảnh báo trước khi train. Fine-tune khởi tạo lại
+#: head theo charset 217 ký tự: crnn_ft 0% sau epoch 1, 60,9% sau epoch 2 (lần chạy 04/11).
+MIN_USEFUL_EPOCHS = 3
+
+# parseq/train.py đặt tên checkpoint '{epoch}-{step}-{val_accuracy:.4f}-{val_NED:.4f}', Lightning
+# chèn "tên=" trước mỗi giá trị -> "epoch=1-step=1602-val_accuracy=0.0000-val_NED=7.0307.ckpt"
+_VAL_ACC_IN_NAME = re.compile(r"val_accuracy=([0-9]+(?:\.[0-9]+)?)")
 
 
 
@@ -232,6 +250,9 @@ def epochs_for_budget(*, budget_hours: float, max_epochs: int, train_samples: in
         "estimated_hours": round(epochs * epoch_seconds / 3600, 2),
         "fits_max_epochs": fit >= max_epochs,
         "over_budget": fit < 1,
+        # Chỉ khi NGÂN SÁCH là thứ giới hạn: người dùng tự đặt --max-epochs 2 (smoke test) thì
+        # không cảnh báo.
+        "too_few_epochs": epochs < min(MIN_USEFUL_EPOCHS, max_epochs),
     }
 
 
@@ -249,6 +270,26 @@ def ckpt_progress(path: Path | str) -> dict[str, Any]:
             elapsed = float(state.get("time_elapsed", {}).get("train", 0.0))
     return {"epoch": int(ckpt.get("epoch", -1)), "global_step": int(ckpt.get("global_step", 0)),
             "train_seconds": round(elapsed, 1)}
+
+
+def train_verdict(run_dir: Path | str, *, min_val_accuracy: float = MIN_VAL_ACCURACY) -> dict[str, Any]:
+    """Run đã train xong có học được gì không, đọc từ TÊN các checkpoint top-k trong
+    ``<run>/checkpoints/`` (không nạp checkpoint nên nhanh, không cần torch).
+
+    ``verdict``: ``ok`` | ``undertrained`` (``val_accuracy`` tốt nhất < ``min_val_accuracy``, đơn
+    vị %) | ``unknown`` (không checkpoint nào mang ``val_accuracy`` trong tên, vd chỉ có
+    ``last.ckpt`` — không đủ căn cứ nên pipeline coi như xong, giữ hành vi cũ).
+    """
+    ckpt_dir = Path(run_dir) / "checkpoints"
+    scores = sorted(float(m.group(1)) for p in ckpt_dir.glob("*.ckpt")
+                    if (m := _VAL_ACC_IN_NAME.search(p.name)))
+    if not scores:
+        return {"verdict": "unknown", "best_val_accuracy": None, "n_scored_ckpt": 0,
+                "min_val_accuracy": min_val_accuracy}
+    best = scores[-1]   # save_top_k giữ k checkpoint tốt nhất -> max của chúng = tốt nhất cả run
+    return {"verdict": "ok" if best >= min_val_accuracy else "undertrained",
+            "best_val_accuracy": best, "n_scored_ckpt": len(scores),
+            "min_val_accuracy": min_val_accuracy}
 
 
 def train_command(config: str, extra: Sequence[str] = ()) -> str:
@@ -281,6 +322,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--json-out", default=None, help="ghi kết quả benchmark / ckpt-info ra JSON")
     ap.add_argument("--ckpt-info", default=None, metavar="CKPT",
                     help="in epoch, global_step, giây đã train của một checkpoint")
+    ap.add_argument("--train-verdict", default=None, metavar="RUN_DIR",
+                    help="run đã train xong có học được gì không (val_accuracy trong tên checkpoint)")
     return ap
 
 
@@ -298,6 +341,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if a.ckpt_info:
         _emit(ckpt_progress(a.ckpt_info), a.json_out)
+        return 0
+    if a.train_verdict:
+        _emit(train_verdict(a.train_verdict), a.json_out)
         return 0
     _require_strhub()
     import torch

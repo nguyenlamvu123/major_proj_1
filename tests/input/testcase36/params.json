@@ -1,0 +1,13 @@
+{
+  "kind": "budget",
+  "desc": "Số đo thật parseq_ft 04/11: 3h chỉ đủ 2 epoch -> too_few_epochs",
+  "inputs": {
+    "budget_hours": 3,
+    "max_epochs": 10,
+    "train_samples": 51230,
+    "val_samples": 2846,
+    "batch_size": 64,
+    "sec_per_train_batch": 4.1713,
+    "sec_per_val_batch": 1.8366
+  }
+}

@@ -1,0 +1,14 @@
+testcase44 — Đoán bình thường: char_accuracy = 1 − CER như cũ
+=============================================================
+
+MỤC ĐÍCH
+    Chặn ở 0 không làm đổi số của trường hợp thường.
+
+ĐẦU VÀO
+    Một mẫu đúng, một mẫu thiếu 1 ký tự (tổng 10 ký tự nhãn).
+
+KỲ VỌNG
+    cer 0.1, char_accuracy 0.9, accuracy 0.5.
+
+VÌ SAO QUAN TRỌNG
+    Mọi số liệu crnn_ft đã có phải giữ nguyên sau bản sửa.

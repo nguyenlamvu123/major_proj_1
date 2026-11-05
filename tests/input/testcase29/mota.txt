@@ -1,0 +1,14 @@
+testcase29 — UNDERTRAINED + --retrain: train lại từ đầu với ngân sách mới
+=========================================================================
+
+MỤC ĐÍCH
+    Lệnh đề xuất cho đêm sau: chỉ train lại parseq_ft với ngân sách lớn hơn.
+
+ĐẦU VÀO
+    Như testcase28; --models parseq_ft --retrain --max-hours 9.
+
+KỲ VỌNG
+    Mọi bước dữ liệu 'skip'; train:parseq_ft 'run' từ đầu, ngân sách 9h; crnn_ft không xuất hiện ở train; eval chạy.
+
+VÌ SAO QUAN TRỌNG
+    Đây là đường duy nhất để thoát trạng thái UNDERTRAINED; phải là run MỚI (lịch LR theo số epoch mới), không train tiếp run cũ.

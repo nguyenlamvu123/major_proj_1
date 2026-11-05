@@ -1212,3 +1212,30 @@ không có top-k, override `max_time`).
 Phụ: `06_eval.sh` bỏ tập test thiếu LMDB thay vì dừng; viết lại `HUONG_DAN_PIPELINE_CPU.md`,
 sửa markdown hỏng trong `CACH_CHAY_TRAIN_CPU.md` và hai lỗi gõ trong
 `BAO_CAO_TONG_KET_DAT_LIEU_HUAN_LUYEN.md`; xoá `trademark_data_min.tar.gz` (file nén rỗng 45 byte).
+
+### 16.9 Sau lần chạy đầu (04→05/11): model "chưa học được", báo cáo lẫn file cũ
+
+Lần chạy thật đầu tiên (`docs/nhat_ky_chay.md`) xong lúc 02:38 nhưng `final_summary.md` sai ba chỗ:
+`parseq_ft` 0% (ngân sách 3h trên CPU chỉ đủ 2 epoch, `val_accuracy` 0,0000 cả hai epoch, loss
+5,39 → 3,27 vẫn đang giảm) mà vẫn được ghi `DONE` và đưa vào bảng như kết quả; dòng `crnn` 200
+mẫu là file 16/10 của máy cũ (`report.py` gom mọi `reports/*.csv`); `char-accuracy` âm (−1,26)
+vì CER > 1 khi model đoán dài hơn nhãn.
+
+| Sửa | Chi tiết |
+|---|---|
+| `UNDERTRAINED` | train đủ epoch xong, `train_utils --train-verdict <run>` đọc `val_accuracy` trong tên các checkpoint top-k; tốt nhất < 1% (`MIN_VAL_ACCURACY`) → ghi `UNDERTRAINED` thay vì `DONE`. Không đọc được (không ckpt nào mang `val_accuracy`) → `DONE` như cũ |
+| Kế hoạch | run mới nhất `UNDERTRAINED` → `skip` kèm gợi ý; **không** tự train lại (cùng ngân sách ra cùng kết quả, mất một đêm); `--retrain` → run mới |
+| Cảnh báo sớm | `epochs_for_budget` thêm `too_few_epochs` = số epoch < min(3, `--max-epochs`) — chỉ khi ngân sách là giới hạn; pipeline in `[WARN]` ngay sau benchmark và nhắc lại ở cuối log |
+| `06_eval.sh` | chọn `last.ckpt` mới nhất của run **không** `UNDERTRAINED` (lùi về run cũ hơn); chọn xong mới dọn báo cáo: không `--only` → chuyển mọi file trong `reports/` vào `reports/archive/<giờ>/`; `--only` → chỉ file của model được đánh giá lại; không model nào dùng được → thoát 1, báo cáo cũ nguyên vẹn. `REPORTS_DIR` đổi được thư mục báo cáo |
+| Metric / báo cáo | `char_accuracy = max(0, 1 − CER)` (CER gốc giữ ở cột `cer`); `final_summary.md` ghi giờ máy kèm độ lệch UTC |
+| Log | `PYTHONUNBUFFERED=1`: lần đầu log đứng im 13 phút ở `us_meta` vì stdout Python qua `tee` bị đệm theo khối |
+
+Không sửa: SWA của `parseq/train.py` (bên thứ ba) bật từ 75% số epoch — với 2 epoch nó thay lịch
+OneCycle bằng LR cố định ngay epoch thứ hai. Không phải nguyên nhân chính (loss vẫn giảm đều) và
+hết tác động khi đủ epoch.
+
+Test: golden `testcase28..44` (3 kế hoạch với `UNDERTRAINED`, 5 `verdict`, 2 ngân sách, 5 lần chạy
+`06_eval.sh` gồm archive và lùi run, 2 `metrics`); expect của `testcase21..26` cập nhật (thêm
+`too_few_epochs`; đường dẫn báo cáo theo `REPORTS_DIR`). Runner luôn đặt `REPORTS_DIR` vào thư mục
+tạm: khi viết tính năng, một lần chạy test trước khi có dòng đó đã chuyển `reports/` thật vào
+archive (đã trả lại nguyên vẹn).

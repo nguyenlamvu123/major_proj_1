@@ -1,0 +1,9 @@
+[
+  "[06_eval] bỏ qua crnn (chưa có checkpoint trong <DATA_ROOT>/runs/crnn/)",
+  "[06_eval] bỏ qua trba (chưa có checkpoint trong <DATA_ROOT>/runs/trba/)",
+  "[06_eval] bỏ qua parseq (chưa có checkpoint trong <DATA_ROOT>/runs/parseq/)",
+  "[06_eval] bỏ qua svtrctc (chưa có checkpoint trong <DATA_ROOT>/runs/svtrctc/)",
+  "[06_eval] bỏ qua crnn_ft (chưa có checkpoint trong <DATA_ROOT>/runs/crnn_ft/)",
+  "[06_eval] bỏ qua trba_ft (chưa có checkpoint trong <DATA_ROOT>/runs/trba_ft/)",
+  "[06_eval] bỏ qua parseq_ft (train xong nhưng chưa học được: <DATA_ROOT>/runs/parseq_ft/2026-11-05_00-27-27/UNDERTRAINED)"
+]

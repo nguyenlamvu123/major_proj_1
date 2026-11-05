@@ -1,0 +1,30 @@
+{
+  "kind": "eval_sh",
+  "desc": "Chỉ có run UNDERTRAINED: bỏ qua model đó, ghi lý do",
+  "args": [],
+  "state": {
+    "runs": [
+      {
+        "model": "parseq_ft",
+        "ts": "2026-11-05_00-27-27",
+        "ckpt_age": 5,
+        "env": {
+          "max_epochs": 2,
+          "batch_size": 64
+        },
+        "files": {
+          "UNDERTRAINED": "val_accuracy tốt nhất 0.0% sau 2 epoch\n"
+        }
+      },
+      {
+        "model": "crnn_ft",
+        "ts": "2026-11-04_21-58-41",
+        "ckpt_age": 10
+      }
+    ],
+    "files": {
+      "lmdb/test/test_us/data.mdb": 10,
+      "lmdb/test/test_vn/data.mdb": 10
+    }
+  }
+}

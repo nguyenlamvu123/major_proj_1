@@ -22,7 +22,7 @@ import csv
 import re
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -91,7 +91,10 @@ def list_figures(figures_dir: "Path | str") -> list[str]:
 
 def render_markdown(rows: list[dict[str, Any]], shift: list[dict[str, str]],
                     figures: list[str]) -> str:
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    # Giờ của máy kèm độ lệch UTC: "19:38 UTC" trên báo cáo dễ bị đọc nhầm là giờ Việt Nam.
+    now = datetime.now().astimezone()
+    off = now.strftime("%z")                      # "+0700"
+    ts = f"{now:%Y-%m-%d %H:%M} (UTC{off[:3]}:{off[3:]})"
     lines: list[str] = []
     lines.append("# Tổng hợp kết quả — nhận dạng chữ nhãn hiệu")
     lines.append("")

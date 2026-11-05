@@ -1,0 +1,14 @@
+testcase37 — --max-epochs 2 do người dùng đặt, dư ngân sách: không cảnh báo
+===========================================================================
+
+MỤC ĐÍCH
+    Cảnh báo chỉ khi NGÂN SÁCH là giới hạn, không phải lựa chọn của người dùng.
+
+ĐẦU VÀO
+    Ngân sách 10h dư nhiều, --max-epochs 2 (smoke test).
+
+KỲ VỌNG
+    epochs 2, fits_max_epochs true, too_few_epochs false.
+
+VÌ SAO QUAN TRỌNG
+    Cảnh báo sai mỗi lần smoke test sẽ khiến người dùng quen bỏ qua cảnh báo thật.

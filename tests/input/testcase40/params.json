@@ -1,0 +1,26 @@
+{
+  "kind": "eval_sh",
+  "desc": "Run mới nhất UNDERTRAINED: dùng checkpoint run cũ hơn",
+  "args": [],
+  "state": {
+    "runs": [
+      {
+        "model": "parseq_ft",
+        "ts": "2026-11-07_00-00-00",
+        "ckpt_age": 5,
+        "files": {
+          "UNDERTRAINED": "val_accuracy tốt nhất 0.0% sau 2 epoch\n"
+        }
+      },
+      {
+        "model": "parseq_ft",
+        "ts": "2026-11-01_00-00-00",
+        "ckpt_age": 50
+      }
+    ],
+    "files": {
+      "lmdb/test/test_us/data.mdb": 10,
+      "lmdb/test/test_vn/data.mdb": 10
+    }
+  }
+}

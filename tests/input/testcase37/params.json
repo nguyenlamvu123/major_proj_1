@@ -1,0 +1,13 @@
+{
+  "kind": "budget",
+  "desc": "--max-epochs 2 do người dùng đặt, dư ngân sách: không cảnh báo",
+  "inputs": {
+    "budget_hours": 10,
+    "max_epochs": 2,
+    "train_samples": 640,
+    "val_samples": 64,
+    "batch_size": 64,
+    "sec_per_train_batch": 1,
+    "sec_per_val_batch": 1
+  }
+}

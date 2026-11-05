@@ -79,7 +79,8 @@ bash scripts/09_full_pipeline_cpu.sh --max-hours 3   # chạy thật (nên trong
 Script tự dựng `.venv` (torch CPU nếu không có GPU), chạy lại an toàn (bước nào xong thì bỏ qua,
 model train dở thì train tiếp) và với `--max-hours` thì đo tốc độ thật để chọn số epoch vừa ngân
 sách mỗi model. Chi tiết: [HUONG_DAN_PIPELINE_CPU.md](HUONG_DAN_PIPELINE_CPU.md); train trên CPU
-nhanh/chậm thế nào: [CACH_CHAY_TRAIN_CPU.md](CACH_CHAY_TRAIN_CPU.md).
+nhanh/chậm thế nào: [CACH_CHAY_TRAIN_CPU.md](CACH_CHAY_TRAIN_CPU.md); các lần đã chạy, kết quả và
+việc còn lại: [docs/nhat_ky_chay.md](docs/nhat_ky_chay.md).
 
 ## Huấn luyện (Google Colab, GPU T4)
 

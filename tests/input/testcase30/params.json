@@ -1,0 +1,70 @@
+{
+  "kind": "plan",
+  "desc": "Run cũ UNDERTRAINED, run mới hơn train dở: train tiếp run mới",
+  "args": [
+    "--accelerator",
+    "cpu"
+  ],
+  "state": {
+    "stamps": {
+      "us_meta": [
+        "rows=60000",
+        600
+      ],
+      "us_images": [
+        "-",
+        500
+      ],
+      "clean": [
+        "-",
+        400
+      ],
+      "split": [
+        "seed=1111",
+        300
+      ],
+      "lmdb": [
+        "-",
+        200
+      ],
+      "vn": [
+        "limit=2000",
+        150
+      ],
+      "vn_lmdb": [
+        "split=unverified",
+        100
+      ]
+    },
+    "venv": {
+      "python": true,
+      "stamp": [
+        "accelerator=cpu",
+        0
+      ]
+    },
+    "runs": [
+      {
+        "model": "parseq_ft",
+        "ts": "2026-11-05_00-27-27",
+        "ckpt_age": 100,
+        "env": {
+          "max_epochs": 2,
+          "batch_size": 64
+        },
+        "files": {
+          "UNDERTRAINED": "val_accuracy tốt nhất 0.0% sau 2 epoch\n"
+        }
+      },
+      {
+        "model": "parseq_ft",
+        "ts": "2026-11-06_21-00-00",
+        "ckpt_age": 10,
+        "env": {
+          "max_epochs": 8,
+          "batch_size": 64
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "verdict": "undertrained",
+  "best_val_accuracy": 0.0,
+  "n_scored_ckpt": 2,
+  "min_val_accuracy": 1.0
+}

@@ -1,0 +1,14 @@
+testcase40 — Run mới nhất UNDERTRAINED: dùng checkpoint run cũ hơn
+==================================================================
+
+MỤC ĐÍCH
+    Run hỏng mới hơn không che run tốt cũ hơn.
+
+ĐẦU VÀO
+    parseq_ft có run mới (UNDERTRAINED) và run cũ hơn bình thường.
+
+KỲ VỌNG
+    evaluate dùng ckpt của run 2026-11-01_00-00-00 cho cả test_us và test_vn.
+
+VÌ SAO QUAN TRỌNG
+    --retrain thất bại không được làm mất kết quả tốt đã có trong báo cáo.

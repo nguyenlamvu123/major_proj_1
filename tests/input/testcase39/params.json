@@ -1,0 +1,28 @@
+{
+  "kind": "eval_sh",
+  "desc": "--only crnn_ft: chỉ chuyển báo cáo của crnn_ft, giữ model khác",
+  "args": [
+    "--only",
+    "crnn_ft"
+  ],
+  "state": {
+    "runs": [
+      {
+        "model": "crnn_ft",
+        "ts": "2026-11-04_21-58-41",
+        "ckpt_age": 10
+      }
+    ],
+    "files": {
+      "lmdb/test/test_us/data.mdb": 10,
+      "lmdb/test/test_vn/data.mdb": 10
+    },
+    "reports": {
+      "crnn_ft_us.csv": 100,
+      "crnn_ft_vn.summary.json": 100,
+      "parseq_ft_us.csv": 100,
+      "crnn_us.csv": 100,
+      "final_summary.md": 100
+    }
+  }
+}

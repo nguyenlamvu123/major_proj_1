@@ -1,0 +1,14 @@
+testcase41 — Chỉ có run UNDERTRAINED: bỏ qua model đó, ghi lý do
+================================================================
+
+MỤC ĐÍCH
+    Đúng tình huống sáng 05/11 sau khi có tính năng mới.
+
+ĐẦU VÀO
+    crnn_ft bình thường; parseq_ft chỉ có run UNDERTRAINED.
+
+KỲ VỌNG
+    parseq_ft 'bỏ qua' với lý do chưa học được + đường dẫn UNDERTRAINED; crnn_ft được đánh giá; thoát 0.
+
+VÌ SAO QUAN TRỌNG
+    Báo cáo không còn dòng parseq_ft 0% trông như kết quả thật, và log nói rõ vì sao thiếu.

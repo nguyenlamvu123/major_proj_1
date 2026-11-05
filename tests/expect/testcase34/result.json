@@ -1,0 +1,6 @@
+{
+  "verdict": "ok",
+  "best_val_accuracy": 1.0,
+  "n_scored_ckpt": 2,
+  "min_val_accuracy": 1.0
+}

@@ -1,0 +1,14 @@
+testcase36 — Số đo thật parseq_ft 04/11: 3h chỉ đủ 2 epoch -> too_few_epochs
+============================================================================
+
+MỤC ĐÍCH
+    Cảnh báo sớm (trước khi train) đúng ca đã làm hỏng parseq_ft.
+
+ĐẦU VÀO
+    Số đo benchmark.json của parseq_ft đêm 04/11 (4,17 s/batch train), ngân sách 3h, tối đa 10 epoch.
+
+KỲ VỌNG
+    epochs 2, epoch_minutes 57.1, too_few_epochs true.
+
+VÌ SAO QUAN TRỌNG
+    Đêm 04/11 không có cảnh báo nào: biết từ 00:28 thì đã đổi kế hoạch thay vì mất 2 giờ.

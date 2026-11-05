@@ -1,0 +1,7 @@
+{
+  "kind": "verdict",
+  "desc": "Chỉ có last.ckpt, không có val_accuracy trong tên -> unknown",
+  "ckpts": [
+    "last.ckpt"
+  ]
+}

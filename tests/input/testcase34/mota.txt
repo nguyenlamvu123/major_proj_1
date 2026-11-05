@@ -1,0 +1,14 @@
+testcase34 — Đúng ngưỡng 1.0% -> ok (biên)
+==========================================
+
+MỤC ĐÍCH
+    Kiểm điều kiện biên của ngưỡng MIN_VAL_ACCURACY = 1.0.
+
+ĐẦU VÀO
+    Hai checkpoint 0,5% và 1,0%.
+
+KỲ VỌNG
+    verdict 'ok' (>= ngưỡng), best_val_accuracy 1.0.
+
+VÌ SAO QUAN TRỌNG
+    Giữ nguyên nghĩa '>= 1%' — đổi thành '>' sẽ âm thầm chặn model vừa chạm ngưỡng.

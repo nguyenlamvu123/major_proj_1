@@ -342,6 +342,18 @@ bash scripts/09_full_pipeline_cpu.sh --max-hours 3                # chạy thậ
 `HẾT. Báo cáo: …/reports/final_summary.md`, mỗi model trong `--models` có `runs/<model>/<giờ>/DONE`
 (hoặc được liệt kê "chưa đủ epoch"), chạy lại cùng lệnh thì mọi bước dữ liệu `skip`.
 
+### 16.9 Model chưa học được, báo cáo sạch
+
+```bash
+pytest -q tests/test_golden.py                                         # 44 testcase
+bash scripts/09_full_pipeline_cpu.sh --dry-run --max-hours 3           # parseq_ft: skip, CHƯA HỌC ĐƯỢC
+bash scripts/09_full_pipeline_cpu.sh --dry-run --models parseq_ft --retrain --max-hours 9
+```
+**Pass khi**: test xanh; dry-run thứ nhất in `train:parseq_ft | skip | train xong nhưng CHƯA HỌC
+ĐƯỢC …`, thứ hai in `train:parseq_ft | run | từ đầu, ngân sách 9h …` và mọi bước dữ liệu `skip`;
+sau một lần eval đầy đủ, `reports/` chỉ còn file của model đang có checkpoint dùng được, file cũ nằm
+trong `reports/archive/<giờ>/`, không cột `char-accuracy` nào âm.
+
 ---
 
 ## Ghi chú chung

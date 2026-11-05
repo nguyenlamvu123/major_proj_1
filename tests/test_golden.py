@@ -13,11 +13,22 @@ kind = "plan"     scripts/09_full_pipeline_cpu.sh --dry-run trên một DATA_ROO
        state = {"stamps": {bước: [nội dung, tuổi_giây]},   -> <DATA_ROOT>/.pipeline/<bước>
                 "files": {đường dẫn tương đối DATA_ROOT: tuổi_giây},
                 "venv": {"python": true, "stamp": [nội dung, tuổi_giây]},
-                "runs": [{"model", "ts", "ckpt_age", "done", "env": {...}}],
+                "runs": [{"model", "ts", "ckpt_age", "done", "env": {...},
+                          "files": {tên file trong run dir: nội dung}}],   vd UNDERTRAINED
+                "reports": {tên file: tuổi_giây},  -> <WORK>/reports (REPORTS_DIR)
                 "fake_gpu": true}   -> có nvidia-smi giả trong PATH
 kind = "budget"   trademark_ocr.train_utils.epochs_for_budget(**params["inputs"]) -> result.json
 kind = "eval_sh"  scripts/06_eval.sh với PYTHON giả ghi lại lệnh; params["state"] như plan
-                  (runs + files), params["args"] -> calls.json, exit.json, forbidden.json
+                  (runs + files + reports), params["args"] -> calls.json, exit.json,
+                  forbidden.json, reports_after.json (file trong REPORTS_DIR sau khi chạy,
+                  thư mục archive/<giờ> thay bằng archive/<TS>)
+kind = "verdict"  trademark_ocr.train_utils.train_verdict trên một run dir có các checkpoint
+                  tên params["ckpts"] (file rỗng); params["kwargs"] -> result.json
+kind = "metrics"  trademark_ocr.metrics.evaluate_metrics(params["preds"], params["gts"]),
+                  làm tròn 6 chữ số -> result.json
+
+MỌI lệnh bash chạy với REPORTS_DIR=<WORK>/reports: 06_eval.sh chuyển báo cáo cũ vào archive,
+để mặc định thì test sẽ dọn reports/ THẬT của repo (đã xảy ra một lần khi viết tính năng này).
 
 Thêm testcase = thêm thư mục, không sửa file này. Chạy:
     python -m pytest -q tests/test_golden.py
@@ -95,6 +106,10 @@ def build_state(state: dict, data_root: Path, venv: Path) -> None:
         if run.get("env"):
             touch_age(rd / "pipeline_train.env", 0,
                       "".join(f"{k}={v}\n" for k, v in run["env"].items()))
+        for name, content in run.get("files", {}).items():
+            touch_age(rd / name, 0, content)
+    for name, age in state.get("reports", {}).items():
+        touch_age(data_root.parent / "reports" / name, age, "x")
 
 
 def normalize(text: str, mapping: dict[str, str]) -> str:
@@ -110,6 +125,7 @@ def run_bash(script: str, args: list[str], *, out: Path, state: dict, extra_env:
     bin_dir = make_stubs(out, state)
     env = {k: v for k, v in os.environ.items() if k not in ("DATA_ROOT", "PYTHON")}
     env["PATH"] = f"{bin_dir}:{env.get('PATH', '/usr/bin:/bin')}"
+    env["REPORTS_DIR"] = str(work / "reports")
     env.update({k: v.replace("<WORK>", str(work)) for k, v in extra_env.items()})
     args = [a.replace("<WORK>", str(work)) for a in args]
     proc = subprocess.run(["bash", str(REPO / "scripts" / script), *args], env=env,
@@ -164,9 +180,27 @@ def run_case(name: str) -> Path:
         dump(out / "forbidden.json", forbidden)
         skipped = [normalize(l, mapping) for l in proc.stdout.splitlines() if "bỏ qua" in l]
         dump(out / "skipped.json", skipped)
+        reports = out / "work" / "reports"
+        after = sorted(re.sub(r"archive/\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d", "archive/<TS>",
+                              str(f.relative_to(reports)))
+                       for f in reports.rglob("*") if f.is_file()) if reports.exists() else []
+        dump(out / "reports_after.json", after)
         if proc.returncode != 0:
             dump(out / "error.json", {"code": proc.returncode,
                                       "stderr": normalize(proc.stderr, mapping)})
+    elif kind == "verdict":
+        from trademark_ocr.train_utils import train_verdict
+        run_dir = out / "work" / "run"
+        (run_dir / "checkpoints").mkdir(parents=True)
+        for ck in params["ckpts"]:
+            (run_dir / "checkpoints" / ck).write_bytes(b"")
+        dump(out / "result.json", train_verdict(run_dir, **params.get("kwargs", {})))
+
+    elif kind == "metrics":
+        from trademark_ocr.metrics import evaluate_metrics
+        res = evaluate_metrics(params["preds"], params["gts"])
+        dump(out / "result.json", {k: round(v, 6) for k, v in res.items()})
+
     else:
         raise ValueError(f"{name}: kind lạ {kind!r}")
     return out

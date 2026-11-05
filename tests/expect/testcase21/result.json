@@ -4,5 +4,6 @@
   "epoch_minutes": 0.6,
   "estimated_hours": 0.1,
   "fits_max_epochs": true,
-  "over_budget": false
+  "over_budget": false,
+  "too_few_epochs": false
 }
