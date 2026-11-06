@@ -4,17 +4,22 @@ Mỗi lần chạy thật `scripts/09_full_pipeline_cpu.sh` (hoặc train/eval t
 nhất ở trên**: lệnh, thời gian từng bước, kết quả, cái gì sai, đã sửa gì, việc tiếp theo. Log đầy đủ
 nằm ở `data/logs/pipeline_<giờ>.log` (không đưa vào git).
 
-## Tình trạng 4 mô hình (cập nhật chiều 05/11)
+## Tình trạng 4 mô hình (cập nhật sáng 06/11)
 
-| Kiến trúc | Biến thể | Trạng thái | Kết quả |
+| Kiến trúc | Biến thể | Trạng thái | Kết quả test |
 |---|---|---|---|
-| CRNN (CTC, 8,4 M) | `crnn_ft` | ✅ xong — CPU, 8 epoch (lần 1); chưa overfit, còn học thêm được → ⏳ train thêm lên 20 epoch trên máy khác (mục 4) | test US **73,0%**; VN **18,3%** (27,0% bỏ hoa/thường; 0% trên nhãn có dấu) |
-| PARSeq (24 M) | `parseq_ft` | ❌ lần 1 chỉ 2 epoch, chưa học được (`UNDERTRAINED`) → ⏳ train lại tối 05/11, CPU 9h | — |
-| SVTR-CTC (2,3 M) | `svtr` (từ đầu, không có pretrained) | ⏳ tối 05/11 nếu parseq_ft xong trước ~05:35 | — |
-| TRBA (50 M) | `trba_ft` | ⏳ Colab GPU (mục 3 bên dưới) | — |
+| CRNN (CTC, 8,4 M) | `crnn_ft` | ✅ xong — CPU, 8 epoch (lần 1); chưa overfit, còn học thêm được → ⏳ train thêm lên 20 epoch trên máy khác (mục 4) | US **73,0%**; VN **18,3%** (27,0% bỏ hoa/thường; 0% trên nhãn có dấu) |
+| PARSeq (24 M) | `parseq_ft` | ✅ xong — CPU, 7 epoch (lần 2); val gần bão hoà từ epoch 4–5, train thêm khó được gì | US **88,7%**; VN **27,6%** (41,1% bỏ hoa/thường) |
+| SVTR-CTC (2,3 M) | `svtr` (từ đầu, không có pretrained) | ✅ xong — CPU, 10 epoch (lần 2); val_loss vẫn giảm, train thêm được bằng `--continue` | US **69,4%**; VN **11,4%** (16,4% bỏ hoa/thường) |
+| TRBA (50 M) | `trba_ft` | ⏳ Colab GPU: dừng ở epoch 8/20 vì tài khoản hết hạn mức GPU → train tiếp, **không** train lại (mục 3) | — |
 
 Bản train từ đầu `crnn`, `trba`, `parseq` chưa lên kế hoạch (chỉ cần nếu muốn so fine-tune với
-train từ đầu). `reports/final_summary.md` hiện vẫn là bản sai của lần 1; lần eval kế tiếp sinh lại.
+train từ đầu). `reports/final_summary.md` là bản của lần 2 (06/11 07:10): 3 model trên test US
+(2.847 mẫu) và test VN (2.000 mẫu **chưa duyệt tay**).
+
+Checkpoint được chấm test là `checkpoints/last.ckpt`. Với Lightning 2.6, file này chỉ được ghi lại
+ở epoch nào lọt **top-3 val_accuracy**, nên nó là "epoch gần nhất lọt top-3", không nhất thiết là
+epoch cuối. Epoch thật sự được chấm của từng model ghi ở "Lần 2 → Checkpoint được chấm".
 
 Đồ thị train (loss train / val_loss / val_accuracy theo epoch, kết luận overfit) ở
 `reports/figures/`, giải thích trong `BAO_CAO_TONG_KET_DAT_LIEU_HUAN_LUYEN.md` mục 2.5. Mỗi lần
@@ -22,47 +27,36 @@ eval vẽ lại; vẽ riêng: `.venv/bin/python -m trademark_ocr.train_curves --
 
 ## Việc tiếp theo
 
-### 1. Ban ngày: duyệt tay nhãn VN
-
-Không cần chạy thêm gì, vì tối nay script tự build lại tập test VN từ bản đã duyệt.
+### 1. Duyệt tay nhãn VN (chưa làm)
 
 ```bash
 .venv/bin/python -m trademark_ocr.vn_review make --n 300   # rồi sửa data/processed/review_vn.csv
 .venv/bin/python -m trademark_ocr.vn_review apply
+bash scripts/09_full_pipeline_cpu.sh --only vn_lmdb,eval      # build lại test VN + chấm lại mọi model
 ```
 
 - `make` tạo `data/processed/review_vn.csv` và `review_vn.html` (ảnh cạnh nhãn để xem nhanh).
   Sửa cột `visible_text` thành đúng chữ nhìn thấy trong ảnh (đúng rồi thì giữ nguyên); ảnh không
   dùng được thì để **trống**.
-- `apply` phải xong **trước 21:00**: pipeline thấy `split_test_vn_verified.csv` mới hơn thì tự
-  build lại `test_vn` trước khi train.
+- Dòng thứ ba không train gì, chỉ build lại `test_vn` từ bản đã duyệt rồi chấm lại mọi model có
+  checkpoint (vài phút). Đừng chạy nó lúc máy đang train. Lần pipeline có train kế tiếp cũng tự
+  build lại `test_vn` nếu thấy `split_test_vn_verified.csv` mới hơn.
 - Sau khi duyệt, tập test VN chỉ còn các mẫu đã duyệt (~300, trừ dòng trống), không còn 2.000:
   số liệu VN đúng hơn nhưng khoảng tin cậy rộng hơn. Tỉ lệ nhãn WIPO sai nằm ở
   `data/processed/review_vn_report.json`.
 
-### 2. Tối 05/11, 21:00 (đã hẹn lịch): `parseq_ft` rồi `svtr`
+### 2. ✅ Tối 05/11: `parseq_ft` rồi `svtr` — đã chạy xong
 
-Lịch trong phiên Claude chạy `data/night_2026-11-05.sh` trong tmux `doan` (không nằm trong git):
-
-1. `09_full_pipeline_cpu.sh --models parseq_ft --retrain --max-hours 9`: khoảng 8 epoch × 57 phút,
-   dự kiến xong ~04:45, sau đó eval.
-2. Còn ≥ 2 giờ ngân sách trước **08:00 06/11** thì
-   `09_full_pipeline_cpu.sh --models svtr --max-hours <phần còn lại> --max-epochs 30`, rồi eval
-   lại mọi model. Ngân sách = (08:00 − lúc xong − 10 phút) / 1,15, vì trần cứng là 115% ngân sách.
-   Xong lúc 04:45 thì được 2,7h; xong sau ~05:35 thì bỏ qua svtr.
-3. Cả chuỗi nằm dưới một khoá `systemd-inhibit`. Script ép `LC_NUMERIC=C`, vì locale `vi_VN` làm
-   `awk` in `2,7` mà pipeline từ chối `--max-hours 2,7`.
-
-Log: `data/logs/night_2026-11-05.log` (quyết định của chuỗi) và hai file
-`data/logs/pipeline_2026-11-0{5,6}_*.log`. Muốn dừng: `tmux kill-session -t doan`. Lịch chỉ sống
-trong phiên Claude đang mở: thoát Claude trước 21:00 thì tự chạy tay
-`env -u DATA_ROOT tmux new-session -d -s doan "bash data/night_2026-11-05.sh"`.
-
-Sáng 06/11 đọc `reports/final_summary.md`. Nếu parseq_ft vẫn chưa học được (đủ 8 epoch mà
-`val_accuracy` < 1%), log ghi `UNDERTRAINED`, báo cáo bỏ model này; khi đó chuyển parseq_ft sang
-Colab như mục 3.
+Kết quả và thời gian ở mục "Lần 2" bên dưới. Lịch hẹn trong phiên Claude chỉ chạy một lần và đã
+hết; không còn lịch nào tự chạy. Script chuỗi `data/night_2026-11-05.sh` (không nằm trong git) giữ
+lại để tham khảo.
 
 ### 3. `trba_ft` trên Colab GPU
+
+**Tình trạng 06/11:** lần train đầu trên Colab dừng ở epoch 8/20 vì tài khoản hết hạn mức GPU.
+Checkpoint nằm trên Drive của tài khoản đó, ở `MyDrive/trademark_data/runs/trba_ft/<giờ>/`.
+**Train tiếp theo mục 3a**, không train lại từ đầu. Nếu phải sang tài khoản Google khác, làm theo
+mục 3b, nhưng đọc lưu ý điều khoản ở đó trước.
 
 Train trên Colab, **eval ở máy local** để mọi model đánh giá trên đúng một bộ test. **Không** tải
 lại dữ liệu bằng `01_download_data.ipynb`: danh sách gazette USPTO thay đổi theo ngày, nên tập
@@ -109,17 +103,128 @@ Tải `data/lmdb_trainval.tar` lên Google Drive, vào thư mục `MyDrive/trade
      `[05_train] checkpoint -> /content/drive/MyDrive/trademark_data/runs/trba_ft/<timestamp>/` là
      nơi lưu thật.
    - Batch giữ 64 như lần chạy CPU.
-   - Bị ngắt giữa chừng: máy ảo mới mất `/content/lmdb_root`. Chạy lại dòng `tar`, rồi thêm
-     `hydra.run.dir=<thư mục run cũ trên Drive> ckpt_path=<thư mục run cũ>/checkpoints/last.ckpt`
-     vào lệnh train.
-   - Colab miễn phí có giới hạn phiên, và để tab im lâu cũng bị ngắt. Thời gian 20 epoch trên T4
-     chưa đo; bảng ước lượng cũ ghi 2–4 giờ.
+   - Bị ngắt giữa chừng (mất kết nối, hết 12 giờ, hết hạn mức GPU): **train tiếp theo mục 3a**.
+     Chạy lại ô train ở trên mà **thiếu** `ckpt_path=` là tạo run mới, train lại từ epoch 1.
+   - Colab miễn phí có giới hạn phiên, và để tab im lâu cũng bị ngắt. Lần đầu (tháng 11) được
+     8 epoch thì hết hạn mức GPU.
 3. Xong thì ghi lại `val_accuracy` tốt nhất (nằm trong tên file `checkpoints/epoch=…-val_accuracy=…ckpt`).
+
+#### 3a. Train tiếp run bị ngắt (cùng tài khoản Google)
+
+**Cơ chế.** Override `ckpt_path=<run>/checkpoints/last.ckpt` khôi phục trọng số, optimizer, lịch
+learning rate OneCycle, bộ đếm epoch/bước và danh sách top-3 checkpoint, rồi chạy nốt các epoch còn
+lại của **chính run đó**. Run chưa chạy hết 20 epoch nên lịch learning rate nối tiếp đúng chỗ. Đây là
+chỗ khác với `--continue` (mục 4), vốn dành cho run đã train **xong**. Đã thử trên máy local với
+trba_ft thu nhỏ (8 batch/epoch, 3 epoch): `kill -9` giữa epoch 2 rồi chạy lại với `ckpt_path`.
+Lightning in "Restored all states", train nốt epoch 2–3, không lỗi. Đồ thị nối liền qua hai file log.
+
+Trên Colab, sau khi chạy lại 3 ô đầu của `00_setup` (mount Drive, clone `16-fix-review`, cài thư
+viện):
+
+**Ô 1 — xem checkpoint trên Drive còn nguyên không.** Máy ảo bị thu hồi đột ngột có thể làm file
+đang ghi dở chưa kịp đồng bộ lên Drive.
+
+```python
+RUN = "/content/drive/MyDrive/trademark_data/runs/trba_ft/<giờ>"   # thư mục có các file epoch=…ckpt
+!ls -la {RUN}/checkpoints
+import torch
+c = torch.load(f"{RUN}/checkpoints/last.ckpt", map_location="cpu", weights_only=False)
+print("last.ckpt: đã xong", c["epoch"] + 1, "epoch | global_step", c["global_step"])
+```
+
+- `global_step` = số epoch × 801 (51.230 ảnh / batch 64, làm tròn lên). 8 epoch thì in `8 | 6408`.
+- Số epoch in ra có thể **nhỏ hơn** epoch đang chạy lúc bị ngắt. Lightning 2.6 chỉ ghi lại
+  `last.ckpt` ở epoch lọt **top-3 val_accuracy**, nên nó là epoch gần nhất lọt top-3. Train tiếp từ
+  đó vẫn đúng, chỉ phải chạy lại các epoch sau nó.
+- `torch.load` báo lỗi (file ghi dở): thay `last.ckpt` trong ô 2 bằng file `epoch=…ckpt` có số
+  epoch lớn nhất. File đó cũng chứa đủ trạng thái để train tiếp.
+
+**Ô 2 — train tiếp.**
+
+```python
+!mkdir -p /content/lmdb_root && tar -xf /content/drive/MyDrive/trademark_data/lmdb_trainval.tar -C /content/lmdb_root
+!bash scripts/05_train.sh trba_ft --max-epochs 20 --num-workers 2 data.root_dir=/content/lmdb_root/lmdb hydra.run.dir={RUN} ckpt_path={RUN}/checkpoints/last.ckpt
+```
+
+Chạy đúng khi đủ cả ba điều sau:
+
+- dòng `[05_train] checkpoint -> …` trỏ đúng `RUN` cũ;
+- log có `Restored all states from the checkpoint at …`;
+- thanh tiến trình bắt đầu ở `Epoch <số epoch ô 1 in ra>/19`, không phải `Epoch 0/19`.
+  Lightning đếm epoch từ 0: `Epoch 8/19` là epoch thứ 9 trên 20.
+
+Không được đổi:
+
+- `--max-epochs 20` và batch (mặc định 64; không truyền `--batch-size`). Đổi một trong hai thì số
+  bước của lịch OneCycle khác bản đã lưu, dẫn tới lỗi "Tried to step … times" hoặc learning rate
+  sai. `--num-workers` đổi thoải mái.
+- `hydra.run.dir` và `ckpt_path` phải cùng một run. Thiếu `ckpt_path` là run mới từ epoch 1.
+
+Bị ngắt lần nữa thì chạy lại đúng ô 1 và ô 2 với cùng `RUN`. Mỗi lần chỉ mất phần epoch chưa kịp ghi
+checkpoint.
+
+#### 3b. Chuyển run sang một tài khoản Google khác
+
+> **Lưu ý điều khoản.** FAQ của Colab (<https://research.google.com/colaboratory/faq.html>, mục
+> các hoạt động bị cấm) ghi rõ: "using multiple accounts to work around access or resource usage
+> restrictions". Dùng tài khoản thứ hai **chỉ để né** hạn mức GPU của tài khoản thứ nhất là vi phạm,
+> và có thể khiến tài khoản bị hạn chế. Có hai cách không vi phạm, đều train tiếp theo mục 3a, không
+> cần chuyển gì:
+>
+> - chờ hạn mức GPU tự mở lại (Google không công bố bao lâu, vì hạn mức thay đổi theo thời gian);
+> - mua compute units (gói Pay As You Go) cho chính tài khoản đang giữ run.
+>
+> Các bước dưới đây dùng khi chuyển sang một tài khoản được phép dùng, ví dụ tài khoản có gói trả phí.
+
+Checkpoint và dữ liệu nằm trên Drive của tài khoản cũ (gọi là A). Colab chạy bằng tài khoản mới (B)
+chỉ mount được Drive của B, nên phải chép run sang Drive của B và **giữ nguyên đường dẫn**
+`MyDrive/trademark_data/runs/trba_ft/<giờ>/`. Lý do: `last.ckpt` lưu đường dẫn thư mục checkpoint.
+Nếu đường dẫn khác, Lightning cảnh báo "The dirpath has changed…" và lập lại danh sách top-3 từ
+rỗng: các file `epoch=…ckpt` cũ không bao giờ bị dọn, nên tốn thêm vài GB Drive. Kết quả train vẫn
+đúng.
+
+Dung lượng: mỗi checkpoint TRBA chứa cả trạng thái optimizer (AdamW), cỡ 0,6 GB. Một run gồm
+`last.ckpt` và 3 file `epoch=…ckpt`, tức khoảng 2,4 GB (xem cột kích thước trên Drive). Drive miễn
+phí có 15 GB.
+
+1. **[drive.google.com, tài khoản A]** Chuột phải thư mục `trademark_data` → Chia sẻ → nhập email
+   tài khoản B, chọn quyền **Người xem** → Gửi. B chỉ cần đọc. Quyền xem còn chặn việc lỡ ghi
+   checkpoint mới vào Drive của A: lỡ trỏ nhầm thì báo lỗi quyền truy cập, không ghi lẫn.
+2. **[drive.google.com, tài khoản B]** Vào "Được chia sẻ với tôi" → chuột phải `trademark_data` →
+   Sắp xếp → Thêm lối tắt → Drive của tôi. Sau đó đổi tên lối tắt thành `trademark_data_A` (chuột
+   phải → Đổi tên), để khỏi trùng tên với thư mục `trademark_data` của chính B.
+3. **[Colab, tài khoản B]** Chọn Runtime T4 GPU. Chạy 3 ô đầu `00_setup` với
+   `BRANCH = "16-fix-review"`; khi `drive.mount` hỏi thì chọn tài khoản B. Cell 1 tự tạo
+   `MyDrive/trademark_data/` của B.
+4. **[Colab B]** Chép run, chỉ làm một lần:
+
+   ```python
+   SRC = "/content/drive/MyDrive/trademark_data_A"                    # lối tắt tới Drive của A (chỉ đọc)
+   GIO = "<giờ>"                                                        # tên thư mục run trba_ft bên A
+   RUN = f"/content/drive/MyDrive/trademark_data/runs/trba_ft/{GIO}"   # Drive của B, cùng đường dẫn như A
+   !ls {SRC}/runs/trba_ft/                                              # phải thấy thư mục <giờ>
+   !mkdir -p /content/drive/MyDrive/trademark_data/runs/trba_ft
+   !cp -r {SRC}/runs/trba_ft/{GIO} /content/drive/MyDrive/trademark_data/runs/trba_ft/
+   !ls -la {RUN} {RUN}/checkpoints                                     # đủ file, cùng kích thước như bên A
+   ```
+
+   Nếu `/content/drive/MyDrive/` không có `trademark_data_A`: chờ vài phút cho lối tắt đồng bộ rồi
+   chạy `drive.mount('/content/drive', force_remount=True)`. Vẫn không thấy thì tải thư mục run từ
+   Drive của A về máy, rồi tải lên Drive của B vào đúng
+   `MyDrive/trademark_data/runs/trba_ft/<giờ>/` bằng giao diện web.
+5. **[Colab B]** Chạy ô 1 và ô 2 của mục 3a với `RUN` ở bước 4. Riêng dòng `tar` thì đọc từ lối tắt,
+   khỏi chép 2,2 GB:
+   `!mkdir -p /content/lmdb_root && tar -xf {SRC}/lmdb_trainval.tar -C /content/lmdb_root`.
+   Dòng `[05_train] checkpoint -> …` phải là `RUN` trên Drive của **B**, không phải đường dẫn chứa
+   `trademark_data_A`.
+6. Bị ngắt tiếp thì làm lại bước 3 và 5, không chép lại. Xong 20 epoch thì mang về máy local như dưới
+   đây, lấy từ Drive của **B**.
 
 **Mang về máy local:**
 
-1. Từ Drive tải `trademark_data/runs/trba_ft/<giờ>/`: `checkpoints/last.ckpt`, `config/`,
-   `hparams.yaml`, **`events.out.tfevents.*`** (log để vẽ đồ thị train) và **tên** các file
+1. Từ Drive của tài khoản đang giữ run, tải `trademark_data/runs/trba_ft/<giờ>/`:
+   `checkpoints/last.ckpt`, `config/`, `hparams.yaml`, **`events.out.tfevents.*`** (log để vẽ
+   đồ thị train; train tiếp sau mỗi lần ngắt sinh thêm một file, lấy **tất cả**) và **tên** các file
    `checkpoints/epoch=…ckpt` (cần để `--continue` biết đã train mấy epoch; chép file nặng, hoặc
    `touch` một file rỗng cùng tên). Đặt vào `data/runs/trba_ft/<giờ>/`.
 2. Nếu `val_accuracy` tốt nhất ≥ 1%: `touch data/runs/trba_ft/<giờ>/DONE`. Thiếu `DONE`, lần
@@ -288,18 +393,25 @@ Kiểm:
   - Viết lại phần "Nhận xét" theo số mới:
     1. val_accuracy tốt nhất bao nhiêu, ở epoch nào; tăng bao nhiêu so với 74,07%.
     2. Kết luận overfit: lấy câu "**Kết luận:**" trong `train_curves.md`. Nếu là "có dấu hiệu
-       overfit", nêu epoch val_loss thấp nhất và cho biết checkpoint dùng để test là epoch tốt
-       nhất theo val_accuracy, không phải epoch cuối.
-    3. Các epoch ngay sau chỗ nối (epoch 9–10) có chững hoặc giảm không. Nếu có, giải thích là do
+       overfit", nêu epoch val_loss thấp nhất.
+    3. Checkpoint đem chấm test là epoch nào. Đó là `last.ckpt` của run mới, tức epoch gần nhất
+       lọt top-3 val_accuracy, không nhất thiết là epoch tốt nhất hay epoch cuối (xem "Lần 2 →
+       Checkpoint được chấm"). Đọc epoch của nó bằng
+       `.venv/bin/python -c "import torch,sys;c=torch.load(sys.argv[1],map_location='cpu',weights_only=False);print(c['epoch']+1)" <run>/checkpoints/last.ckpt`
+       Số in ra đếm trong run mới, cộng thêm 8 epoch của run cũ. Nếu số in ra lớn hơn
+       `trainer.max_epochs` trong `<run>/config/config.yaml` thì đó là model sau SWA, giống
+       svtrctc ở lần 2.
+    4. Các epoch ngay sau chỗ nối (epoch 9–10) có chững hoặc giảm không. Nếu có, giải thích là do
        learning rate khởi động lại (mục 2.6), không phải overfit.
-    4. Test US / VN mới (`reports/crnn_ft_us.summary.json`, `crnn_ft_vn.summary.json`, hoặc
+    5. Test US / VN mới (`reports/crnn_ft_us.summary.json`, `crnn_ft_vn.summary.json`, hoặc
        `final_summary.md`) so với 73,0% / 18,3% của bản 8 epoch.
 - **Mục 2.6:** thay đoạn "**Kế hoạch:**" bằng một câu đã làm: máy nào (CPU, số luồng, RAM), batch,
   bao nhiêu phút/epoch (`benchmark.json` của run mới), mấy đêm.
 - **Không** đổi các số của lần 1 (8 epoch) ở chỗ khác. Đó là lịch sử, giữ để so sánh.
 
-Ghi thêm một mục "Lần 2 — crnn_ft train tiếp trên máy B" ở đầu phần nhật ký bên dưới (trên "Lần 1"),
-cùng khuôn: lệnh, máy, thời gian, kết quả, sự cố. Cập nhật bảng "Tình trạng 4 mô hình" ở đầu file.
+Ghi thêm một mục "Lần 3 — crnn_ft train tiếp trên máy B" (hoặc số kế tiếp, nếu đã có lần 3) ở đầu
+phần nhật ký bên dưới (trên mục mới nhất), cùng khuôn: lệnh, máy, thời gian, kết quả, sự cố. Cập
+nhật bảng "Tình trạng 4 mô hình" ở đầu file.
 
 Commit trên `vunl`:
 
@@ -309,6 +421,134 @@ git commit -m "16-fix-review: crnn_ft train tiếp lên 20 epoch: đồ thị + 
 ```
 
 **Không** commit `data/` (đã `.gitignore`, chứa checkpoint vài trăm MB) và `reports/*.csv`.
+
+---
+
+## Lần 2 — 05/11/2026 20:59 → 06/11/2026 07:10 (máy `vunl`, CPU)
+
+### Bối cảnh
+
+- Máy như lần 1. Nhánh `16-fix-review`, commit `a299574`. Tập VN vẫn **chưa duyệt tay**.
+- Lịch hẹn 21:00 trong phiên Claude chạy chuỗi `data/night_2026-11-05.sh` trong tmux `doan`, dưới
+  một khoá `systemd-inhibit` (máy không ngủ suốt đêm):
+  1. `09_full_pipeline_cpu.sh --models parseq_ft --retrain --max-hours 9`
+  2. còn ≥ 2 giờ trước 08:00 thì `09_full_pipeline_cpu.sh --models svtr --max-hours <phần còn lại> --max-epochs 30`
+- Log: `data/logs/night_2026-11-05.log` (quyết định của chuỗi),
+  `data/logs/pipeline_2026-11-05_20-59-07.log`, `data/logs/pipeline_2026-11-06_04-21-56.log`.
+
+### Thời gian từng bước
+
+| Giờ | Bước | Kết quả |
+|---|---|---|
+| 20:59–04:18 | train `parseq_ft` (từ đầu) | đo 4,43 s/batch → 60,5 phút/epoch → ngân sách 9h chọn **7 epoch** (ước 7,1h); xong sau 438 phút |
+| 04:18–04:21 | eval + đồ thị | crnn_ft, parseq_ft |
+| 04:21 | chuỗi quyết định | còn 3,0h trước 08:00 → chạy svtr với `--max-hours 3.0` |
+| 04:21–07:07 | train `svtr` (từ đầu) | đo 1,09 s/batch → 15,0 phút/epoch → chọn **10 epoch** (ước 2,5h); xong sau 164 phút |
+| 07:07–07:10 | eval + đồ thị | crnn_ft, parseq_ft, svtrctc → `reports/final_summary.md`, `reports/figures/` |
+
+Dự tính trước đó (8 epoch × 57 phút) lệch vì lần này đo được 60,5 phút/epoch, nên ngân sách chỉ đủ
+7 epoch. svtr được phép tới 30 epoch, nhưng 3 giờ chỉ đủ 10. Mỗi lần eval chuyển bộ báo cáo trước đó
+vào `reports/archive/<giờ>/` (không đưa vào git).
+
+### Kết quả
+
+Val accuracy theo epoch. Bảng đầy đủ ở `reports/figures/train_curves.md`, đồ thị ở
+`BAO_CAO_TONG_KET_DAT_LIEU_HUAN_LUYEN.md` mục 2.5.
+
+- **parseq_ft:** 84,3 → 87,8 → 88,7 → 89,4 → **89,5** → 89,5 → 89,1% (epoch 1–7).
+  - val_loss thấp nhất ở epoch 5 (0,479), sau đó lên 0,497 (+4%) trong khi loss train vẫn giảm.
+  - Kết luận: **gần bão hoà**. Đúng chiều của overfit nhưng chưa tới ngưỡng +5% của luật.
+- **svtrctc:** 0 → 0,7 → 50,5 → 61,4 → 64,9 → 68,1 → 69,2 → 69,8 → 71,1 → **71,8%** (epoch 1–10).
+  - Hai epoch đầu gần 0% vì model train từ đầu.
+  - val_loss vẫn giảm tới epoch cuối. Kết luận: **chưa bão hoà**.
+
+**Checkpoint được chấm.** `last.ckpt` là epoch gần nhất lọt top-3 val_accuracy (xem đầu file), nên
+không phải lúc nào cũng là epoch cuối:
+
+| Model | `last.ckpt` là | val của checkpoint đó | val tốt nhất |
+|---|---|---|---|
+| crnn_ft | epoch 8 (bước 6.408) | 74,07% | 74,07% (epoch 8) |
+| parseq_ft | epoch 6 (bước 4.806); epoch 7 (89,14%) không lọt top-3 nên không được ghi | 89,46% | 89,49% (epoch 5) |
+| svtrctc | model sau SWA (bước 8.011) | 70,52% | 71,82% (epoch 10) |
+
+Sau epoch cuối, Lightning chạy thêm một lượt qua tập train để tính lại BatchNorm cho model SWA:
+- **svtr:** lượt này làm bộ đếm bước tăng 1 (8.010 → 8.011), nên checkpoint được ghi. Model SWA lọt
+  top-3 (70,52% > 69,75% của epoch 8), vì vậy svtrctc được chấm trên model SWA, kém epoch tốt nhất
+  1,3 điểm val.
+- **crnn_ft:** bộ đếm bước giữ nguyên 6.408, nên Lightning không ghi checkpoint.
+
+**Test** (crnn_ft giữ nguyên số của lần 1):
+
+| Model | Tập | n | accuracy | bỏ hoa/thường | bỏ cả dấu | 1−NED |
+|---|---|---|---|---|---|---|
+| parseq_ft | US | 2.847 | **88,7%** | 88,7% | 88,9% | 0,957 |
+| parseq_ft | VN | 2.000 | **27,6%** | 41,1% | 45,8% | 0,534 |
+| svtrctc | US | 2.847 | **69,4%** | 69,4% | 69,5% | 0,848 |
+| svtrctc | VN | 2.000 | **11,4%** | 16,4% | 17,2% | 0,275 |
+| crnn_ft | US | 2.847 | 73,0% | 73,0% | 73,1% | 0,889 |
+| crnn_ft | VN | 2.000 | 18,3% | 27,0% | 28,5% | 0,380 |
+
+Theo loại nhãn hiệu (US, bỏ hoa/thường):
+
+| Model | `standard_character` (2.288) | `typeset_old` (29) | `stylized_words` (112) | `design_with_words` (418) |
+|---|---|---|---|---|
+| parseq_ft | 98,3% | 96,6% | 67,9% | 40,9% |
+| crnn_ft | 84,9% | 96,6% | 42,0% | 14,4% |
+| svtrctc | 83,9% | 89,7% | 13,4% | 3,4% |
+
+Tập VN:
+
+| Model | US→VN, bỏ hoa/thường (CI 95%) | US→VN, chỉ 1.442 nhãn VN không dấu | Đọc đúng 558 nhãn VN **có dấu** |
+|---|---|---|---|
+| parseq_ft | −0,476 [−0,502; −0,453] | −0,319 [−0,347; −0,291] | 2/558 (0,4%) |
+| crnn_ft | −0,460 [−0,484; −0,434] | −0,355 [−0,384; −0,325] | 0 |
+| svtrctc | −0,530 [−0,554; −0,507] | −0,466 [−0,495; −0,440] | 0 |
+
+Cả ba model gần như không đọc được chữ có dấu, vì dữ liệu train USPTO gần như không có dấu. parseq_ft
+tốt nhất ở mọi cột. Khoảng cách lớn nhất nằm ở nhãn có hình vẽ (`design_with_words`): 40,9% so với
+14,4% và 3,4%.
+
+### Phát hiện: vì sao parseq_ft lần 1 không học được mà lần 2 học được
+
+Cùng cấu hình, cùng nạp 172 tensor pretrained. Chỉ khác `max_epochs` (2 so với 7), nên lịch OneCycle
+dài khác nhau. Lần 1, sau 1.602 bước val vẫn 0%. Lần 2, ngay sau epoch 1 (801 bước) val đã 84,3%.
+Như vậy "ít epoch" **tự nó** không giải thích được lần 1.
+
+Loss train theo bước tách nhau từ khoảng bước 100:
+
+| bước | 100 | 200 | 300 | 400 | 600 | 800 |
+|---|---|---|---|---|---|---|
+| lần 1 (2 epoch) | 5,31 | 5,12 | 4,85 | 4,58 | 4,15 | 3,85 |
+| lần 2 (7 epoch) | 5,20 | 3,52 | 3,09 | 1,23 | 0,42 | 0,45 |
+
+Learning rate đỉnh (1,75·10⁻⁴ = 7·10⁻⁴ × 64/256) đạt sau phần warmup, dài 7,5% tổng số bước:
+
+- **Lần 1:** đỉnh ở **bước 120**, lúc loss vẫn ~5,3 = ln 217, tức lớp ra mới khởi tạo còn đoán ngẫu
+  nhiên.
+- **Lần 2:** đỉnh ở **bước 420**, lúc loss đã xuống 1,23.
+
+**Giả thuyết mạnh nhất:** learning rate lên đỉnh khi lớp ra còn ngẫu nhiên, nên gradient lớn và nhiễu
+dội ngược vào phần trọng số pretrained, làm hỏng nó. Model phải học lại gần như từ đầu, cùng với
+việc SWA thay lịch LR từ epoch 2 (đã ghi ở lần 1).
+
+Đây **chưa** được kiểm chứng bằng thí nghiệm đối chứng (cùng thứ tự dữ liệu, chỉ đổi độ dài warmup).
+Thứ tự dữ liệu hai lần cũng khác nhau, vì `train.py` không đặt seed. Hệ quả thực tế: fine-tune cần
+lịch đủ dài. Pipeline đã cảnh báo khi ngân sách chỉ đủ dưới 3 epoch.
+
+### Sự cố và quan sát
+
+- Không lỗi. Cả hai bước train thoát 0, eval chạy hai lần đều xong.
+- `last.ckpt` không phải epoch cuối (bảng "Checkpoint được chấm"). Đây là hành vi của Lightning 2.6,
+  không phải lỗi pipeline. Chưa sửa. Muốn chấm epoch val tốt nhất thì phải đổi `06_eval.sh` sang
+  chọn file `epoch=…ckpt` có `val_accuracy` cao nhất. Việc đó đổi số liệu test của svtrctc (epoch
+  tốt nhất hơn model SWA 1,3 điểm val), và cần thống nhất trước khi làm.
+- Cuối log có cảnh báo: tập VN chưa duyệt tay.
+
+### Việc tiếp theo
+
+Xem đầu file: trba_ft train tiếp (mục 3), crnn_ft lên 20 epoch (mục 4), duyệt tay VN (mục 1).
+svtrctc cũng chưa bão hoà, có thể train thêm bằng
+`--from train --models svtr --continue --max-epochs 30 --max-hours <giờ>`.
 
 ---
 
@@ -375,6 +615,9 @@ Coverage VN 77,8%: 425 nhãn dài quá 25 ký tự (`max_label_length`), 83 nhã
    - Yếu tố phụ: SWA của `parseq/train.py` bật từ 75% số epoch. Với 2 epoch, nó thay lịch
      OneCycle bằng LR cố định ngay từ epoch thứ hai, nên LR không giảm dần về cuối.
    - **Lỗi của pipeline:** vẫn ghi `DONE` và đưa 0% vào bảng như một kết quả.
+   - **Bổ sung sau lần 2:** cùng cấu hình nhưng 7 epoch thì val đạt 84% ngay sau epoch 1. Vậy nguyên
+     nhân chính có lẽ là warmup quá ngắn (LR lên đỉnh ở bước 120), chứ không phải số epoch. Xem
+     "Lần 2 → Phát hiện".
 2. **Dòng `crnn` 200 mẫu US / 36 mẫu VN, accuracy 0**: file `reports/crnn_*` ngày 16/10 của máy
    cũ (LMDB 500 mẫu). `report.py` gom mọi `reports/*.csv` nên chúng lẫn vào bảng.
 3. **`char-accuracy` âm** (parseq_ft −1,26): định nghĩa `1 − CER` mà CER > 1 khi model đoán dài
