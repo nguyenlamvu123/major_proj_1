@@ -1,0 +1,14 @@
+testcase72 — hydra.run.dir + ckpt_path bọc ngoặc kép, có dấu cách: log checkpoint đúng, không dính ngoặc
+====================================================================================================
+
+MỤC ĐÍCH
+    09_full_pipeline_cpu.sh luôn bọc hydra.run.dir/ckpt_path trong ngoặc kép; dòng 'checkpoint ->' phải in đường dẫn sạch.
+
+ĐẦU VÀO
+    crnn_ft, hydra.run.dir="…/crnn ft có dấu cách/2026-11-07_20-44-52", ckpt_path="…/last.ckpt" (đều bọc ngoặc kép).
+
+KỲ VỌNG
+    Thoát 0; log checkpoint -> <DATA_ROOT>/runs/crnn ft có dấu cách/2026-11-07_20-44-52/ (không có dấu ngoặc).
+
+VÌ SAO QUAN TRỌNG
+    Máy C 07/11 (thư mục 'GenAI 2025') hỏng vì đường dẫn có dấu cách không bọc ngoặc; bọc rồi thì log phải còn đọc được.

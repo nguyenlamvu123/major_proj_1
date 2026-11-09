@@ -1314,3 +1314,22 @@ chỉ cần `model.init_from=<ckpt>`; config train từ đầu chuyển `model._
 
 Test: golden `testcase60..69` (dry-run); phần chạy thật kiểm tay bằng Python giả (override, file
 env) và smoke 2 batch thật cho cả `crnn_ft` lẫn `crnn` (factory) với `init_from` = checkpoint thật.
+
+### 16.13 Đường dẫn có dấu cách trong override Hydra
+
+Máy C (07/11) để repo ở `/media/…/GenAI 2025/đồ án chuyên ngành 1`. Override
+`hydra.run.dir=/media/…/GenAI 2025/…` vỡ grammar của Hydra (`OverrideParseException`), dù bash đã
+truyền nguyên một đối số: Hydra tự tách theo dấu cách bên trong giá trị.
+
+- `09_full_pipeline_cpu.sh` bọc ngoặc kép mọi đường dẫn nó đưa vào override: `hydra.run.dir`,
+  `ckpt_path`, `model.init_from`, `+model.init_from`. Hydra tự bỏ lớp ngoặc khi đọc giá trị (kiểm
+  bằng `OverridesParser`).
+- `05_train.sh` dùng chính các giá trị đó cho việc của bash (kiểm thư mục LMDB, in `checkpoint ->`),
+  nên bỏ một lớp `"…"`/`'…'` trước (hàm `unquote`). Không bỏ thì `-d "\"…/lmdb\"/train"` sai và báo
+  thiếu LMDB oan.
+- Lệnh gửi sang `train.py` giữ nguyên ngoặc.
+
+Test: golden `testcase71..75` (`train_sh`: ngoặc kép, ngoặc đơn, `+data.root_dir`, thư mục thiếu,
+`hydra.run.dir`/`ckpt_path` có dấu cách). Phía `09` chưa có golden cho lệnh train thật (kind `plan`
+chỉ in kế hoạch): bằng chứng là log máy C chạy được với đường dẫn bọc ngoặc, cộng phép thử
+`OverridesParser`.

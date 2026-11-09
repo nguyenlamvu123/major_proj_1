@@ -4,18 +4,28 @@ Mỗi lần chạy thật `scripts/09_full_pipeline_cpu.sh` (hoặc train/eval t
 nhất ở trên**: lệnh, thời gian từng bước, kết quả, cái gì sai, đã sửa gì, việc tiếp theo. Log đầy đủ
 nằm ở `data/logs/pipeline_<giờ>.log` (không đưa vào git).
 
-## Tình trạng 4 mô hình (cập nhật sáng 06/11)
+## Tình trạng 4 mô hình (cập nhật 09/11)
 
 | Kiến trúc | Biến thể | Trạng thái | Kết quả test |
 |---|---|---|---|
-| CRNN (CTC, 8,4 M) | `crnn_ft` | ✅ xong — CPU, 8 epoch (lần 1); chưa overfit, còn học thêm được → ⏳ train thêm lên 20 epoch trên máy khác (mục 4) | US **73,0%**; VN **18,3%** (27,0% bỏ hoa/thường; 0% trên nhãn có dấu) |
+| CRNN (CTC, 8,4 M) | `crnn_ft` | ✅ train lại **từ đầu 20 epoch** trên máy C (CPU, 07–08/11, lần 4): val **76,35%** (epoch 20), vẫn chưa overfit. ⚠️ **Checkpoint chưa mang về** (`checkpoints/` trống) → chưa eval. Bản 8 epoch (lần 1, val 74,07%) vẫn là bản đang được chấm | (bản 8 epoch) US **73,0%**; VN **18,3%** (27,0% bỏ hoa/thường; 0% trên nhãn có dấu) |
 | PARSeq (24 M) | `parseq_ft` | ✅ xong — CPU, 7 epoch (lần 2); val gần bão hoà từ epoch 4–5, train thêm khó được gì | US **88,7%**; VN **27,6%** (41,1% bỏ hoa/thường) |
 | SVTR-CTC (2,3 M) | `svtr` (từ đầu, không có pretrained) | ✅ xong — CPU, 10 epoch (lần 2); val_loss vẫn giảm, train thêm được bằng `--continue` | US **69,4%**; VN **11,4%** (16,4% bỏ hoa/thường) |
-| TRBA (50 M) | `trba_ft` | ⏳ Colab GPU: dừng ở epoch 8/20 vì tài khoản hết hạn mức GPU → train tiếp, **không** train lại (mục 3) | — |
+| TRBA (50 M) | `trba_ft` | ✅ **20/20 epoch** trên Colab T4, 4 phiên (05–07/11, lần 3); val tốt nhất **86,72%** (epoch 19), `last.ckpt` = epoch 20 (86,47%); đã mang về, có `DONE`. Chưa eval | — |
 
 Bản train từ đầu `crnn`, `trba`, `parseq` chưa lên kế hoạch (chỉ cần nếu muốn so fine-tune với
 train từ đầu). `reports/final_summary.md` là bản của lần 2 (06/11 07:10): 3 model trên test US
-(2.847 mẫu) và test VN (2.000 mẫu **chưa duyệt tay**).
+(2.847 mẫu) và test VN (2.000 mẫu **chưa duyệt tay**). Chưa có trba_ft và crnn_ft 20 epoch.
+
+**Việc cần làm tiếp (09/11):**
+1. crnn_ft 20 epoch: checkpoint chỉ có ở máy C. Eval ngay trên máy C (dự phòng Colab), mang 4 file
+   kết quả và `last.ckpt` (khoảng 135 MB) về, rồi `touch data/runs/crnn_ft/2026-11-07_20-44-52/DONE`.
+   Chi tiết ở [`docs/eval_crnn_ft_may_C.md`](eval_crnn_ft_may_C.md).
+2. trba_ft (checkpoint đã ở máy này): `bash scripts/06_eval.sh --only trba_ft`, chạy sau bước 1.
+   Chưa có `last.ckpt` của run 20 epoch thì **đừng** eval crnn_ft ở máy này, kể cả qua
+   `09_full_pipeline_cpu.sh --only eval`: eval lấy run mới nhất có checkpoint, nên sẽ chấm bản 8 epoch
+   (04/11) và ghi đè.
+3. Cập nhật số test vào `BAO_CAO_TONG_KET_DAT_LIEU_HUAN_LUYEN.md` mục 2.5 (các ô "chờ eval").
 
 Checkpoint được chấm test là `checkpoints/last.ckpt`. Với Lightning 2.6, file này chỉ được ghi lại
 ở epoch nào lọt **top-3 val_accuracy**, nên nó là "epoch gần nhất lọt top-3", không nhất thiết là
@@ -53,10 +63,10 @@ lại để tham khảo.
 
 ### 3. `trba_ft` trên Colab GPU
 
-**Tình trạng 06/11:** lần train đầu trên Colab dừng ở epoch 8/20 vì tài khoản hết hạn mức GPU.
-Checkpoint nằm trên Drive của tài khoản đó, ở `MyDrive/trademark_data/runs/trba_ft/<giờ>/`.
-**Train tiếp theo mục 3a**, không train lại từ đầu. Nếu phải sang tài khoản Google khác, làm theo
-mục 3b, nhưng đọc lưu ý điều khoản ở đó trước.
+**Tình trạng 09/11: ✅ xong 20/20 epoch** (diễn biến ở "Lần 3"). Run đã mang về
+`data/runs/trba_ft/2026-11-05_08-28-47/`, có `DONE`. Các mục 3a–3c dưới đây giữ lại làm hướng dẫn
+cho lần train trên Colab sau. Rút kinh nghiệm từ lần 3: dùng `--num-workers 0` hoặc `1`, vì với
+`--num-workers 2` tiến trình đọc dữ liệu bị kill do hết RAM ở 3/4 phiên.
 
 Train trên Colab, **eval ở máy local** để mọi model đánh giá trên đúng một bộ test. **Không** tải
 lại dữ liệu bằng `01_download_data.ipynb`: danh sách gazette USPTO thay đổi theo ngày, nên tập
@@ -324,6 +334,10 @@ từ A, đã ghi chú từng ô, ô train cũ đã vô hiệu hoá, có thêm ô
 
 ### 4. Train thêm `crnn_ft` lên 20 epoch trên một máy Ubuntu khác (yếu hơn)
 
+**Tình trạng 09/11:** máy C không có checkpoint 8 epoch nên **train lại từ đầu 20 epoch** thay vì
+`--continue` (diễn biến ở "Lần 4"). Còn thiếu: mang `checkpoints/` về (xem "Việc cần làm tiếp" ở
+đầu file). Hướng dẫn dưới đây vẫn đúng cho lần `--continue` sau.
+
 Viết để một người hoặc một AI khác làm theo từng bước, không cần đọc phần còn lại. Nhãn **[vunl]**
 là máy hiện tại (có dữ liệu, checkpoint, các model khác); **[máy B]** là máy Ubuntu yếu hơn sẽ train.
 
@@ -511,6 +525,99 @@ git commit -m "16-fix-review: crnn_ft train tiếp lên 20 epoch: đồ thị + 
 ```
 
 **Không** commit `data/` (đã `.gitignore`, chứa checkpoint vài trăm MB) và `reports/*.csv`.
+
+---
+
+## Lần 4 — `crnn_ft` train lại từ đầu 20 epoch, 07/11 20:04 → 08/11 (máy C, CPU)
+
+### Bối cảnh
+
+- Máy C: CPU, không GPU (torch 2.14.1+cu130, chạy CPU). Repo ở
+  `/media/zaibachkhoa/education/GenAI 2025/đồ án chuyên ngành 1`, **có dấu cách**.
+- Máy C không có checkpoint 8 epoch của lần 1, nên train lại từ đầu thay vì `--continue`:
+  `09_full_pipeline_cpu.sh --from train --skip eval --models crnn_ft --max-epochs 20 --batch-size 16 --num-workers 0`.
+- Run `data/runs/crnn_ft/2026-11-07_20-44-52/` đã mang về `vunl` (config, `hparams.yaml`, 5 file log
+  TensorBoard, `train.log`), **trừ `checkpoints/`** (trống). Log pipeline của máy C: 8 file
+  `data/logs/pipeline_2026-11-0{7,8}_*.log`.
+
+### Diễn biến
+
+| Bắt đầu | Kết quả |
+|---|---|
+| 07/11 20:04 | Lỗi sau 1 phút: đường dẫn có dấu cách làm Hydra không đọc được `hydra.run.dir=…` (`OverrideParseException`). Máy C sửa bằng cách bọc ngoặc kép; bản sửa đã đưa vào repo, xem "Đã sửa" |
+| 07/11 20:11 | `DataLoader worker … killed` (hết RAM) với `--num-workers 1` → chuyển `--num-workers 0` |
+| 07/11 20:44 → 08/11 05:18 | Epoch 1–10, khoảng 47 phút/epoch (batch 16), rồi tiến trình bị `Killed`, có lẽ hết RAM, giữa epoch 11 |
+| 08/11 14:04 | Lỗi sau 1 phút: `ckpt_path=` chưa bọc ngoặc, cùng lỗi dấu cách → máy C sửa tiếp |
+| 08/11 14:09 → 15:03 | Xong epoch 11, bị `Killed` |
+| 08/11 15:41 → 16:10 | Bị `Killed`, không xong epoch nào. Lệnh có `--batch-size 8`, nhưng khi train tiếp pipeline giữ batch 16 của run (cố ý: đổi batch làm lệch lịch OneCycle) |
+| 08/11 16:15 → 20:03 | Epoch 12–15, bị `Killed` |
+| 08/11 21:42 → ? | Chạy **ngoài pipeline** (không có log), **batch 8** (6.404 bước/epoch, thấy từ log TensorBoard): epoch 16–20 |
+
+Từ epoch 16 SWA đã thay lịch OneCycle bằng learning rate cố định, nên đổi sang batch 8 không gây lỗi
+lịch learning rate. Tuy vậy, 5 epoch cuối được train với batch khác 15 epoch đầu: báo cáo phải ghi
+điều này. `pipeline_train.env` của run vẫn ghi `batch_size=16`.
+
+### Kết quả (val)
+
+Val accuracy theo epoch: 0 → 0,5 → 55,5 → 63,3 → 66,3 → 68,7 → 70,4 → 71,0 → 71,9 → 72,8 → 73,1 →
+73,2 → 73,8 → 74,2 → 74,4 → 74,5 → 74,5 → 75,3 → 75,8 → **76,35%** (epoch 1–20). Bảng đầy đủ ở
+`reports/figures/train_curves.md`.
+
+- val_loss giảm liên tục tới epoch 20 (0,3896): **chưa overfit**, còn học thêm được.
+- Hơn bản 8 epoch của lần 1 (74,07%) **2,3 điểm** val.
+- Khởi đầu chậm hơn lần 1 (epoch 2: 0,5% so với 60,9%). Lý do: parseq nhân learning rate với
+  batch/256, nên batch 16 cho learning rate đỉnh nhỏ hơn 4 lần so với batch 64 của lần 1.
+- Chưa có số test: thiếu checkpoint (xem "Việc cần làm tiếp" ở đầu file).
+
+### Đã sửa
+
+`scripts/09_full_pipeline_cpu.sh` bọc ngoặc kép mọi đường dẫn trong override Hydra (`hydra.run.dir`,
+`ckpt_path`, `model.init_from`, `+model.init_from`). `scripts/05_train.sh` bỏ lớp ngoặc trước khi kiểm
+thư mục LMDB và in dòng `checkpoint ->`. Bản sửa lấy từ máy C, thêm hai chỗ máy C bỏ sót
+(`+model.init_from`, `data.root_dir` trong `05_train.sh`). Kiểm bằng bộ phân tích override của Hydra:
+không ngoặc thì `OverrideParseException`, có ngoặc thì nhận đúng đường dẫn. Golden `testcase71..75`;
+toàn bộ `pytest tests/` 315 passed; trả `05_train.sh` về bản cũ thì cả 5 testcase mới đỏ.
+
+---
+
+## Lần 3 — `trba_ft` 20 epoch trên Colab T4, 05/11 15:28 → 07/11 (4 phiên)
+
+### Diễn biến
+
+Run `2026-11-05_08-28-47` (tên theo giờ UTC), luôn train tiếp đúng run đó bằng `ckpt_path` (mục 3a–3c).
+Giờ bắt đầu lấy từ tên file log TensorBoard, giờ VN:
+
+| Phiên | Bắt đầu | Epoch train được | Kết thúc |
+|---|---|---|---|
+| 1 | 05/11 15:28 | 1–8 | hết hạn mức GPU giữa epoch 9 (577/801) |
+| 2 | 06/11 11:03 | 9–15 | `DataLoader worker … killed` (hết RAM, `--num-workers 2`) giữa epoch 16 |
+| 3 | 07/11 10:58 | 16–17 | hỏng giữa epoch 18; chạy lại lúc 12:18 lại hỏng sau ~385 bước |
+| 4 | 07/11 17:04 | 18–20 | `DataLoader worker … killed` giữa lượt SWA cuối ("Epoch 20/20", 453/802) |
+
+Tốc độ: phiên 1 khoảng 33,5 phút/epoch (0,45 batch/giây), phiên 4 khoảng 25 phút/epoch (0,58
+batch/giây). Notebook của phiên 2 và phiên 4 (có output) lưu ở `data/logs/colab_trba_ft/`; phiên 3
+không có notebook, diễn biến suy từ file log TensorBoard.
+
+### Kết quả (val)
+
+- Val accuracy epoch 9–20: 84,8 → 84,7 → 85,1 → 85,8 → 85,6 → 85,9 → 86,1 → 86,2 → 86,3 → 86,3 →
+  **86,72** → 86,47%.
+- Epoch 6–8 (81,17 / 82,22 / 84,15%) chỉ biết qua tên checkpoint dự phòng. **Thiếu file log
+  TensorBoard của phiên 1** (epoch 1–8) trong số file đã tải về, nên đồ thị bắt đầu từ epoch 9. Nếu
+  file `events.out.tfevents.*` của phiên 1 còn trong thư mục run trên Drive của tài khoản A thì chép
+  thêm vào `data/runs/trba_ft/2026-11-05_08-28-47/` rồi vẽ lại.
+- Top-3 cuối cùng: epoch 19 (86,72%), epoch 20 (86,47%), epoch 17 (86,30%). `last.ckpt` = epoch 20
+  (`global_step` 16.020 = 20 × 801), là checkpoint sẽ được chấm.
+- val_loss dao động 0,46–0,53 nhưng thấp nhất ở epoch 20 (0,4639): **chưa overfit**. Các epoch cuối chỉ
+  thêm khoảng 0,2 điểm/epoch.
+- Lượt SWA cuối hỏng giữa chừng: trọng số trung bình (epoch 16–20) nằm trong trạng thái callback của
+  `last.ckpt`, nhưng chưa bao giờ được đánh giá hay chép vào model. Không ảnh hưởng eval, vì
+  `last.ckpt` giữ trọng số epoch 20.
+- Đã đánh dấu `DONE` ở `vunl`. Chưa eval trên test.
+
+Đã bỏ (chuyển vào thùng rác của ổ `/mnt/1864…`): 6 checkpoint dự phòng (epoch 6, 7, 8, 12, 14, 15;
+4,8 GB), bản sao thiếu `last.ckpt` của run, 2 file zip tải từ Drive, bản sao LMDB train/val (trùng
+md5 với `data/lmdb/`), báo cáo cũ và notebook trùng của máy C.
 
 ---
 

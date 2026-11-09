@@ -1,0 +1,14 @@
+testcase73 — data.root_dir='…' bọc ngoặc đơn: cũng bỏ được dấu ngoặc khi kiểm thư mục
+=====================================================================================
+
+MỤC ĐÍCH
+    Hydra nhận cả ngoặc đơn; 05_train.sh phải bỏ ngoặc đơn như ngoặc kép.
+
+ĐẦU VÀO
+    crnn_ft, data.root_dir='<WORK>/thư mục có dấu cách/lmdb' (ngoặc đơn).
+
+KỲ VỌNG
+    Thoát 0; log LMDB=<WORK>/thư mục có dấu cách/lmdb.
+
+VÌ SAO QUAN TRỌNG
+    Người dùng gõ tay (vd trên Colab) hay dùng ngoặc đơn; không được báo thiếu LMDB oan.

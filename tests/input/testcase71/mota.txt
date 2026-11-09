@@ -1,0 +1,14 @@
+testcase71 — data.root_dir="…có dấu cách…" (bọc ngoặc kép): kiểm đúng thư mục LMDB, không dính dấu ngoặc
+====================================================================================================
+
+MỤC ĐÍCH
+    Đường dẫn LMDB có dấu cách phải bọc ngoặc kép để Hydra nhận; 05_train.sh vẫn phải kiểm đúng thư mục.
+
+ĐẦU VÀO
+    crnn_ft, data.root_dir="<WORK>/thư mục có dấu cách/lmdb" (bọc ngoặc kép); LMDB train/val có ở đó.
+
+KỲ VỌNG
+    Thoát 0; log LMDB=<WORK>/thư mục có dấu cách/lmdb (không có dấu ngoặc); lệnh gửi python giữ nguyên ngoặc kép (Hydra tự bỏ).
+
+VÌ SAO QUAN TRỌNG
+    Bản cũ kiểm thư mục '"…/lmdb"/train' (dính dấu ngoặc) nên báo thiếu LMDB dù LMDB có thật.

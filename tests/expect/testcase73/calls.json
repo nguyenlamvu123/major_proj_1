@@ -1,0 +1,3 @@
+[
+  "<REPO>/third_party/parseq/train.py --config-dir <REPO>/configs/hydra --config-name tm_crnn_ft trainer.max_epochs=20 data.root_dir='<WORK>/thư mục có dấu cách/lmdb'"
+]

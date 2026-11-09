@@ -1,0 +1,16 @@
+{
+  "kind": "train_sh",
+  "desc": "data.root_dir=\"…\" trỏ thư mục không có LMDB: báo lỗi với đường dẫn sạch, thoát 1",
+  "args": [
+    "crnn_ft",
+    "--max-epochs",
+    "20",
+    "data.root_dir=\"<WORK>/thư mục có dấu cách/chưa giải nén\""
+  ],
+  "state": {
+    "files": {
+      "lmdb/train/trademark/data.mdb": 10,
+      "lmdb/val/data.mdb": 10
+    }
+  }
+}

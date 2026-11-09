@@ -1,0 +1,14 @@
+testcase74 — data.root_dir="…" trỏ thư mục không có LMDB: báo lỗi với đường dẫn sạch, thoát 1
+=============================================================================================
+
+MỤC ĐÍCH
+    Kiểm LMDB vẫn chặn đúng khi đường dẫn bọc ngoặc mà thư mục thiếu thật.
+
+ĐẦU VÀO
+    crnn_ft, data.root_dir="<WORK>/thư mục có dấu cách/chưa giải nén" — thư mục không tồn tại.
+
+KỲ VỌNG
+    Thoát 1, không gọi python; stderr: thiếu LMDB ở <WORK>/thư mục có dấu cách/chưa giải nén/train (không dính ngoặc).
+
+VÌ SAO QUAN TRỌNG
+    Bỏ ngoặc không được làm mất chốt chặn sớm; thông báo phải chỉ đúng đường dẫn để người dùng sửa.

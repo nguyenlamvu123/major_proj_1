@@ -367,6 +367,14 @@ mỗi model có log, crnn_ft kết luận "chưa thấy overfit" (val_loss 0,425
 Sau khi train thật: run mới có `pipeline_train.env` với `continue_from=crnn_ft/2026-11-04_21-58-41`,
 đồ thị crnn_ft nối epoch 1–8 với 9–20.
 
+### 16.13 Đường dẫn có dấu cách
+```bash
+python -m pytest -q tests/test_golden.py -k "testcase71 or testcase72 or testcase73 or testcase74 or testcase75"
+```
+**Pass khi**: 5 testcase xanh; trả `scripts/05_train.sh` về bản trước 16.13 thì cả 5 đỏ. Trên máy có
+đường dẫn chứa dấu cách, `09_full_pipeline_cpu.sh --from train --models crnn_ft` vào được bước train
+(không còn `OverrideParseException`).
+
 ---
 
 ## Ghi chú chung

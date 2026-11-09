@@ -227,14 +227,15 @@ augment, chỉ so **xu hướng** của hai đường, không so độ lớn. Mo
 thấp nhất ở epoch k, sau đó ít nhất 2 epoch, epoch cuối cao hơn mức thấp nhất trên 5%, trong khi
 loss train vẫn giảm, thì là "có dấu hiệu overfit".
 
-#### Tổng hợp các model đã train (06/11/2026)
+#### Tổng hợp các model đã train (cập nhật 09/11/2026)
 
 | Model | Train | val tốt nhất | Checkpoint đem chấm test | Test US | Test VN (bỏ hoa/thường) | Đường cong |
 |---|---|---|---|---|---|---|
 | `parseq_ft` | 7 epoch, CPU, 7,3 giờ | **89,49%** (epoch 5) | epoch 6 (val 89,46%) | **88,7%** | **27,6%** (41,1%) | gần bão hoà, chưa rõ overfit |
-| `crnn_ft` | 8 epoch, CPU, 2,5 giờ | 74,07% (epoch 8) | epoch 8 (val 74,07%) | 73,0% | 18,3% (27,0%) | chưa overfit, còn học được |
+| `trba_ft` | 20 epoch, Colab GPU T4, 4 phiên | **86,72%** (epoch 19) | epoch 20 (val 86,47%) | chờ eval | chờ eval | chưa overfit, gần bão hoà |
+| `crnn_ft` | 20 epoch, CPU, train lại từ đầu (epoch 16–20 batch 8) | **76,35%** (epoch 20) | chưa mang checkpoint về | chờ eval | chờ eval | chưa overfit, còn học được |
+| `crnn_ft` (bản 8 epoch, 04/11) | 8 epoch, CPU, 2,5 giờ | 74,07% (epoch 8) | epoch 8 (val 74,07%) | 73,0% | 18,3% (27,0%) | chưa overfit; thay bằng bản 20 epoch khi có số test |
 | `svtrctc` | 10 epoch, CPU, 2,7 giờ, train từ đầu | 71,82% (epoch 10) | model sau SWA (val 70,52%) | 69,4% | 11,4% (16,4%) | chưa overfit, còn học được |
-| `trba_ft` | đang train trên Colab GPU (8/20 epoch) | — | — | — | — | — |
 
 Test US: 2.847 ảnh. Test VN: 2.000 ảnh, **chưa duyệt tay** nhãn.
 
@@ -243,9 +244,50 @@ Test US: 2.847 ảnh. Test VN: 2.000 ảnh, **chưa duyệt tay** nhãn.
 top-3", không nhất thiết là epoch cuối hay epoch tốt nhất. Cột "Checkpoint đem chấm test" ghi epoch
 thật sự được chấm. Chọn checkpoint chỉ dựa trên tập val, không nhìn tập test.
 
-#### CRNN fine-tune (`crnn_ft`) — 8 epoch trên CPU, 04/11/2026
+#### CRNN fine-tune (`crnn_ft`) — 20 epoch, train lại từ đầu trên CPU, 07–08/11/2026
 
 ![Đường cong huấn luyện crnn_ft](reports/figures/train_curves_crnn_ft.png)
+
+| epoch | loss train | val_loss | val_accuracy (%) | val 1−NED (%) | ghi chú |
+|---|---|---|---|---|---|
+| 1 | 9,5351 | 3,3840 | 0,00 | 0,00 | lớp ra vừa khởi tạo lại cho 217 ký tự |
+| 2 | 2,9972 | 1,7728 | 0,46 | 42,34 | |
+| 3 | 1,2300 | 0,7039 | 55,45 | 84,01 | |
+| 4 | 0,8218 | 0,5779 | 63,28 | 86,25 | |
+| 5 | 0,7191 | 0,5244 | 66,27 | 87,29 | |
+| 6 | 0,6644 | 0,4916 | 68,66 | 87,81 | |
+| 7 | 0,6290 | 0,4690 | 70,38 | 88,39 | |
+| 8 | 0,6042 | 0,4542 | 71,01 | 88,66 | |
+| 9 | 0,5845 | 0,4448 | 71,86 | 88,93 | |
+| 10 | 0,5689 | 0,4352 | 72,77 | 89,21 | |
+| 11 | 0,5596 | 0,4276 | 73,08 | 89,38 | |
+| 12 | 0,5476 | 0,4238 | 73,23 | 89,36 | |
+| 13 | 0,5391 | 0,4197 | 73,82 | 89,59 | |
+| 14 | 0,5359 | 0,4164 | 74,21 | 89,68 | |
+| 15 | 0,5324 | 0,4144 | 74,35 | 89,73 | |
+| 16 | 0,5386 | 0,4119 | 74,49 | 89,67 | từ đây: SWA, batch 8 |
+| 17 | 0,5334 | 0,4075 | 74,46 | 89,79 | |
+| 18 | 0,5241 | 0,4034 | 75,33 | 89,86 | |
+| 19 | 0,5076 | 0,3950 | 75,83 | 90,01 | |
+| 20 | 0,5012 | **0,3896** | **76,35** | 90,27 | tốt nhất |
+
+**Nhận xét:**
+
+1. **Chưa overfit, vẫn chưa bão hoà.** val_loss giảm liên tục tới epoch 20 và val_accuracy vẫn tăng
+   (+0,5 điểm ở epoch cuối). So với bản 8 epoch (74,07%, bên dưới), 20 epoch được thêm **2,3 điểm**
+   val.
+2. **Đây là train lại từ đầu, không phải `--continue`** (mục 2.6): máy CPU dùng để train không có
+   checkpoint 8 epoch. Máy đó yếu (thiếu RAM), tiến trình bị kill 5 lần và được train tiếp từ
+   checkpoint mỗi lần ([`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md), lần 4).
+3. **Batch không đồng nhất:** epoch 1–15 batch 16, epoch 16–20 batch 8 (đổi để đỡ tốn RAM). Từ
+   epoch 16 SWA giữ learning rate cố định, nên việc đổi batch không làm lệch lịch learning rate, nhưng
+   đây không phải một lần train "sạch" với một batch duy nhất.
+4. **Khởi đầu chậm hơn bản 8 epoch** (epoch 2: 0,5% so với 60,9%): parseq nhân learning rate với
+   batch/256, nên batch 16 có learning rate đỉnh nhỏ hơn 4 lần so với batch 64.
+5. **Chưa có số test:** checkpoint của run này chưa được chép về máy đánh giá. Bảng tổng hợp và số
+   test sẽ cập nhật sau khi eval.
+
+##### Bản 8 epoch (04/11/2026, batch 64) — giữ để so sánh
 
 | epoch | loss train | val_loss | val_accuracy (%) | val 1−NED (%) | ghi chú |
 |---|---|---|---|---|---|
@@ -259,11 +301,11 @@ thật sự được chấm. Chọn checkpoint chỉ dựa trên tập val, khô
 | 8 | 0,5503 | **0,4254** | **74,07** | 89,52 | tốt nhất, checkpoint dùng để test |
 | 8 (SWA) | — | 0,4445 | 72,59 | 89,10 | model sau khi gộp trọng số SWA |
 
-**Nhận xét:**
+**Nhận xét (bản 8 epoch):**
 
 1. **Chưa overfit.** val_loss giảm liên tục tới epoch cuối (0,4254 là mức thấp nhất) và
    val_accuracy vẫn tăng (73,05% → 74,07% ở epoch cuối). Model **chưa bão hoà**: dừng ở 8 epoch là
-   do ngân sách 3 giờ CPU, không phải vì đã học xong. Vì vậy đợt tiếp theo **train thêm** (mục 2.6).
+   do ngân sách 3 giờ CPU, không phải vì đã học xong. Bản 20 epoch ở trên xác nhận điều này.
 2. Mức tăng mỗi epoch giảm dần (+6,7 → +2,8 → +1,1 → +1,0 → +0,4 → +1,0 điểm %), nên train thêm có
    lẽ chỉ được vài điểm %.
 3. Epoch 1 có accuracy 0%: lớp ra được khởi tạo lại cho bảng 217 ký tự tiếng Việt. Từ epoch 2 trở đi
@@ -353,6 +395,43 @@ thật sự được chấm. Chọn checkpoint chỉ dựa trên tập val, khô
 4. **Test:** US 69,4%, VN 11,4% (16,4% bỏ hoa/thường): thấp nhất trong ba model. Kém rõ nhất ở nhãn
    có hình vẽ (`design_with_words`, US: 3,4% so với 14,4% của crnn_ft và 40,9% của parseq_ft).
 
+#### TRBA fine-tune (`trba_ft`) — 20 epoch trên Colab GPU T4, 05–07/11/2026
+
+![Đường cong huấn luyện trba_ft](reports/figures/train_curves_trba_ft.png)
+
+| epoch | loss train | val_loss | val_accuracy (%) | val 1−NED (%) | ghi chú |
+|---|---|---|---|---|---|
+| 6 | — | — | 81,17 | 92,70 | chỉ biết qua tên checkpoint (thiếu log phiên 1) |
+| 7 | — | — | 82,22 | 93,10 | như trên |
+| 8 | — | — | 84,15 | 93,39 | như trên |
+| 9 | 0,3649 | 0,4863 | 84,75 | 93,62 | |
+| 10 | 0,3529 | 0,5270 | 84,68 | 93,64 | |
+| 11 | 0,3430 | 0,4750 | 85,14 | 93,61 | |
+| 12 | 0,3284 | 0,4677 | 85,84 | 93,88 | |
+| 13 | 0,3200 | 0,4930 | 85,59 | 93,78 | |
+| 14 | 0,3125 | 0,5033 | 85,87 | 94,00 | |
+| 15 | 0,3058 | 0,5045 | 86,05 | 94,02 | |
+| 16 | 0,3036 | 0,4775 | 86,19 | 94,06 | từ đây: SWA |
+| 17 | 0,3000 | 0,4756 | 86,30 | 93,96 | |
+| 18 | 0,2995 | 0,4842 | 86,26 | 94,03 | |
+| 19 | 0,2952 | 0,4730 | **86,72** | 93,99 | tốt nhất |
+| 20 | 0,2938 | **0,4639** | 86,47 | 93,88 | checkpoint dùng để test (`last.ckpt`) |
+
+**Nhận xét:**
+
+1. **Chưa overfit, gần bão hoà.** val_loss dao động trong khoảng 0,46–0,53 nhưng thấp nhất ở epoch
+   cuối, trong khi loss train giảm đều. val_accuracy chỉ còn tăng khoảng 0,2 điểm mỗi epoch ở cuối.
+2. **Train qua 4 phiên Colab** vì giới hạn tài nguyên miễn phí: hết hạn mức GPU sau epoch 8, và 3 lần
+   tiến trình đọc dữ liệu bị kill vì hết RAM. Mỗi lần đều train tiếp đúng run cũ bằng `ckpt_path`
+   (mục 2.6), nên lịch learning rate liền mạch như một lần train không bị ngắt.
+3. **Thiếu đường cong epoch 1–8:** file log TensorBoard của phiên đầu không có trong các file mang
+   về. Đồ thị bắt đầu từ epoch 9; val của epoch 6–8 lấy từ tên checkpoint dự phòng.
+4. **Lượt SWA cuối không hoàn tất** (phiên cuối bị ngắt giữa lượt này), nên không có điểm "model sau
+   SWA". Checkpoint dùng để test là epoch 20 (val 86,47%), kém epoch tốt nhất 0,25 điểm.
+5. **Tốc độ:** khoảng 25–33 phút/epoch trên T4 (batch 64). Có lẽ khâu đọc và augment ảnh trên CPU
+   của Colab mới là chỗ nghẽn, không phải GPU (chưa đo riêng).
+6. **Chưa có số test** — chờ eval trên máy đánh giá.
+
 **Vẽ lại / cập nhật đồ thị.** `bash scripts/06_eval.sh` (hoặc bước `eval` của
 `09_full_pipeline_cpu.sh`) tự vẽ lại sau mỗi lần đánh giá. Vẽ riêng, không cần đánh giá:
 
@@ -387,12 +466,15 @@ dụng cho lần train **bị ngắt giữa chừng**. Nó khôi phục cả l�
 bash scripts/09_full_pipeline_cpu.sh --from train --models crnn_ft --continue --max-epochs 20 --max-hours 8
 ```
 
-**Kế hoạch:** crnn_ft 8 → 20 epoch, chạy trên một máy Ubuntu khác (yếu hơn). Từng bước, gồm cả
+**Thực tế (09/11):** máy CPU yếu hơn không có checkpoint 8 epoch, nên crnn_ft được **train lại từ
+đầu 20 epoch** (mục 2.5) thay vì dùng `--continue`. Cơ chế `--continue` vẫn dùng được cho lần sau.
+**Kế hoạch ban đầu:** crnn_ft 8 → 20 epoch, chạy trên một máy Ubuntu khác (yếu hơn). Từng bước, gồm cả
 cách mang dữ liệu và checkpoint qua lại giữa hai máy, ở
 [`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md) mục "Việc tiếp theo → 4". Kết quả sẽ được bổ sung vào
 mục 2.5 sau khi train xong. svtrctc (10 epoch, chưa bão hoà) cũng có thể train thêm theo cách này.
 
-**Phân biệt với train tiếp một run bị ngắt.** `trba_ft` trên Colab dừng ở epoch 8/20 vì hết hạn mức
+**Phân biệt với train tiếp một run bị ngắt.** `trba_ft` trên Colab dừng ở epoch 8/20 (rồi bị ngắt
+thêm 3 lần nữa trước khi xong 20 epoch) vì hết hạn mức
 GPU, tức run **chưa** chạy hết lịch learning rate. Trường hợp này dùng cơ chế sẵn có
 `ckpt_path=<run>/checkpoints/last.ckpt`: Lightning khôi phục trọng số, optimizer, lịch learning rate
 và bộ đếm epoch, rồi chạy nốt các epoch còn lại của **chính run đó**. Về nguyên tắc, kết quả tương

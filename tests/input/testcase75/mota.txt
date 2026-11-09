@@ -1,0 +1,14 @@
+testcase75 — +data.root_dir="…" (tiền tố +) bọc ngoặc kép: cũng được nhận và bỏ ngoặc
+=====================================================================================
+
+MỤC ĐÍCH
+    Override dạng +key= cũng đi qua cùng nhánh kiểm LMDB.
+
+ĐẦU VÀO
+    crnn_ft, +data.root_dir="<WORK>/thư mục có dấu cách/lmdb".
+
+KỲ VỌNG
+    Thoát 0; log LMDB=<WORK>/thư mục có dấu cách/lmdb.
+
+VÌ SAO QUAN TRỌNG
+    Ba dạng data.root_dir= / +data.root_dir= / ++data.root_dir= phải hành xử như nhau.
