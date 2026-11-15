@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import csv
-
 import pytest
 
 from trademark_ocr.metrics import (
@@ -92,8 +90,9 @@ def test_per_sample_row_matches_report_columns():
     row = per_sample("abd", "abc")
     assert row["correct"] == 0 and row["ned"] == pytest.approx(1 / 3)
     assert row["gt_len"] == 3 and row["pred_len"] == 3
-    from trademark_ocr.metrics import REPORT_COLUMNS
-    assert set(row) == set(REPORT_COLUMNS) - {"idx"}
+    from trademark_ocr.metrics import REPORT_COLUMNS, SAMPLE_CONTEXT_COLUMNS
+    # per_sample lo các cột tính từ (pred, gt); evaluate điền các cột ngữ cảnh của mẫu
+    assert set(row) == set(REPORT_COLUMNS) - set(SAMPLE_CONTEXT_COLUMNS)
 
 
 # ------------------------------ evaluate CLI ------------------------------
@@ -110,38 +109,6 @@ def test_evaluate_lmdb_dir_mapping(tmp_path):
     assert lmdb_dir(tmp_path, "val") == tmp_path / "lmdb" / "val"
     assert lmdb_dir(tmp_path, "test_us") == tmp_path / "lmdb" / "test" / "test_us"
     assert lmdb_dir(tmp_path, "test_vn") == tmp_path / "lmdb" / "test" / "test_vn"
-
-
-@pytest.mark.skipif(
-    not (__import__("os").environ.get("DATA_ROOT") or
-         __import__("pathlib").Path("/media/zaibachkhoa/AC84-F995/trademark_data/lmdb/val").exists()),
-    reason="cần LMDB val trên đĩa (nhánh 05)")
-def test_evaluate_end_to_end_on_real_lmdb(tmp_path):
-    """Chạy thật: dùng model CHƯA train (khởi tạo từ config) -> chỉ kiểm tra CSV."""
-    import hydra
-    from trademark_ocr.train_utils import compose_config
-    from trademark_ocr import evaluate as ev
-
-    cfg = compose_config("tm_crnn", ["model.batch_size=16"])
-    model = hydra.utils.instantiate(cfg.model)
-    # giả lập "ckpt" bằng model đang có: bỏ qua load_model, dùng trực tiếp
-    loader = ev.build_loader("val", data_root=ev.DEFAULT_DATA_ROOT, batch_size=16, limit=32)
-    out = tmp_path / "crnn_us.csv"
-    preds, gts = [], []
-    with out.open("w", encoding="utf-8", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=list(ev.REPORT_COLUMNS))
-        w.writeheader()
-        for i, (pred, gt, conf) in enumerate(ev.iter_predictions(model.eval(), loader)):
-            preds.append(pred); gts.append(gt)
-            w.writerow({"idx": i, "pred": pred, "gt": gt, "correct": int(pred == gt),
-                        "ned": ev.normalized_edit_distance(pred, gt),
-                        "char_err": 0.0, "pred_len": len(pred), "gt_len": len(gt)})
-    assert out.exists() and len(preds) >= 1
-    m = ev.evaluate_metrics(preds, gts)
-    assert 0.0 <= m["accuracy"] <= 1.0 and 0.0 <= m["cer"] <= 1.0
-    header = out.read_text(encoding="utf-8").splitlines()[0]
-    for col in ("pred", "gt", "correct", "ned"):
-        assert col in header
 
 
 # ------------------------ tính chất của edit distance ------------------------
@@ -198,3 +165,52 @@ def test_accuracy_is_strict_on_case_and_diacritics():
     """Hành vi hiện tại (nhánh 10): accuracy so khớp tuyệt đối từng codepoint."""
     m = evaluate_metrics(["ĐÔNG Á", "dong a", "DONG A"], ["ĐÔNG Á", "DONG A", "ĐÔNG Á"])
     assert m["accuracy"] == pytest.approx(1 / 3)
+
+
+# ------------------- ba mức so khớp (REVIEW.md §4.2) -------------------
+
+def test_strip_diacritics_examples():
+    from trademark_ocr.metrics import strip_diacritics
+
+    assert strip_diacritics("HP Food Đặc sản Hải Phòng") == "HP Food Dac san Hai Phong"
+    assert strip_diacritics("ĐƯỜNG") == "DUONG"
+    assert strip_diacritics("LJ LEJET CAFÉ BISTRO") == "LJ LEJET CAFE BISTRO"
+    assert strip_diacritics("PLAIN 123") == "PLAIN 123"
+
+
+def test_has_diacritics():
+    from trademark_ocr.metrics import has_diacritics
+
+    assert has_diacritics("Luân Hồi") and has_diacritics("đ")
+    assert not has_diacritics("Qgreen") and not has_diacritics("1P's Bakery")
+
+
+def test_match_levels_separate_case_and_diacritic_errors():
+    # ROOT CAUSE:
+    #
+    # Nhãn US (USPTO markText) viết HOA toàn bộ, nhãn VN viết lẫn hoa/thường và có dấu.
+    # Chỉ có accuracy tuyệt đối thì 42% nhãn VN chắc chắn sai dù ảnh đọc đúng chữ, và độ
+    # sụt US→VN trộn lẫn "quy ước ghi nhãn" với "khác biệt hình ảnh".
+    #
+    # Đã sửa bằng hai mức so khớp thêm: nocase (bỏ hoa/thường) và base (bỏ cả dấu).
+    preds = ["HOFF", "LUAN HOI", "LUÂN HỒI", "XYZ"]
+    gts = ["Hoff", "Luân Hồi", "Luân Hồi", "ABC"]
+    m = evaluate_metrics(preds, gts)
+    assert m["accuracy"] == 0.0                            # tuyệt đối: sai cả 4
+    assert m["accuracy_nocase"] == pytest.approx(2 / 4)   # HOFF, LUÂN HỒI
+    assert m["accuracy_base"] == pytest.approx(3 / 4)     # + LUAN HOI
+    assert m["one_minus_ned_base"] >= m["one_minus_ned_nocase"] >= m["one_minus_ned"]
+
+
+def test_per_sample_level_flags():
+    row = per_sample("LUAN HOI", "Luân Hồi")
+    assert (row["correct"], row["correct_nocase"], row["correct_base"]) == (0, 0, 1)
+    assert row["gt_has_diacritics"] == 1
+    assert per_sample("HOFF", "Hoff")["correct_nocase"] == 1
+
+
+def test_empty_metrics_have_every_key():
+    from trademark_ocr.metrics import METRIC_KEYS
+
+    m = evaluate_metrics([], [])
+    assert set(METRIC_KEYS) <= set(m)

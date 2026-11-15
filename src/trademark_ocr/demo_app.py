@@ -1,8 +1,8 @@
 """Nhánh 14 (phần 1) — demo suy luận ảnh → chữ cho nhãn hiệu.
 
 Nạp checkpoint (parseq hoặc SVTRCTC tự viết — dùng lại ``evaluate.load_model``),
-tiền xử lý ảnh giống lúc train (``SceneTextDataModule.get_transform((32,128))``),
-rồi in dự đoán. Có thêm chế độ web (Gradio) tuỳ chọn.
+tiền xử lý ảnh giống lúc train (``SceneTextDataModule.get_transform``, kích thước lấy từ
+``model.hparams.img_size``), rồi in dự đoán. Có thêm chế độ web (Gradio) tuỳ chọn.
 
 CLI
 ---
@@ -21,16 +21,20 @@ import sys
 from pathlib import Path
 from typing import Any, Sequence
 
-DEFAULT_IMG_SIZE = (32, 128)
+def model_img_size(model: Any) -> tuple[int, int]:
+    """``(H, W)`` mà model được train — ảnh demo phải resize đúng cỡ này (mọi system của
+    parseq và ``SVTRCTC`` đều ``save_hyperparameters()`` nên ckpt luôn có ``img_size``)."""
+    h, w = model.hparams.img_size
+    return int(h), int(w)
 
 
-def load_transform(img_size: tuple[int, int] = DEFAULT_IMG_SIZE):
+def load_transform(img_size: tuple[int, int]):
     """Transform ảnh giống lúc train (không augment)."""
     from strhub.data.module import SceneTextDataModule
-    return SceneTextDataModule.get_transform(img_size, augment=False)
+    return SceneTextDataModule.get_transform(tuple(img_size), augment=False)
 
 
-def preprocess(paths: Sequence[str], img_size: tuple[int, int] = DEFAULT_IMG_SIZE):
+def preprocess(paths: Sequence[str], img_size: tuple[int, int]):
     """Danh sách đường dẫn ảnh -> tensor ``(B, 3, H, W)``."""
     import torch
     from PIL import Image
@@ -55,12 +59,11 @@ def decode_predictions(model: Any, logits: Any) -> list[tuple[str, float]]:
     return out
 
 
-def predict(model: Any, paths: Sequence[str], device: str = "cpu",
-            img_size: tuple[int, int] = DEFAULT_IMG_SIZE) -> list[dict[str, Any]]:
+def predict(model: Any, paths: Sequence[str], device: str = "cpu") -> list[dict[str, Any]]:
     """Suy luận trên nhiều ảnh; trả list ``{image, pred, confidence}``."""
     import torch
     model = model.eval().to(device)
-    imgs = preprocess(paths, img_size).to(device)
+    imgs = preprocess(paths, model_img_size(model)).to(device)
     with torch.inference_mode():
         logits = model(imgs)
     decoded = decode_predictions(model, logits)
@@ -69,8 +72,7 @@ def predict(model: Any, paths: Sequence[str], device: str = "cpu",
 
 
 def run(images: Sequence[str], ckpt: str | Path | None = None, device: str = "cpu",
-        model: Any | None = None, img_size: tuple[int, int] = DEFAULT_IMG_SIZE,
-        log=print) -> list[dict[str, Any]]:
+        model: Any | None = None, log=print) -> list[dict[str, Any]]:
     if not images:
         raise SystemExit("cần --image <đường dẫn ảnh> ...")
     if model is None:
@@ -78,21 +80,20 @@ def run(images: Sequence[str], ckpt: str | Path | None = None, device: str = "cp
             raise SystemExit("cần --ckpt <checkpoint> để nạp model")
         from trademark_ocr.evaluate import load_model
         model = load_model(ckpt, device=device)
-    rows = predict(model, images, device=device, img_size=img_size)
+    rows = predict(model, images, device=device)
     for r in rows:
         log(f"{Path(r['image']).name}: {r['pred']!r} (conf={r['confidence']:.3f})")
     return rows
 
 
-def build_interface(model: Any, device: str = "cpu",
-                    img_size: tuple[int, int] = DEFAULT_IMG_SIZE):
+def build_interface(model: Any, device: str = "cpu"):
     """Giao diện Gradio (nhãn hiệu -> chữ)."""
     import gradio as gr
-    from PIL import Image
+
+    tf = load_transform(model_img_size(model))
 
     def _predict(pil):
         import torch
-        tf = load_transform(img_size)
         x = tf(pil.convert("RGB")).unsqueeze(0).to(device)
         with torch.inference_mode():
             logits = model.eval().to(device)(x)
