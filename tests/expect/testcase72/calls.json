@@ -1,0 +1,3 @@
+[
+  "<REPO>/third_party/parseq/train.py --config-dir <REPO>/configs/hydra --config-name tm_crnn_ft trainer.max_epochs=20 hydra.run.dir=\"<DATA_ROOT>/runs/crnn ft có dấu cách/2026-11-07_20-44-52\" ckpt_path=\"<DATA_ROOT>/runs/crnn ft có dấu cách/2026-11-07_20-44-52/checkpoints/last.ckpt\""
+]

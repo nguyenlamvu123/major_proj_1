@@ -62,12 +62,15 @@ done
 # data.root_dir= thắng mặc định của config (${oc.env:DATA_ROOT}/lmdb). Bản cũ luôn kiểm
 # $DATA_ROOT/lmdb/train nên chặn nhầm lần chạy Colab đúng (LMDB ở /content, DATA_ROOT trên Drive)
 # và để lọt lần chạy trỏ data.root_dir= vào thư mục chưa giải nén (lỗi muộn, sau khi nạp model).
+# Giá trị override có thể bọc "…" hoặc '…' (bắt buộc với Hydra khi đường dẫn có dấu cách, vd
+# 09_full_pipeline_cpu.sh luôn bọc): Hydra tự bỏ lớp ngoặc, còn bash phải bỏ trước khi kiểm thư mục.
+unquote() { local v="$1"; v="${v%\"}"; v="${v#\"}"; v="${v%\'}"; v="${v#\'}"; printf '%s' "$v"; }
 lmdb_root="$DATA_ROOT/lmdb"
 run_dir="$DATA_ROOT/runs/${CONFIG#tm_}/<timestamp>"
 for o in ${overrides[@]+"${overrides[@]}"}; do
   case "$o" in
-    data.root_dir=*|+data.root_dir=*|++data.root_dir=*) lmdb_root="${o#*data.root_dir=}" ;;
-    hydra.run.dir=*) run_dir="${o#hydra.run.dir=}" ;;
+    data.root_dir=*|+data.root_dir=*|++data.root_dir=*) lmdb_root="$(unquote "${o#*data.root_dir=}")" ;;
+    hydra.run.dir=*) run_dir="$(unquote "${o#hydra.run.dir=}")" ;;
   esac
 done
 for sub in train val; do

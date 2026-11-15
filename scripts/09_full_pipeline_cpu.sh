@@ -381,7 +381,8 @@ for m in ${MODELS//,/ }; do
     run="${ck%/checkpoints/last.ckpt}"
     epochs="$(env_val "$run" max_epochs)"; bs="$(env_val "$run" batch_size)"
     epochs="${epochs:-$MAX_EPOCHS}"; bs="${bs:-$BATCH_SIZE}"
-    extra+=("ckpt_path=$ck")
+    # Đường dẫn trong override Hydra luôn bọc "…": có dấu cách (vd "GenAI 2025") là vỡ grammar của Hydra.
+    extra+=("ckpt_path=\"$ck\"")
     if [[ -n "$MAX_HOURS" ]]; then
       # Timer của Lightning cộng dồn thời gian đã train từ checkpoint -> trần = đã train + ngân sách mới
       done_s=0
@@ -423,16 +424,17 @@ for m in ${MODELS//,/ }; do
       # đổi init_from; config train từ đầu thì chuyển _target_ sang factory, lớp thật vào model.target
       # (evaluate.py đọc model.target khi _target_ là factory).
       if [[ "$m" == *_ft ]]; then
-        extra+=("model.init_from=$base_ck")
+        extra+=("model.init_from=\"$base_ck\"")
       else
         extra+=("model._target_=trademark_ocr.pretrained.finetune" "+model.target=$(model_class "$m")"
-                "+model.init_from=$base_ck")
+                "+model.init_from=\"$base_ck\"")
       fi
       echo "[PIPELINE] $m: train tiếp từ $base_ck (đã train ${CONT_TOTAL[$m]} epoch) thêm $epochs epoch"
     fi
   fi
-  # hydra.run.dir cố định = run đã chọn: train tiếp ghi vào ĐÚNG thư mục cũ, không đẻ run rỗng
-  extra+=("hydra.run.dir=$run")
+  # hydra.run.dir cố định = run đã chọn: train tiếp ghi vào ĐÚNG thư mục cũ, không đẻ run rỗng.
+  # Đường dẫn có khoảng trắng (vd "GenAI 2025") làm vỡ Hydra override grammar → quote.
+  extra+=("hydra.run.dir=\"$run\"")
   t0=$(date +%s)
   if bash scripts/05_train.sh "$m" --accelerator "$ACCELERATOR" --devices 1 \
        --batch-size "$bs" --num-workers "$NUM_WORKERS" --max-epochs "$epochs" "${extra[@]}"; then

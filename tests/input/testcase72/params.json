@@ -1,0 +1,17 @@
+{
+  "kind": "train_sh",
+  "desc": "hydra.run.dir + ckpt_path bọc ngoặc kép, có dấu cách: log checkpoint đúng, không dính ngoặc",
+  "args": [
+    "crnn_ft",
+    "--max-epochs",
+    "20",
+    "hydra.run.dir=\"<WORK>/data/runs/crnn ft có dấu cách/2026-11-07_20-44-52\"",
+    "ckpt_path=\"<WORK>/data/runs/crnn ft có dấu cách/2026-11-07_20-44-52/checkpoints/last.ckpt\""
+  ],
+  "state": {
+    "files": {
+      "lmdb/train/trademark/data.mdb": 10,
+      "lmdb/val/data.mdb": 10
+    }
+  }
+}
