@@ -27,16 +27,14 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
 import lmdb
 
-DEFAULT_DATA_ROOT: str = os.environ.get(
-    "DATA_ROOT", "/media/zaibachkhoa/AC84-F995/trademark_data"
-)
+from trademark_ocr import DEFAULT_DATA_ROOT
+
 
 #: subset -> hàm tạo đường dẫn (root, name)
 def lmdb_path(data_root: Path | str, subset: str, name: str = "trademark") -> Path:

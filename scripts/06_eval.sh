@@ -14,7 +14,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON="${PYTHON:-$(command -v python3 || command -v python)}"
-DATA_ROOT="${DATA_ROOT:-/media/zaibachkhoa/AC84-F995/trademark_data}"
+DATA_ROOT="${DATA_ROOT:-$REPO_ROOT/data}"
 export DATA_ROOT
 export PYTHONPATH="$REPO_ROOT/src:$REPO_ROOT/third_party/parseq:${PYTHONPATH:-}"
 

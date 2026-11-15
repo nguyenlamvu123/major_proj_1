@@ -24,7 +24,7 @@
 
 - **Package**: `src/trademark_ocr/` (cài `pip install -e .`). Import: `from trademark_ocr.charset import ...`.
 - **Môi trường**:
-  - `DATA_ROOT` — gốc dữ liệu. Local: `/media/zaibachkhoa/AC84-F995/trademark_data`; Colab: `/content/drive/MyDrive/trademark_data`. Mọi script nhận `--data-root` hoặc env `DATA_ROOT` (fallback `./data`).
+  - `DATA_ROOT` — gốc dữ liệu. Local (máy chủ repo): `/media/zaibachkhoa/AC84-F995/trademark_data`; Colab: `/content/drive/MyDrive/trademark_data`. Mọi script nhận `--data-root` hoặc env `DATA_ROOT`; không đặt thì dùng `<repo>/data` — một chỗ duy nhất: `trademark_ocr.DEFAULT_DATA_ROOT` (config hydra: `${oc.env:DATA_ROOT,data}`, script: `${DATA_ROOT:-$REPO_ROOT/data}`).
   - `REPO_ROOT` = thư mục chứa file này (tự resolve từ vị trí file).
 - **Layout dữ liệu dưới DATA_ROOT**:
 
@@ -126,7 +126,7 @@ Mô hình SVTR-CTC của mình cũng tuân theo pattern này (nhánh 09).
 | `src/trademark_ocr/split.py` | 05 | split 80/10/10 chống leak | processed txt | `processed/{train,val,test_us}.txt` |
 | `src/trademark_ocr/build_lmdb.py` | 05 | convert txt → LMDB parseq | txt + images | `$DATA_ROOT/lmdb/**` |
 | `src/trademark_ocr/train_utils.py` | 07 | helpers cho train (resolve config, sanity check) | – | – |
-| `src/trademark_ocr/models_svtr.py` | 09 | `SVTRCTC` (Lightning, CTCSystem) | – | ckpt |
+| `src/trademark_ocr/svtr_ctc.py` | 09 | `SVTRCTC` (Lightning, CTCSystem) | – | ckpt |
 | `src/trademark_ocr/metrics.py` | 10 | accuracy, 1−NED, char accuracy | pred/gt lists | dict/DataFrame |
 | `src/trademark_ocr/evaluate.py` | 10 | inference hàng loạt trên LMDB/txt | ckpt + dataset | `reports/*.csv` |
 | `src/trademark_ocr/fetch_vn.py` | 11 | crawl nhãn hiệu VN (WIPO Publish) | query/pages | `raw/images_vn/`, `processed/test_vn.txt` |
@@ -149,7 +149,7 @@ Mô hình SVTR-CTC của mình cũng tuân theo pattern này (nhánh 09).
 | CRNN | CTC cổ điển | baseline tối giản, tiêu chuẩn STR 2016 | `strhub.models.crnn` (parseq) |
 | TRBA | TPS + Attention | đại diện chuỗi attention truyền thống | `strhub.models.trba` |
 | PARSeq | Transformer + permutation LM | đại diện SOTA encoder-decoder | `strhub.models.parseq` |
-| SVTR-CTC | Transformer + CTC | **mô hình hiện đại** (đối thủ SVTRv2/PP-OCRv4); code riêng | `trademark_ocr.models_svtr` |
+| SVTR-CTC | Transformer + CTC | **mô hình hiện đại** (đối thủ SVTRv2/PP-OCRv4); code riêng | `trademark_ocr.svtr_ctc` |
 
 *(Nhắc lại phương án mở rộng — nếu sau này cần thêm:*
 - ***B** = `clovaai/deep-text-recognition-benchmark` (benchmark chuẩn, data LMDB MJ+ST, so số liệu báo cáo);*
@@ -1152,3 +1152,24 @@ Test (`tests/test_pretrained.py`, offline — "pretrained" giả bằng PARSeq n
 strict load lỗi (tái hiện), `load_matching` bỏ đúng 3 tensor, factory từ file `.pt` và từ
 ckpt Lightning, từ chối file không khớp, `tm_parseq_ft` instantiate được với
 `init_from=null`, `evaluate` giải `FINETUNE_TARGET` ra `PARSeq`.
+
+### 16.7 Dọn dẹp: đường dẫn mặc định, alias script, ghim parseq, notebook Colab (REVIEW §4.6, §4.8)
+
+| Việc | Trước | Sau |
+|---|---|---|
+| `DATA_ROOT` mặc định | `/media/zaibachkhoa/...` lặp ở 10 module, 4 config, 5 script | `trademark_ocr.DEFAULT_DATA_ROOT` = env hoặc `<repo>/data`; config `${oc.env:DATA_ROOT,data}`; script `${DATA_ROOT:-$REPO_ROOT/data}`; 2 notebook EDA dùng `Path.cwd().parent / 'data'` (output cũ giữ nguyên) |
+| `05_train.sh svtrctc` (README) | `unknown model` | `svtr\|svtrctc` → `tm_svtrctc` |
+| parseq | clone HEAD, không ghim | `scripts/00_get_parseq.sh` clone + checkout `PARSEQ_COMMIT=1902db0…` (SHA đầy đủ trong script) |
+| `requirements.txt` | có `aiohttp` (không dùng) | bỏ |
+| DESIGN bảng module / model zoo | `models_svtr.py` | `svtr_ctc.py` |
+| log `evaluate` | `[evaluate] checkpoints / …` (tên thư mục) | `[evaluate] <lớp model> / …` |
+| `docs/colab/` | chỉ `.gitkeep` | `00_setup` (clone repo + `00_get_parseq` + test nhanh), `01_download_data` (US → LMDB, VN → duyệt tay → LMDB), `02_train` (chép LMDB ra đĩa máy ảo, `05_train.sh <MODEL>`), `03_eval` (`06_eval.sh` → `final_summary.md`) |
+
+⚠️ Đổi mặc định `DATA_ROOT`: máy nào trước đây dựa vào mặc định `/media/...` mà không
+`export DATA_ROOT` thì giờ sẽ đọc/ghi `<repo>/data` — ACCEPTANCE đã `export` ở bước cài đặt.
+
+Test (`tests/test_repo_hygiene.py`, mới): không còn đường dẫn máy cụ thể trong
+`src/scripts/configs/docs`; `DEFAULT_DATA_ROOT` theo env hoặc `<repo>/data` (subprocess);
+`05_train.sh` nhận `svtr`/`svtrctc`/`parseq_ft`; mọi lệnh `05_train.sh <tên>` trong README có
+trong script; clone parseq đúng SHA ghim; không còn `aiohttp`; 4 notebook Colab hợp lệ và chỉ
+trỏ tới script/module có thật.

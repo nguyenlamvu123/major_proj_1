@@ -24,17 +24,14 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
 
+from trademark_ocr import DEFAULT_DATA_ROOT
 from trademark_ocr.charset import CHARSET_VI, collapse_ws, contains_only_supported, to_nfc
 from trademark_ocr.fetch_images import probe_image, read_index
 
-DEFAULT_DATA_ROOT: str = os.environ.get(
-    "DATA_ROOT", "/media/zaibachkhoa/AC84-F995/trademark_data"
-)
 
 CLEAN_COLUMNS: list[str] = [
     "serial_number",

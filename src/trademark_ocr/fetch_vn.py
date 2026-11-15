@@ -39,7 +39,6 @@ import argparse
 import csv
 import html as _html
 import json
-import os
 import re
 import sys
 import time
@@ -49,9 +48,8 @@ from pathlib import Path
 from typing import Any, Callable, Iterator
 from urllib.parse import urljoin
 
-DEFAULT_DATA_ROOT: str = os.environ.get(
-    "DATA_ROOT", "/media/zaibachkhoa/AC84-F995/trademark_data"
-)
+from trademark_ocr import DEFAULT_DATA_ROOT
+
 VN_BASE = "https://wipopublish.ipvietnam.gov.vn/wopublish-search"
 SEARCH_PATH = "/public/trademarks?query=*:*"
 
