@@ -17,7 +17,7 @@ không CTC không thể phát nhãn dài nhất — class kiểm tra lúc dựng
 (Bản đầu tiên giảm cả chiều rộng rồi trải phẳng lưới 4×16 theo hàng thành 64 bước: kiểm tra
 `64 ≥ 25` vẫn qua nhưng thực chất chỉ có 16 cột — xem REVIEW.md §4.4.)
 
-Tham chiếu: SVTR (Yu et al., 2022) + PP-OCRv3 "SVTR-Lite" (bỏ bớt global mixing ở
+Tham chiếu: SVTR (Du et al., 2022) + PP-OCRv3 "SVTR-Lite" (bỏ bớt global mixing ở
 stage đầu, dùng depthwise conv). Đây là bản **tự viết** phục vụ so sánh, không phải
 bản chính thức của OpenOCR.
 """

@@ -1,6 +1,6 @@
 # Tổng hợp kết quả — nhận dạng chữ nhãn hiệu
 
-_Sinh lúc: 2026-11-10 08:36 (UTC+07:00)_
+_Sinh lúc: 2026-11-15 20:42 (UTC+07:00)_
 
 ## Bảng tổng hợp (model × dataset)
 
@@ -77,6 +77,6 @@ _`standard_character` là chữ đánh máy font chuẩn do USPTO dựng — d�
 
 ## Hình minh hoạ
 
-- `/mnt/1864514f-3a41-4b8f-9907-2fbcd9d2815b/airi/doanchuyennganh1/data/processed/eda_figures/err_by_length.png`
-- `/mnt/1864514f-3a41-4b8f-9907-2fbcd9d2815b/airi/doanchuyennganh1/data/processed/eda_figures/err_char_confusions.png`
-- `/mnt/1864514f-3a41-4b8f-9907-2fbcd9d2815b/airi/doanchuyennganh1/data/processed/eda_figures/err_top_samples.png`
+- `/media/zaibachkhoa/education/GenAI 2025/đồ án chuyên ngành 1/data/processed/eda_figures/err_by_length.png`
+- `/media/zaibachkhoa/education/GenAI 2025/đồ án chuyên ngành 1/data/processed/eda_figures/err_char_confusions.png`
+- `/media/zaibachkhoa/education/GenAI 2025/đồ án chuyên ngành 1/data/processed/eda_figures/err_top_samples.png`
