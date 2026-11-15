@@ -579,3 +579,24 @@ pytest tests/test_lmdb.py -q
 **Test** (`tests/test_lmdb.py`, 8 test): không trùng nhãn/serial, tất định theo seed, ghi
 đủ file + report, roundtrip LMDB (NFC giữ dấu, decode ảnh), đúng layout parseq, `--limit`,
 bỏ ảnh thiếu, và **tích hợp thật** với `strhub.data.dataset.LmdbDataset`.
+
+## Nhánh 06-eda — `notebooks/01_eda_us.ipynb`
+
+Notebook EDA (đã execute & commit kèm output). Đọc `processed/clean.csv` (nhánh 04) và các
+`split_*.csv`, sinh hình vào `$DATA_ROOT/processed/eda_figures/`:
+
+| Hình | Nội dung |
+|---|---|
+| `fig_len_hist.png` | phân bố `n_chars` |
+| `fig_drawing_kind.png` | số mẫu theo `drawing_kind` |
+| `fig_nwords.png` | phân bố số từ mỗi nhãn |
+| `fig_img_size.png` | histogram width/height (mẫu ≤ 500 ảnh) |
+| `fig_char_freq.png` | top 30 ký tự + đếm ký tự có dấu tiếng Việt |
+
+Lưu ý kỹ thuật: dùng backend `Agg` + chỉ `savefig` (môi trường headless). Cấu hình qua env
+`DATA_ROOT`. **Không** xác minh nhãn↔ảnh bằng mắt trong notebook (giới hạn môi trường) —
+việc này tách sang nhánh 13 (error analysis) + kiểm tra thủ công vài mẫu.
+
+**Số liệu thực đo**: 4840 dòng; `standard_character 3341 / design_with_words 853 /
+stylized_words 410 / typeset_old 236`; mean words/label `1.692`; median ảnh `600×250`;
+top ký tự `E,A,O,I,' ',R,...`; 1 ký tự có dấu tiếng Việt trong nhãn US.

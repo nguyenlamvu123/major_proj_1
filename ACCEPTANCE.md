@@ -94,6 +94,9 @@ jupyter nbconvert --to notebook --execute notebooks/01_eda_us.ipynb --output /tm
 ls $DATA_ROOT/processed/eda_figures/*.png | head
 ```
 **Pass khi**: notebook chạy hết cell không lỗi, sinh ≥ 4 figure.
+> Notebook dùng `DATA_ROOT` (env). Sinh 5 hình: `fig_len_hist, fig_drawing_kind, fig_nwords,
+> fig_img_size, fig_char_freq`. Đã chạy: 4840 dòng, 5 hình, ~10 s. Notebook đã commit ở dạng
+> **đã execute** (không lỗi).
 
 ## 07-train-crnn — baseline CRNN+CTC
 
