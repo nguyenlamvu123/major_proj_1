@@ -196,6 +196,11 @@ python -m trademark_ocr.eval_domain_shift --reports reports/ --out reports/domai
 **Pass khi**: `domain_shift.csv` có cột `model,acc_us,acc_vn,delta`
 (hiệu số âm = sụt độ chính xác khi sang domain VN).
 
+> **Đã nghiệm thu**: 7 test pass. Chạy thật với `reports/crnn_us.csv` + `reports/crnn_vn.csv`
+> → `crnn,0.0,0.0,0.0,200,36`. Cột gồm cả `n_us,n_vn`; bảng **sort theo `delta` tăng dần**.
+> - Model chỉ có 1 domain bị bỏ qua (không sinh dòng rác).
+> - `n_vn=36` (không phải 50) vì nhãn VN dài/có dấu bị `max_label_length=25` lọc — hợp lệ.
+
 ## 13-error-analysis — phân tích lỗi
 
 ```bash
