@@ -227,6 +227,22 @@ augment, chỉ so **xu hướng** của hai đường, không so độ lớn. Mo
 thấp nhất ở epoch k, sau đó ít nhất 2 epoch, epoch cuối cao hơn mức thấp nhất trên 5%, trong khi
 loss train vẫn giảm, thì là "có dấu hiệu overfit".
 
+#### Tổng hợp các model đã train (06/11/2026)
+
+| Model | Train | val tốt nhất | Checkpoint đem chấm test | Test US | Test VN (bỏ hoa/thường) | Đường cong |
+|---|---|---|---|---|---|---|
+| `parseq_ft` | 7 epoch, CPU, 7,3 giờ | **89,49%** (epoch 5) | epoch 6 (val 89,46%) | **88,7%** | **27,6%** (41,1%) | gần bão hoà, chưa rõ overfit |
+| `crnn_ft` | 8 epoch, CPU, 2,5 giờ | 74,07% (epoch 8) | epoch 8 (val 74,07%) | 73,0% | 18,3% (27,0%) | chưa overfit, còn học được |
+| `svtrctc` | 10 epoch, CPU, 2,7 giờ, train từ đầu | 71,82% (epoch 10) | model sau SWA (val 70,52%) | 69,4% | 11,4% (16,4%) | chưa overfit, còn học được |
+| `trba_ft` | đang train trên Colab GPU (8/20 epoch) | — | — | — | — | — |
+
+Test US: 2.847 ảnh. Test VN: 2.000 ảnh, **chưa duyệt tay** nhãn.
+
+**Checkpoint đem chấm test** là file `checkpoints/last.ckpt` của run. Với Lightning 2.6, file này chỉ
+được ghi lại ở epoch có checkpoint lọt **top-3 theo val_accuracy**, nên nó là "epoch gần nhất lọt
+top-3", không nhất thiết là epoch cuối hay epoch tốt nhất. Cột "Checkpoint đem chấm test" ghi epoch
+thật sự được chấm. Chọn checkpoint chỉ dựa trên tập val, không nhìn tập test.
+
 #### CRNN fine-tune (`crnn_ft`) — 8 epoch trên CPU, 04/11/2026
 
 ![Đường cong huấn luyện crnn_ft](reports/figures/train_curves_crnn_ft.png)
@@ -253,19 +269,89 @@ loss train vẫn giảm, thì là "có dấu hiệu overfit".
 3. Epoch 1 có accuracy 0%: lớp ra được khởi tạo lại cho bảng 217 ký tự tiếng Việt. Từ epoch 2 trở đi
    phần trọng số pretrained mới phát huy tác dụng.
 4. Điểm "SWA" (Stochastic Weight Averaging, lấy trung bình trọng số 2 epoch cuối) được đo sau khi
-   train xong. Ở đây nó kém epoch 8 (72,59% so với 74,07%), nên checkpoint dùng để test là epoch 8.
+   train xong. Ở đây nó kém epoch 8 (72,59% so với 74,07%). Lightning không ghi checkpoint cho điểm
+   này, nên checkpoint dùng để test (`last.ckpt`) là epoch 8.
 5. Kết quả test của checkpoint này (`docs/nhat_ky_chay.md`, lần 1): test US **73,0%** (sát val 74,1%, tức val đại diện
    tốt cho test cùng nguồn); test VN 18,3%. Mức sụt US→VN là do khác miền dữ liệu (chữ có dấu,
    nhãn viết thường, kiểu chữ), **không** phải overfit. Overfit chỉ đo được trên dữ liệu cùng phân
    bố với tập train.
 
-#### PARSeq fine-tune (`parseq_ft`) — 2 epoch, 05/11/2026
+#### PARSeq fine-tune (`parseq_ft`) — 7 epoch trên CPU, đêm 05→06/11/2026
 
 ![Đường cong huấn luyện parseq_ft](reports/figures/train_curves_parseq_ft.png)
 
-Ngân sách 3 giờ CPU chỉ đủ 2 epoch (57 phút/epoch). Loss vẫn đang giảm (val_loss 3,84 → 3,26) nhưng
-val_accuracy 0% cả hai epoch: **chưa học được**, chưa đủ điểm để nói về overfit. Đang train lại với
-ngân sách 9 giờ (đêm 05→06/11); đồ thị sẽ tự cập nhật sau lần đánh giá kế tiếp.
+| epoch | loss train | val_loss | val_accuracy (%) | val 1−NED (%) | ghi chú |
+|---|---|---|---|---|---|
+| 1 | 2,1533 | 0,5365 | 84,26 | 94,47 | lớp ra vừa khởi tạo lại cho 217 ký tự |
+| 2 | 0,3033 | 0,4813 | 87,81 | 95,60 | |
+| 3 | 0,2492 | 0,4797 | 88,65 | 95,97 | |
+| 4 | 0,2224 | 0,4792 | 89,39 | 96,18 | |
+| 5 | 0,2041 | **0,4791** | **89,49** | 96,28 | tốt nhất (cả val_loss lẫn val_accuracy) |
+| 6 | 0,1963 | 0,4927 | 89,46 | 96,23 | checkpoint dùng để test |
+| 7 | 0,1883 | 0,4969 | 89,14 | 96,23 | |
+
+**Nhận xét:**
+
+1. **Gần bão hoà, mới chớm dấu hiệu overfit, chưa đủ để kết luận.**
+   - Từ epoch 4, val_accuracy chỉ dao động trong khoảng 89,1–89,5%.
+   - val_loss thấp nhất ở epoch 5 (0,4791), rồi tăng 4% trong 2 epoch cuối, trong khi loss train
+     vẫn giảm (0,204 → 0,188). Đó đúng là chiều của overfit.
+   - Nhưng mức tăng chưa tới ngưỡng 5% của luật, và val_accuracy chỉ giảm 0,35 điểm (khoảng 10
+     trên 2.846 ảnh).
+   - Kết luận: train thêm với cùng dữ liệu khó cải thiện, nên **không** train thêm parseq_ft.
+2. **Học rất nhanh:** đạt 84,3% ngay sau epoch 1, trong khi crnn_ft ở epoch 1 là 0%. Loss train
+   epoch 1 (2,15) cao hơn hẳn val_loss vì nó là trung bình cả epoch, gồm cả những bước đầu khi lớp ra
+   còn đoán ngẫu nhiên (loss 5,39 = ln 217).
+3. **Vì sao lần train trước (2 epoch, 04→05/11) không học được.**
+   - Cùng cấu hình, cùng trọng số khởi tạo: lần trước sau 1.602 bước val vẫn 0%, lần này sau 801
+     bước đã 84,3%.
+   - Trong epoch đầu, hai lần chỉ khác độ dài lịch learning rate OneCycle (tính theo tổng số epoch).
+     Lần trước, learning rate lên đỉnh ở bước 120, khi lớp ra còn đoán ngẫu nhiên (loss ~5,3). Lần
+     này lên đỉnh ở bước 420, khi loss đã 1,23.
+   - Giả thuyết: learning rate cao quá sớm làm hỏng phần trọng số pretrained. Chưa kiểm chứng bằng
+     thí nghiệm đối chứng; số liệu từng bước ở
+     [`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md), lần 2.
+4. **Checkpoint dùng để test là epoch 6** (89,46%), không phải epoch 7. Epoch 7 (89,14%) không lọt
+   top-3 nên Lightning không ghi lại `last.ckpt`. Chênh lệch với epoch tốt nhất (89,49%) không đáng
+   kể.
+5. **Không có điểm SWA trên đồ thị.** PARSeq không có BatchNorm, nên Lightning không chạy lượt đánh
+   giá thêm cho model sau SWA. Model đó cũng không được lưu, và không được đem chấm.
+6. **Test:** US 88,7%, sát val 89,5%. VN 27,6%, bỏ hoa/thường 41,1%: tốt nhất trong các model đã
+   train. Tuy vậy, trên 558 nhãn VN có dấu chỉ đọc đúng 2 nhãn (0,4%), vì dữ liệu train USPTO gần
+   như không có chữ có dấu.
+
+#### SVTR-CTC (`svtrctc`) — 10 epoch trên CPU, train từ đầu, 06/11/2026
+
+![Đường cong huấn luyện svtrctc](reports/figures/train_curves_svtrctc.png)
+
+| epoch | loss train | val_loss | val_accuracy (%) | val 1−NED (%) | ghi chú |
+|---|---|---|---|---|---|
+| 1 | 6,1960 | 3,4441 | 0,00 | 0,00 | khởi tạo ngẫu nhiên, không có pretrained |
+| 2 | 3,3263 | 2,4724 | 0,74 | 36,34 | |
+| 3 | 2,0051 | 0,8851 | 50,46 | 78,45 | |
+| 4 | 1,3090 | 0,7054 | 61,38 | 82,25 | |
+| 5 | 1,1181 | 0,6392 | 64,86 | 83,77 | |
+| 6 | 0,9806 | 0,5984 | 68,13 | 84,32 | |
+| 7 | 0,8959 | 0,5807 | 69,22 | 84,93 | |
+| 8 | 0,8486 | 0,5627 | 69,75 | 85,10 | |
+| 9 | 0,8139 | 0,5439 | 71,08 | 86,08 | |
+| 10 | 0,7910 | **0,5325** | **71,82** | 85,93 | tốt nhất |
+| 10 (SWA) | — | 0,5611 | 70,52 | 85,36 | model sau SWA; checkpoint dùng để test |
+
+**Nhận xét:**
+
+1. **Chưa overfit, chưa bão hoà.** val_loss giảm liên tục tới epoch cuối, và val_accuracy vẫn tăng
+   (+1,3 rồi +0,7 điểm ở hai epoch cuối). Dừng ở 10 epoch là do ngân sách 3 giờ CPU còn lại của đêm.
+   Có thể train thêm bằng cơ chế ở mục 2.6.
+2. **Khởi đầu chậm:** hai epoch đầu gần 0%, epoch 3 mới vọt lên 50%. Đây là model duy nhất train từ
+   đầu, không có trọng số pretrained, và loss CTC thường cần một thời gian trước khi canh được vị trí
+   ký tự.
+3. **Checkpoint dùng để test là model sau SWA** (70,52%), kém epoch 10 khoảng 1,3 điểm val.
+   - Sau epoch cuối, Lightning chạy thêm một lượt qua tập train để tính lại BatchNorm cho model SWA.
+     Lượt này được ghi thành checkpoint, và lọt top-3 vì hơn epoch 8 (69,75%).
+   - Hệ quả: số test của svtrctc có thể thấp hơn một chút so với nếu chấm epoch 10.
+4. **Test:** US 69,4%, VN 11,4% (16,4% bỏ hoa/thường): thấp nhất trong ba model. Kém rõ nhất ở nhãn
+   có hình vẽ (`design_with_words`, US: 3,4% so với 14,4% của crnn_ft và 40,9% của parseq_ft).
 
 **Vẽ lại / cập nhật đồ thị.** `bash scripts/06_eval.sh` (hoặc bước `eval` của
 `09_full_pipeline_cpu.sh`) tự vẽ lại sau mỗi lần đánh giá. Vẽ riêng, không cần đánh giá:
@@ -304,7 +390,15 @@ bash scripts/09_full_pipeline_cpu.sh --from train --models crnn_ft --continue --
 **Kế hoạch:** crnn_ft 8 → 20 epoch, chạy trên một máy Ubuntu khác (yếu hơn). Từng bước, gồm cả
 cách mang dữ liệu và checkpoint qua lại giữa hai máy, ở
 [`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md) mục "Việc tiếp theo → 4". Kết quả sẽ được bổ sung vào
-mục 2.5 sau khi train xong.
+mục 2.5 sau khi train xong. svtrctc (10 epoch, chưa bão hoà) cũng có thể train thêm theo cách này.
+
+**Phân biệt với train tiếp một run bị ngắt.** `trba_ft` trên Colab dừng ở epoch 8/20 vì hết hạn mức
+GPU, tức run **chưa** chạy hết lịch learning rate. Trường hợp này dùng cơ chế sẵn có
+`ckpt_path=<run>/checkpoints/last.ckpt`: Lightning khôi phục trọng số, optimizer, lịch learning rate
+và bộ đếm epoch, rồi chạy nốt các epoch còn lại của **chính run đó**. Về nguyên tắc, kết quả tương
+đương một lần train liền mạch, chỉ khác thứ tự xáo dữ liệu. `--continue` chỉ dùng cho run đã train
+**xong** như crnn_ft. Các bước làm
+trên Colab ở [`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md) mục "Việc tiếp theo → 3a".
 
 ## 3. Lệnh tổng kết nhanh
 
