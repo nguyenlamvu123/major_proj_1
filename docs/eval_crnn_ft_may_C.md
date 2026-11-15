@@ -171,9 +171,27 @@ cp data/eval_crnn_ft/crnn_ft_us.* data/eval_crnn_ft/crnn_ft_vn.* reports/
 .venv/bin/python -m trademark_ocr.report --reports reports/ --out reports/final_summary.md
 ```
 
-Điền số test vào `BAO_CAO_TONG_KET_DAT_LIEU_HUAN_LUYEN.md` mục 2.5 (các ô "chờ eval"), rồi commit
-cùng `reports/final_summary.md`.
-
 trba_ft cũng đang chờ eval, nhưng checkpoint của nó đã ở máy chính:
 `bash scripts/06_eval.sh --only trba_ft`. Chạy lệnh đó **sau** bước ghép ở trên, vì nó dựng lại
 `final_summary.md` từ mọi CSV đang có trong `reports/`.
+
+### Vẽ lại đồ thị quá trình train
+
+```bash
+.venv/bin/python -m trademark_ocr.train_curves --runs data/runs --out-dir reports/figures
+```
+
+- Đồ thị vẽ từ log TensorBoard, không phụ thuộc kết quả eval. Bản hiện có vẽ hôm 09/11.
+- Cần vẽ lại sau khi đã `touch …/DONE`: lúc vẽ bản hiện có, run crnn_ft chưa có `DONE`, nên
+  `reports/figures/train_curves.md` vẫn ghi run đó "chưa xong".
+- `06_eval.sh --only trba_ft` ở trên cũng tự vẽ lại ở bước cuối. Đã chạy lệnh đó thì không cần
+  chạy lệnh vẽ riêng.
+- Đồ thị trba_ft hiện chỉ có epoch 9–20, vì thiếu log của phiên đầu ở tài khoản A. Trên Drive của
+  A, mở `trademark_data/runs/trba_ft/2026-11-05_08-28-47/` và tìm file
+  `events.out.tfevents.179386…` (ghi ngày 05/11). Nếu có, chép vào cùng thư mục ở máy chính trước
+  khi vẽ, thì đồ thị sẽ đủ epoch 1–20.
+
+### Cuối cùng
+
+Sửa báo cáo cuối cùng (`BAO_CAO_TONG_KET_DAT_LIEU_HUAN_LUYEN.md`, gồm các ô "chờ eval" ở mục 2.5),
+rồi commit cùng `reports/final_summary.md` và `reports/figures/`.
