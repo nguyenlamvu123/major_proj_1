@@ -1,0 +1,14 @@
+testcase23 — Một epoch đã vượt ngân sách
+========================================
+
+MỤC ĐÍCH
+    Máy quá chậm so với ngân sách vẫn train tối thiểu 1 epoch và báo over_budget.
+
+ĐẦU VÀO
+    1h; 6 s/batch train → 1 epoch ≈ 5150 s.
+
+KỲ VỌNG
+    epochs = 1, over_budget = true, fits_max_epochs = false.
+
+VÌ SAO QUAN TRỌNG
+    epochs = 0 sẽ làm Lightning không train gì mà vẫn thoát 0 — tối lặng lẽ không có model.

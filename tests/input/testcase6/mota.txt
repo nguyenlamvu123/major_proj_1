@@ -1,0 +1,14 @@
+testcase6 — Train dở có pipeline_train.env + một model đã DONE
+==============================================================
+
+MỤC ĐÍCH
+    Train tiếp phải giữ đúng số epoch/batch lúc bắt đầu; model đã xong thì bỏ qua.
+
+ĐẦU VÀO
+    crnn_ft có last.ckpt + pipeline_train.env (7 epoch, batch 32), chưa DONE; parseq_ft có DONE.
+
+KỲ VỌNG
+    crnn_ft 'resume' giữ 7 epoch, batch 32 (khác tham số mặc định 10/64); parseq_ft 'skip' đã xong.
+
+VÌ SAO QUAN TRỌNG
+    Lịch LR OneCycle khôi phục từ checkpoint đã cố định tổng số bước: train tiếp bằng tham số khác có thể crash.

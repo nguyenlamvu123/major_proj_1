@@ -1,0 +1,58 @@
+{
+  "models": {
+    "crnn_ft": {
+      "run": "crnn_ft/2026-11-04_21-58-41",
+      "status": "DONE",
+      "segments": [
+        {
+          "run": "crnn_ft/2026-11-04_21-58-41",
+          "first_epoch": 1,
+          "last_epoch": 3,
+          "continued_from": null
+        }
+      ],
+      "epochs": [
+        {
+          "epoch": 1,
+          "run": "crnn_ft/2026-11-04_21-58-41",
+          "train_loss": 4.5,
+          "val_loss": 2.0,
+          "val_accuracy": 10.0,
+          "val_NED": 50.0,
+          "swa": false
+        },
+        {
+          "epoch": 2,
+          "run": "crnn_ft/2026-11-04_21-58-41",
+          "train_loss": 1.75,
+          "val_loss": 1.0,
+          "val_accuracy": 50.0,
+          "val_NED": 80.0,
+          "swa": false
+        },
+        {
+          "epoch": 3,
+          "run": "crnn_ft/2026-11-04_21-58-41",
+          "train_loss": 1.0,
+          "val_loss": 0.8,
+          "val_accuracy": 60.0,
+          "val_NED": 85.0,
+          "swa": false
+        }
+      ],
+      "best": {
+        "epoch": 3,
+        "val_accuracy": 60.0
+      },
+      "overfit": {
+        "verdict": "chua_thay",
+        "best_val_loss_epoch": 3,
+        "text": "chưa thấy overfit: val_loss vẫn giảm tới epoch 3 (0,8000); model còn học thêm được"
+      },
+      "figure": "train_curves_crnn_ft.png"
+    }
+  },
+  "skipped": {
+    "trba_ft": "không run nào có log TensorBoard (events.out.tfevents.*) với val_accuracy"
+  }
+}

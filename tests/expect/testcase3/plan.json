@@ -1,0 +1,13 @@
+[
+  "[plan] setup            | skip   | đã xong (accelerator=cpu)",
+  "[plan] us_meta          | run    | 01_get_meta.sh --limit 80000 --resume",
+  "[plan] us_images        | run    | 02_get_images.sh --workers 16 (tải tiếp ảnh còn thiếu)",
+  "[plan] clean            | run    | trademark_ocr.clean",
+  "[plan] split            | run    | trademark_ocr.split --seed 1111",
+  "[plan] lmdb             | run    | build_lmdb train, val, test_us",
+  "[plan] vn               | skip   | đã xong (limit=2000)",
+  "[plan] vn_lmdb          | skip   | đã xong (split=unverified)",
+  "[plan] train:crnn_ft    | run    | từ đầu, 10 epoch, batch 64, cpu",
+  "[plan] train:parseq_ft  | run    | từ đầu, 10 epoch, batch 64, cpu",
+  "[plan] eval             | run    | 06_eval.sh --device cpu (mọi model có checkpoint) + báo cáo"
+]

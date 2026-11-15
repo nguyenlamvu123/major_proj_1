@@ -1,0 +1,14 @@
+testcase26 — Hai model, đủ hai tập test
+=======================================
+
+MỤC ĐÍCH
+    Eval chạy cho mọi model có checkpoint, theo thứ tự cố định của 06_eval.sh.
+
+ĐẦU VÀO
+    crnn_ft và parseq_ft có last.ckpt; có cả test_us và test_vn.
+
+KỲ VỌNG
+    4 lệnh evaluate (crnn_ft us/vn rồi parseq_ft us/vn) + 3 lệnh tổng hợp; 5 model khác 'bỏ qua (chưa có checkpoint)'.
+
+VÌ SAO QUAN TRỌNG
+    Tên file báo cáo <model>_<domain>.csv là hợp đồng với eval_domain_shift/report.

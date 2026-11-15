@@ -1,0 +1,14 @@
+testcase4 — Bước thượng nguồn mới hơn: split, lmdb chạy lại
+===========================================================
+
+MỤC ĐÍCH
+    Dấu của bước thượng nguồn mới hơn dấu hạ nguồn thì hạ nguồn phải chạy lại.
+
+ĐẦU VÀO
+    Dấu clean có tuổi 50 giây, mới hơn split (300) và lmdb (200).
+
+KỲ VỌNG
+    us_meta, us_images, clean 'skip'; split, lmdb 'run'.
+
+VÌ SAO QUAN TRỌNG
+    Mô phỏng việc chạy lại clean bằng tay rồi chạy script: LMDB phải theo kịp clean.csv mới.

@@ -1,0 +1,17 @@
+{
+  "kind": "train_sh",
+  "desc": "Mặc định: LMDB ở $DATA_ROOT/lmdb -> train như cũ",
+  "args": [
+    "crnn_ft",
+    "--max-epochs",
+    "1",
+    "--accelerator",
+    "cpu"
+  ],
+  "state": {
+    "files": {
+      "lmdb/train/trademark/data.mdb": 10,
+      "lmdb/val/data.mdb": 10
+    }
+  }
+}

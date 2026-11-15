@@ -1,0 +1,14 @@
+testcase65 — --continue mà model chưa có run nào: bỏ qua, gợi ý bỏ --continue
+=============================================================================
+
+MỤC ĐÍCH
+    --continue không được lặng lẽ train từ đầu.
+
+ĐẦU VÀO
+    Không có run crnn_ft nào.
+
+KỲ VỌNG
+    train:crnn_ft 'skip': chưa có run nào có checkpoint để train tiếp — bỏ --continue để train từ đầu.
+
+VÌ SAO QUAN TRỌNG
+    Người dùng gõ --continue là muốn giữ trọng số cũ; train từ đầu mà không báo là làm khác điều được yêu cầu.

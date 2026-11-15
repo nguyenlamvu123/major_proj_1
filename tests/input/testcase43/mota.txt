@@ -1,0 +1,14 @@
+testcase43 — Đoán dài hơn nhãn (CER > 1): char_accuracy = 0, không âm
+=====================================================================
+
+MỤC ĐÍCH
+    Tái hiện cột char-accuracy -1,2575 của parseq_ft trong báo cáo 05/11.
+
+ĐẦU VÀO
+    pred 10 ký tự cho nhãn 2 ký tự (8 phép sửa).
+
+KỲ VỌNG
+    cer 4.0 (giữ nguyên), char_accuracy 0.0.
+
+VÌ SAO QUAN TRỌNG
+    Độ chính xác âm vô nghĩa và làm người đọc nghi cả bảng số.

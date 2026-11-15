@@ -1,0 +1,14 @@
+testcase9 — --max-hours 3: chọn epoch theo đo tốc độ; train tiếp thì cộng thêm ngân sách
+========================================================================================
+
+MỤC ĐÍCH
+    Ngân sách giờ hiện đúng trong kế hoạch cho cả model mới lẫn model train tiếp.
+
+ĐẦU VÀO
+    --max-hours 3; crnn_ft chưa có run; parseq_ft train dở (6 epoch, batch 64).
+
+KỲ VỌNG
+    crnn_ft 'run' 'ngân sách 3h: đo tốc độ rồi chọn ≤ 10 epoch'; parseq_ft 'resume' giữ 6 epoch, 'thêm tối đa 3h'.
+
+VÌ SAO QUAN TRỌNG
+    Đây là chế độ chạy tự động lúc 21 giờ; cắt train giữa lịch LR (chỉ đặt max_time) cho model kém.

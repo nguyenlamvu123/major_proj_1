@@ -1,0 +1,11 @@
+[
+  "data/.pipeline/clean",
+  "data/.pipeline/lmdb",
+  "data/.pipeline/split",
+  "data/.pipeline/us_images",
+  "data/.pipeline/us_meta",
+  "data/.pipeline/vn",
+  "data/.pipeline/vn_lmdb",
+  "venv/.pipeline_setup",
+  "venv/bin/python"
+]

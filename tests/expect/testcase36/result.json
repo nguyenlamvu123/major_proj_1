@@ -1,0 +1,9 @@
+{
+  "epochs": 2,
+  "train_batches_per_epoch": 801,
+  "epoch_minutes": 57.1,
+  "estimated_hours": 1.9,
+  "fits_max_epochs": false,
+  "over_budget": false,
+  "too_few_epochs": true
+}

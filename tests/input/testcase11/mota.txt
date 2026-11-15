@@ -1,0 +1,14 @@
+testcase11 — --only lmdb: ép chạy lại dù đã xong
+================================================
+
+MỤC ĐÍCH
+    --only chạy ĐÚNG các bước liệt kê, ép chạy kể cả khi dấu còn mới.
+
+ĐẦU VÀO
+    Đủ dấu; --only lmdb.
+
+KỲ VỌNG
+    Chỉ lmdb 'run'; mọi bước khác (kể cả train, eval) 'skip' 'không chọn'.
+
+VÌ SAO QUAN TRỌNG
+    Cách sửa nhanh khi nghi LMDB hỏng mà không đụng tới dữ liệu tải về.

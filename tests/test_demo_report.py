@@ -23,8 +23,10 @@ class _StubTokenizer:
 
 
 class _StubModel:
-    def __init__(self):
+    def __init__(self, img_size=(32, 128)):
         self.tokenizer = _StubTokenizer()
+        self.hparams = types.SimpleNamespace(img_size=list(img_size))
+        self.seen_shapes = []
 
     def eval(self):
         return self
@@ -34,6 +36,7 @@ class _StubModel:
 
     def __call__(self, x):
         import torch
+        self.seen_shapes.append(tuple(x.shape))
         return torch.zeros(x.shape[0], 5, 4)
 
     def charset_adapter(self, s):
@@ -61,6 +64,14 @@ def test_demo_predict_with_stub_model(tmp_path):
     assert len(rows) == 2
     assert rows[0]["pred"] == "ABC" and rows[0]["confidence"] == pytest.approx(0.72, abs=1e-6)
     assert rows[0]["image"].endswith("a.png")
+
+
+def test_demo_resizes_to_model_img_size(tmp_path):
+    """Ảnh demo phải resize đúng cỡ model được train (trước đây viết cứng 32×128)."""
+    from trademark_ocr import demo_app
+    model = _StubModel(img_size=(32, 256))
+    demo_app.predict(model, [str(_png(tmp_path))], device="cpu")
+    assert model.seen_shapes == [(1, 3, 32, 256)]
 
 
 def test_demo_run_requires_ckpt(tmp_path):
@@ -132,3 +143,63 @@ def test_report_cli_help_exits_zero():
     with pytest.raises(SystemExit) as e:
         rp.main(["--help"])
     assert e.value.code == 0
+
+
+def _full_report(path, rows):
+    """CSV đủ cột như evaluate (nhánh 16): (pred, gt, drawing_kind, in_scope)."""
+    from trademark_ocr.metrics import REPORT_COLUMNS, per_sample
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(REPORT_COLUMNS))
+        w.writeheader()
+        for i, (pred, gt, kind, scope) in enumerate(rows, start=1):
+            w.writerow({"idx": i, "serial_number": f"S{i}", "drawing_kind": kind,
+                        **per_sample(pred, gt), "in_scope": scope, "confidence": 0.5})
+
+
+def test_report_levels_coverage_and_drawing_kind(tmp_path):
+    _full_report(tmp_path / "crnn_us.csv", [
+        ("ABC", "ABC", "standard_character", 1),
+        ("ABD", "ABC", "stylized_words", 1),
+        ("XYZ", "XYZ", "stylized_words", 1),
+    ])
+    _full_report(tmp_path / "crnn_vn.csv", [
+        ("HOFF", "Hoff", "", 1),
+        ("LUAN HOI", "Luân Hồi", "", 1),
+        ("X", "A" * 30, "", 0),
+    ])
+    res = rp.run(reports_dir=tmp_path, out_path=tmp_path / "s.md",
+                 figures_dir=tmp_path / "none", log=lambda *_: None)
+    md = (tmp_path / "s.md").read_text(encoding="utf-8")
+    vn = next(r for r in res["rows"] if r["dataset"] == "VN")
+    assert vn["accuracy_nocase"] == pytest.approx(1 / 3)
+    assert vn["accuracy_base"] == pytest.approx(2 / 3)
+    assert vn["coverage"] == pytest.approx(2 / 3)
+    assert "| crnn | VN | 3 | 0.667 | 0.0000 | 0.3333 | 0.6667 |" in md
+    # US tách theo loại nhãn hiệu; VN không có drawing_kind -> không có dòng
+    assert "| crnn | US | standard_character | 1 | 1.0000 |" in md
+    assert "| crnn | US | stylized_words | 2 | 0.5000 |" in md
+
+
+def test_report_old_csv_without_new_columns_still_renders(tmp_path):
+    _report(tmp_path / "crnn_us.csv", [("a", "a")])
+    res = rp.run(reports_dir=tmp_path, out_path=tmp_path / "s.md",
+                 figures_dir=tmp_path / "none", log=lambda *_: None)
+    assert res["rows"][0]["coverage"] is None
+    md = (tmp_path / "s.md").read_text(encoding="utf-8")
+    assert "| crnn | US | 1 | – |" in md
+
+
+def test_report_renders_shift_decomposition_from_domain_shift_run(tmp_path):
+    from trademark_ocr import eval_domain_shift as ds
+    _full_report(tmp_path / "crnn_us.csv", [("ABC", "ABC", "stylized_words", 1)] * 20)
+    _full_report(tmp_path / "crnn_vn.csv", [("HOFF", "Hoff", "", 1), ("ĐA", "ĐA", "", 1),
+                                            ("X", "Y", "", 1)] * 10)
+    ds.run(reports_dir=tmp_path, out_path=tmp_path / "domain_shift.csv")
+    rp.run(reports_dir=tmp_path, out_path=tmp_path / "s.md", figures_dir=tmp_path / "none",
+           log=lambda *_: None)
+    md = (tmp_path / "s.md").read_text(encoding="utf-8")
+    assert "### Phân tách nguồn gốc độ sụt" in md
+    line = next(l for l in md.splitlines() if l.startswith("| crnn | -0.6667 |"))
+    assert "-0.3333 [" in line            # Δ bỏ hoa/thường kèm CI
+    assert "| 20 / 10 |" in line          # VN: 20 không dấu, 10 có dấu

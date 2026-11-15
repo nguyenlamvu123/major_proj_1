@@ -1,0 +1,12 @@
+[
+  "[plan] setup            | skip   | không chọn",
+  "[plan] us_meta          | skip   | không chọn",
+  "[plan] us_images        | skip   | không chọn",
+  "[plan] clean            | skip   | không chọn",
+  "[plan] split            | skip   | không chọn",
+  "[plan] lmdb             | skip   | không chọn",
+  "[plan] vn               | skip   | không chọn",
+  "[plan] vn_lmdb          | skip   | không chọn",
+  "[plan] train:parseq_ft  | continue | run MỚI nạp trọng số runs/parseq_ft/2026-11-05_00-27-27/checkpoints/last.ckpt (đã train 2 epoch), thêm 8 epoch (tổng ≤ 10), lịch LR mới, batch 64, cpu",
+  "[plan] eval             | run    | 06_eval.sh --device cpu (mọi model có checkpoint) + báo cáo"
+]

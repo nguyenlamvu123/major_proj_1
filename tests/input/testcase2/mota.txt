@@ -1,0 +1,14 @@
+testcase2 — Chạy lại khi mọi bước dữ liệu đã xong
+=================================================
+
+MỤC ĐÍCH
+    Chạy lại script không được làm lại các bước dữ liệu tốn giờ.
+
+ĐẦU VÀO
+    Đủ dấu 7 bước dữ liệu theo đúng thứ tự thời gian; venv đã dựng (accelerator=cpu); chưa có run nào.
+
+KỲ VỌNG
+    setup và 7 bước dữ liệu 'skip' kèm tham số; chỉ train 2 model + eval chạy.
+
+VÌ SAO QUAN TRỌNG
+    Bản đầu tiên của script build lại/tải lại mỗi lần chạy hoặc bỏ qua sai; chạy lại sau sự cố phải rẻ.

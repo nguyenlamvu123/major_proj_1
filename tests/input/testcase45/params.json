@@ -1,0 +1,18 @@
+{
+  "kind": "train_sh",
+  "desc": "Colab: LMDB giải nén ra đĩa máy ảo, data.root_dir trỏ tới đó -> train",
+  "args": [
+    "trba_ft",
+    "--max-epochs",
+    "20",
+    "--num-workers",
+    "2",
+    "data.root_dir=<WORK>/lmdb_root/lmdb"
+  ],
+  "state": {
+    "files": {
+      "../lmdb_root/lmdb/train/trademark/data.mdb": 10,
+      "../lmdb_root/lmdb/val/data.mdb": 10
+    }
+  }
+}

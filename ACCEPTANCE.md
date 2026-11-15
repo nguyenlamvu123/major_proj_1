@@ -244,6 +244,137 @@ pytest -q
 > **Đã nghiệm thu**: `pytest -q` → 177 pass, 1 skip (test cần LMDB thật), trên venv
 > torch 2.14.1+cpu / PL 2.6.6 / timm 1.0.30. Không cần mạng, không cần `DATA_ROOT`.
 
+## 16-fix-review — xử lý các vấn đề trong REVIEW.md
+
+### 16.1 LMDB ≥ 1.000 mẫu
+
+```bash
+pytest -q tests/test_lmdb.py
+python -m trademark_ocr.build_lmdb --subset train          # toàn bộ split, không --limit
+python -c "import lmdb,os;e=lmdb.open(os.environ['DATA_ROOT']+'/lmdb/train/trademark',readonly=True,lock=False);print(e.begin().get(b'num-samples'))"
+```
+**Pass khi**: test xanh; `num-samples` in ra đúng bằng số dòng `split_train.csv` (không phải `None`).
+
+### 16.2 SVTR-CTC: trục thời gian theo chiều ngang
+
+```bash
+pytest -q tests/test_svtr.py
+python -m trademark_ocr.train_utils --config tm_svtrctc --dry-run
+```
+**Pass khi**: test xanh (`seq_len == 32` @ 32×128, 32×64 bị từ chối); dry-run in `[dry-run] OK`.
+> Thay cho số liệu nhánh 09 (`seq_len=64`). Checkpoint SVTR cũ phải train lại.
+
+### 16.3 Đánh giá trung thực
+
+```bash
+pytest -q tests/test_evaluate.py tests/test_metrics.py
+python -m trademark_ocr.build_lmdb --subset test_vn          # build lại để có khoá meta-*
+python -m trademark_ocr.evaluate --ckpt $DATA_ROOT/runs/<model>/<ts>/checkpoints/last.ckpt \
+    --subset test_vn --out reports/<model>_vn.csv
+python -c "import json;s=json.load(open('reports/<model>_vn.summary.json'));print(s['n'],s['coverage'],s['accuracy'],s['accuracy_nocase'],s['accuracy_base'])"
+```
+**Pass khi**: test xanh; số dòng CSV = `num-samples` của LMDB (không bị lọc); cột `gt` giữ
+nguyên nhãn gốc; summary có `coverage`, `accuracy_nocase`, `accuracy_base`.
+> LMDB build trước nhánh 16 vẫn chấm được nhưng cột `serial_number`/`drawing_kind` rỗng.
+
+### 16.4 Phân tách độ sụt US→VN + báo cáo theo loại nhãn hiệu
+
+```bash
+pytest -q tests/test_domain_shift.py tests/test_demo_report.py
+python -m trademark_ocr.eval_domain_shift --reports reports/ --out reports/domain_shift.csv
+python -m trademark_ocr.report --reports reports/ --out reports/final_summary.md
+```
+**Pass khi**: test xanh; `domain_shift.csv` có thêm `delta_nocase`, `delta_base`,
+`delta_plain_nocase` và cột `_lo/_hi`; `final_summary.md` có các mục "Ba mức so khớp",
+"Phân tách nguồn gốc độ sụt", "Theo loại nhãn hiệu".
+
+### 16.5 Chất lượng tập VN
+
+```bash
+pytest -q tests/test_vn.py tests/test_vn_review.py
+bash scripts/03_get_vn.sh --limit 2000                 # (cần mạng) thêm --registered-only nếu muốn
+python -c "import json,os;r=json.load(open(os.environ['DATA_ROOT']+'/raw/vn_report.json'));print(r['n'],r['n_registered'],r['skipped'])"
+python -m trademark_ocr.vn_review make --n 300         # rồi sửa processed/review_vn.csv bằng tay
+python -m trademark_ocr.vn_review apply
+python -m trademark_ocr.build_lmdb --subset test_vn --split-csv $DATA_ROOT/processed/split_test_vn_verified.csv
+```
+**Pass khi**: test xanh; `vn_report.json` có `skipped` (lý do bỏ) và `n_registered`;
+`review_vn_report.json` có `label_noise_rate` — con số này phải nêu trong báo cáo đồ án.
+
+### 16.6 Fine-tune từ trọng số pretrained
+
+```bash
+pytest -q tests/test_pretrained.py
+python -m trademark_ocr.train_utils --config tm_parseq_ft --dry-run -o model.init_from=null
+bash scripts/05_train.sh parseq_ft --limit-train-batches 2 --max-epochs 1 --accelerator cpu --batch-size 8 --num-workers 0
+```
+**Pass khi**: test xanh; log train có dòng
+`[pretrained] parseq: nạp 172 tensor, bỏ 3 lệch kích thước [...]`; tạo `runs/parseq_ft/<ts>/checkpoints/last.ckpt`.
+> Lần đầu cần mạng (~95 MB parseq, ~33 MB crnn, ~200 MB trba vào cache `torch.hub`).
+
+### 16.7 Dọn dẹp + Colab
+
+```bash
+pytest -q tests/test_repo_hygiene.py
+bash scripts/00_get_parseq.sh                      # in: third_party/parseq @ 1902db0
+grep -rn "/media/zaibachkhoa" src scripts configs docs || echo NO_HARDCODED_PATH
+```
+**Pass khi**: test xanh; in `NO_HARDCODED_PATH`; `docs/colab/` có 4 notebook `00`…`03`.
+
+### Toàn nhánh 16
+
+```bash
+pytest -q
+```
+**Pass khi**: toàn bộ xanh, **không còn test bị skip** (test evaluate cần LMDB thật đã được
+thay bằng bản offline). Đã nghiệm thu: 236 pass trên venv torch 2.14.1+cpu / PL 2.6.6 /
+timm 1.0.30; thêm smoke train thật 2 batch CPU cho `svtr` và `parseq_ft` qua
+`scripts/05_train.sh` trên LMDB tổng hợp, rồi `evaluate` → `eval_domain_shift` → `report`.
+
+### 16.8 Chạy toàn bộ trên một máy
+
+```bash
+pytest -q tests/test_golden.py tests/test_train_utils.py
+bash scripts/09_full_pipeline_cpu.sh --dry-run                    # kế hoạch, không tạo file
+bash scripts/09_full_pipeline_cpu.sh --max-hours 3                # chạy thật (trong tmux)
+```
+**Pass khi**: test xanh (27 testcase golden); dry-run in 11 dòng `[plan]`; chạy thật kết thúc với
+`HẾT. Báo cáo: …/reports/final_summary.md`, mỗi model trong `--models` có `runs/<model>/<giờ>/DONE`
+(hoặc được liệt kê "chưa đủ epoch"), chạy lại cùng lệnh thì mọi bước dữ liệu `skip`.
+
+### 16.9 Model chưa học được, báo cáo sạch
+
+```bash
+pytest -q tests/test_golden.py                                         # 44 testcase
+bash scripts/09_full_pipeline_cpu.sh --dry-run --max-hours 3           # parseq_ft: skip, CHƯA HỌC ĐƯỢC
+bash scripts/09_full_pipeline_cpu.sh --dry-run --models parseq_ft --retrain --max-hours 9
+```
+**Pass khi**: test xanh; dry-run thứ nhất in `train:parseq_ft | skip | train xong nhưng CHƯA HỌC
+ĐƯỢC …`, thứ hai in `train:parseq_ft | run | từ đầu, ngân sách 9h …` và mọi bước dữ liệu `skip`;
+sau một lần eval đầy đủ, `reports/` chỉ còn file của model đang có checkpoint dùng được, file cũ nằm
+trong `reports/archive/<giờ>/`, không cột `char-accuracy` nào âm.
+
+### 16.11–16.12 Đồ thị train, train thêm từ run đã xong
+
+```bash
+pytest -q tests/test_golden.py                                         # 70 testcase
+python -m trademark_ocr.train_curves --out-dir reports/figures         # đọc log, không train
+bash scripts/09_full_pipeline_cpu.sh --dry-run --from train --models crnn_ft --continue --max-epochs 20
+```
+**Pass khi**: test xanh; `reports/figures/` có `train_curves_<model>.png` + `train_curves.md` cho
+mỗi model có log, crnn_ft kết luận "chưa thấy overfit" (val_loss 0,4254 ở epoch 8); dry-run in
+`train:crnn_ft | continue | run MỚI nạp trọng số …last.ckpt (đã train 8 epoch), thêm 12 epoch`.
+Sau khi train thật: run mới có `pipeline_train.env` với `continue_from=crnn_ft/2026-11-04_21-58-41`,
+đồ thị crnn_ft nối epoch 1–8 với 9–20.
+
+### 16.13 Đường dẫn có dấu cách
+```bash
+python -m pytest -q tests/test_golden.py -k "testcase71 or testcase72 or testcase73 or testcase74 or testcase75"
+```
+**Pass khi**: 5 testcase xanh; trả `scripts/05_train.sh` về bản trước 16.13 thì cả 5 đỏ. Trên máy có
+đường dẫn chứa dấu cách, `09_full_pipeline_cpu.sh --from train --models crnn_ft` vào được bước train
+(không còn `OverrideParseException`).
+
 ---
 
 ## Ghi chú chung

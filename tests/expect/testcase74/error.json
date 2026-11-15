@@ -1,0 +1,4 @@
+{
+  "code": 1,
+  "stderr_contains": "thiếu LMDB ở <WORK>/thư mục có dấu cách/chưa giải nén/train"
+}

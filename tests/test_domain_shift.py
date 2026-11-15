@@ -92,3 +92,61 @@ def test_cli_help_exits_zero():
     with pytest.raises(SystemExit) as e:
         ds.main(["--help"])
     assert e.value.code == 0
+
+
+# ------------- tách nguồn gốc của độ sụt (REVIEW.md §4.2, §4.5) -------------
+
+def test_build_rows_separates_label_convention_from_visual_shift(tmp_path):
+    # ROOT CAUSE:
+    #
+    # Bảng cũ chỉ có accuracy tuyệt đối. Nhãn US viết HOA, nhãn VN viết lẫn hoa/thường và có
+    # dấu mà model (chỉ học nhãn US) không thể phát ra → delta trộn ba nguồn: quy ước ghi
+    # nhãn, ký tự chưa học, và khác biệt hình ảnh.
+    #
+    # Đã sửa: thêm delta ở mức nocase/base và tách tập VN theo có dấu / không dấu; delta trên
+    # nhóm VN không dấu ở mức nocase là ước lượng sạch nhất của khác biệt hình ảnh.
+    _write_report(tmp_path / "m_us.csv", [("ABC", "ABC"), ("XYZ", "XYZ")])
+    _write_report(tmp_path / "m_vn.csv", [
+        ("HOFF", "Hoff"),          # chỉ sai hoa/thường
+        ("LUAN HOI", "Luân Hồi"),  # chỉ sai dấu
+        ("ABC", "ABC"),            # đúng
+        ("XYA", "XYZ"),            # sai thật
+    ])
+    r = ds.build_rows(tmp_path)[0]
+    assert r["acc_vn"] == pytest.approx(1 / 4)
+    assert r["acc_vn_nocase"] == pytest.approx(2 / 4)
+    assert r["acc_vn_base"] == pytest.approx(3 / 4)
+    assert r["delta_nocase"] == pytest.approx(2 / 4 - 1.0)
+    assert r["delta_base"] == pytest.approx(3 / 4 - 1.0)
+    assert (r["n_vn_plain"], r["n_vn_diac"]) == (3, 1)
+    assert r["acc_vn_plain_nocase"] == pytest.approx(2 / 3)
+    assert r["acc_vn_diac_nocase"] == 0.0
+    assert r["delta_plain_nocase"] == pytest.approx(2 / 3 - 1.0)
+
+
+def test_bootstrap_ci_brackets_delta_and_shrinks_with_n():
+    small = ds.bootstrap_delta_ci(k_us=40, n_us=50, k_vn=20, n_vn=50)
+    large = ds.bootstrap_delta_ci(k_us=4000, n_us=5000, k_vn=2000, n_vn=5000)
+    for lo, hi in (small, large):
+        assert lo <= 0.4 - 0.8 <= hi
+    assert (large[1] - large[0]) < (small[1] - small[0]) / 5
+    assert ds.bootstrap_delta_ci(k_us=40, n_us=50, k_vn=20, n_vn=50) == small   # tất định
+    assert ds.bootstrap_delta_ci(k_us=1, n_us=1, k_vn=0, n_vn=0) is None
+
+
+def test_run_writes_new_columns_and_empty_subset_as_blank(tmp_path):
+    _write_report(tmp_path / "m_us.csv", [("A", "A")])
+    _write_report(tmp_path / "m_vn.csv", [("B", "B")])                  # không có nhãn có dấu
+    out = tmp_path / "domain_shift.csv"
+    ds.run(reports_dir=tmp_path, out_path=out)
+    with out.open(encoding="utf-8", newline="") as fh:
+        row = next(csv.DictReader(fh))
+    assert list(row) == list(ds.COLUMNS)
+    assert row["n_vn_diac"] == "0" and row["acc_vn_diac_nocase"] == ""
+
+
+def test_run_with_header_only_report_does_not_crash(tmp_path):
+    _write_report(tmp_path / "m_us.csv", [("A", "A")])
+    _write_report(tmp_path / "m_vn.csv", [])                            # chỉ có header
+    res = ds.run(reports_dir=tmp_path, out_path=tmp_path / "o.csv")
+    assert res["rows"][0]["n_vn"] == 0 and res["rows"][0]["delta_nocase"] is None

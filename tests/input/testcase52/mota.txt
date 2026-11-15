@@ -1,0 +1,14 @@
+testcase52 — Lượt SWA (epoch = max_epochs): đánh dấu swa, không tính là tốt nhất
+================================================================================
+
+MỤC ĐÍCH
+    Lightning chạy thêm một lượt sau epoch cuối để tính lại BatchNorm cho trọng số SWA rồi validate lần nữa (crnn_ft 04/11: 72,59% sau 74,07%).
+
+ĐẦU VÀO
+    max_epochs 3 (config.yaml) + một lượt epoch=3 có 1 bước loss và val_accuracy 65% (cao hơn mọi epoch).
+
+KỲ VỌNG
+    Dòng epoch=3 có swa=true, loss train = null, nằm cùng hoành độ epoch 3; 'tốt nhất' vẫn là epoch 3 thật = 60%, không phải 65% của SWA.
+
+VÌ SAO QUAN TRỌNG
+    Không tách ra thì đồ thị có một 'epoch 4' không tồn tại và model tốt nhất bị ghi sai (last.ckpt không chứa trọng số SWA).

@@ -1,0 +1,14 @@
+testcase49 — Override dạng ++data.root_dir= cũng được nhận
+==========================================================
+
+MỤC ĐÍCH
+    Hydra cho phép tiền tố + / ++; script phải hiểu như data.root_dir=.
+
+ĐẦU VÀO
+    Chỉ có LMDB ở <WORK>/lmdb_root/lmdb; override viết ++data.root_dir=.
+
+KỲ VỌNG
+    Thoát 0; log LMDB=<WORK>/lmdb_root/lmdb; override chuyển nguyên văn cho train.py.
+
+VÌ SAO QUAN TRỌNG
+    Nếu không nhận, cách viết hợp lệ của hydra sẽ bị chặn nhầm y như lỗi ban đầu.

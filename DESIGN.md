@@ -24,7 +24,7 @@
 
 - **Package**: `src/trademark_ocr/` (cài `pip install -e .`). Import: `from trademark_ocr.charset import ...`.
 - **Môi trường**:
-  - `DATA_ROOT` — gốc dữ liệu. Local: `/media/zaibachkhoa/AC84-F995/trademark_data`; Colab: `/content/drive/MyDrive/trademark_data`. Mọi script nhận `--data-root` hoặc env `DATA_ROOT` (fallback `./data`).
+  - `DATA_ROOT` — gốc dữ liệu. Local (máy chủ repo): `/media/zaibachkhoa/AC84-F995/trademark_data`; Colab: `/content/drive/MyDrive/trademark_data`. Mọi script nhận `--data-root` hoặc env `DATA_ROOT`; không đặt thì dùng `<repo>/data` — một chỗ duy nhất: `trademark_ocr.DEFAULT_DATA_ROOT` (config hydra: `${oc.env:DATA_ROOT,data}`, script: `${DATA_ROOT:-$REPO_ROOT/data}`).
   - `REPO_ROOT` = thư mục chứa file này (tự resolve từ vị trí file).
 - **Layout dữ liệu dưới DATA_ROOT**:
 
@@ -126,7 +126,7 @@ Mô hình SVTR-CTC của mình cũng tuân theo pattern này (nhánh 09).
 | `src/trademark_ocr/split.py` | 05 | split 80/10/10 chống leak | processed txt | `processed/{train,val,test_us}.txt` |
 | `src/trademark_ocr/build_lmdb.py` | 05 | convert txt → LMDB parseq | txt + images | `$DATA_ROOT/lmdb/**` |
 | `src/trademark_ocr/train_utils.py` | 07 | helpers cho train (resolve config, sanity check) | – | – |
-| `src/trademark_ocr/models_svtr.py` | 09 | `SVTRCTC` (Lightning, CTCSystem) | – | ckpt |
+| `src/trademark_ocr/svtr_ctc.py` | 09 | `SVTRCTC` (Lightning, CTCSystem) | – | ckpt |
 | `src/trademark_ocr/metrics.py` | 10 | accuracy, 1−NED, char accuracy | pred/gt lists | dict/DataFrame |
 | `src/trademark_ocr/evaluate.py` | 10 | inference hàng loạt trên LMDB/txt | ckpt + dataset | `reports/*.csv` |
 | `src/trademark_ocr/fetch_vn.py` | 11 | crawl nhãn hiệu VN (WIPO Publish) | query/pages | `raw/images_vn/`, `processed/test_vn.txt` |
@@ -149,7 +149,7 @@ Mô hình SVTR-CTC của mình cũng tuân theo pattern này (nhánh 09).
 | CRNN | CTC cổ điển | baseline tối giản, tiêu chuẩn STR 2016 | `strhub.models.crnn` (parseq) |
 | TRBA | TPS + Attention | đại diện chuỗi attention truyền thống | `strhub.models.trba` |
 | PARSeq | Transformer + permutation LM | đại diện SOTA encoder-decoder | `strhub.models.parseq` |
-| SVTR-CTC | Transformer + CTC | **mô hình hiện đại** (đối thủ SVTRv2/PP-OCRv4); code riêng | `trademark_ocr.models_svtr` |
+| SVTR-CTC | Transformer + CTC | **mô hình hiện đại** (đối thủ SVTRv2/PP-OCRv4); code riêng | `trademark_ocr.svtr_ctc` |
 
 *(Nhắc lại phương án mở rộng — nếu sau này cần thêm:*
 - ***B** = `clovaai/deep-text-recognition-benchmark` (benchmark chuẩn, data LMDB MJ+ST, so số liệu báo cáo);*
@@ -720,6 +720,9 @@ Cấu hình: `embed_dim=192`, `depths=[2,2]`, `num_heads=6`, `mlp_ratio=4`,
 `img_size=[32,128]` ⇒ `L = 4×16 = 64`. Class **tự kiểm tra** lúc `__init__` bằng 1 forward
 dummy và `assert L >= max_label_length` (báo lỗi rõ nếu vi phạm), đồng thời lưu `self.seq_len`.
 
+> ⚠️ Đã sửa ở **16.2**: bản này trải phẳng lưới 4×16 theo hàng nên thực chất chỉ có 16 cột
+> < 25 ký tự. Hiện tại `Merging` stride (2,1) + gộp chiều cao → `L = W/4 = 32` cột.
+
 ### Bẫy đã bắt được
 
 `CTCSystem`/`BaseSystem` **không** định nghĩa `training_step` (CRNN và TRBA tự khai báo).
@@ -961,3 +964,372 @@ sửa sau không làm hỏng chúng:
 | `tests/test_vn.py` (+2) | `VnClient.iter_rows` với session giả: form id đọc từ HTML, header Wicket, `verify=False`, dừng khi đủ `limit` mà không lật trang thừa, phân trang không lặp mẫu |
 
 Số mẫu trong test e2e cố ý < 1.000 (giới hạn của `create_lmdb`, REVIEW.md §4.1).
+
+## 16-fix-review — xử lý các vấn đề trong REVIEW.md
+
+Mỗi mục dưới đây ứng với một mục của REVIEW.md §4 và một commit trên nhánh này.
+
+### 16.1 `build_lmdb.create_lmdb` — commit theo lô (REVIEW §4.1)
+
+Transaction được quản lý tay: `txn = env.begin(write=True)` → commit mỗi `commit_every`
+mẫu → lô cuối ghi `num-samples` rồi commit → `abort()` nếu có ngoại lệ → `sync/close` trong
+`finally`. Không dùng `with env.begin(...)`: `with` chỉ đóng transaction ban đầu, nên bản cũ
+mất lô cuối + `num-samples` khi có ≥ `commit_every` (1000) mẫu.
+
+`num-samples` cố ý nằm ở lô cuối: dừng giữa chừng thì LMDB không có khoá này và parseq báo
+lỗi ngay, thay vì âm thầm đọc một tập thiếu mẫu.
+
+Test hồi quy (`tests/test_lmdb.py`): `commit_every=3` với 7 mẫu (đọc lại đủ, đúng thứ tự)
+và 1.500 mẫu với mặc định 1.000, đọc bằng `LmdbDataset` thật của parseq.
+
+### 16.2 `svtr_ctc.SVTRNet` — trục thời gian CTC theo chiều ngang (REVIEW §4.4)
+
+| Thành phần | Trước | Sau |
+|---|---|---|
+| `Merging` | `Conv3×3 stride 2` (giảm cả rộng) | `Conv3×3 stride (2,1)` — chỉ giảm cao |
+| Sau các stage | `view(b, h*w, c)` (trải theo hàng) | `mean(dim=2)` — gộp cao về 1, mỗi cột = 1 bước |
+| Vị trí | không có | `pos_embed` học được `(1, C, ceil(H/4), ceil(W/4))` cộng sau stem |
+| `L` @ 32×128 | 64 (= 4 lần quét × 16 cột) | **32 cột** |
+
+`L` giờ chỉ phụ thuộc chiều rộng (`ceil(W/4)`): ảnh cao hơn không thêm bước, ảnh rộng gấp đôi
+thì gấp đôi bước. `assert L >= max_label_length` vì thế mới thực sự kiểm số cột — `img_size`
+32×64 (16 cột) bị từ chối lúc dựng model. Tham số: 2.338.085 (thêm ~49k của `pos_embed`).
+Checkpoint SVTR cũ (chỉ có bản smoke 2 batch) **không** nạp được vào kiến trúc mới.
+
+Test hồi quy (`tests/test_svtr.py`): `L` theo chiều rộng ở 3 kích thước, từ chối 32×64,
+có `pos_embed`; hai test cũ khoá `seq_len == 64` đổi thành 32.
+
+### 16.3 Đánh giá trung thực: ba mức so khớp, không lọc ngầm, truy ngược được mẫu (REVIEW §4.2, §4.5, §4.8)
+
+**`metrics.py`** — hai mức so khớp thêm cho accuracy và 1 − NED:
+
+| mức | chuẩn hoá áp lên cả pred và gt | khoá |
+|---|---|---|
+| strict | không | `accuracy`, `one_minus_ned` (như cũ) |
+| nocase | `str.upper` | `accuracy_nocase`, `one_minus_ned_nocase` |
+| base | `strip_diacritics(...).upper()` (`đ`→`d`) | `accuracy_base`, `one_minus_ned_base` |
+
+Lý do: nhãn USPTO luôn VIẾT HOA còn nhãn VN thì không, và tập US gần như không có chữ có
+dấu. `nocase` loại phần sai do quy ước ghi nhãn; `base` loại thêm phần sai do chưa từng học
+chữ có dấu — phần còn lại mới là khác biệt hình ảnh. `has_diacritics(gt)` cho phép tách tập
+VN thành nhóm có dấu / không dấu.
+
+`REPORT_COLUMNS` (CSV từng mẫu) giờ là:
+`idx, serial_number, drawing_kind, pred, gt, correct, correct_nocase, correct_base, ned,
+char_err, pred_len, gt_len, gt_has_diacritics, in_scope, confidence`.
+`per_sample(pred, gt)` điền mọi cột trừ `SAMPLE_CONTEXT_COLUMNS` (idx, serial, kind,
+in_scope, confidence — do `evaluate` điền). Bên đọc (nhánh 12/13/14) đọc theo **tên cột**.
+
+**`build_lmdb.py`** — thêm khoá `meta-{idx:09d}` = JSON `{serial_number, drawing_kind}`
+(`META_FIELDS`, chỉ trường có giá trị); `read_meta(txn, idx)` trả `{}` với LMDB cũ. parseq
+không đọc khoá này.
+
+**`evaluate.py`** — viết lại phần nạp dữ liệu và nạp model:
+
+| Trước | Sau |
+|---|---|
+| `LmdbDataset` của parseq: bỏ nhãn > 25 ký tự, xoá ký tự ngoài charset khỏi gt | `LmdbEvalDataset`: **mọi** mẫu, gt gốc (NFC); `in_scope = len(gt) ≤ max_len ∧ set(gt) ⊆ charset` |
+| `idx` = thứ tự sau lọc | `idx` = chỉ số LMDB; `serial_number`, `drawing_kind` từ `meta-*` |
+| `(32,128)` và `25` viết cứng | `model.hparams.img_size / max_label_length / charset_train` |
+| `except Exception` → thử `SVTRCTC`; đoán lớp theo chuỗi con đường dẫn | `resolve_model_class`: `--model-class` → `<run>/config/config.yaml` (`model._target_`) → quy ước tên parseq → `SystemExit` có hướng dẫn |
+
+`summary.json` thêm: `coverage`, `n_too_long`, `n_unsupported_char`, `in_scope{metrics}`,
+`model_class`, `img_size`, `max_label_length`, và các khoá `*_nocase`/`*_base`. Metric chính
+tính trên **toàn bộ** tập (mẫu ngoài phạm vi tính là sai); `in_scope` để so với số liệu kiểu
+parseq.
+
+**`demo_app.py`** — `model_img_size(model)` đọc `hparams.img_size`; bỏ `DEFAULT_IMG_SIZE`.
+
+Test: `tests/test_evaluate.py` (mới, offline: ckpt SVTR nhỏ thật + run dir giả có config
+hydra, LMDB VN có nhãn quá dài và ký tự lạ, `img_size` 32×160 để chứng minh đọc hparams),
+`tests/test_metrics.py` (+5, bỏ test cũ chỉ chạy với LMDB thật và API cũ), `tests/test_lmdb.py`
+(+1 meta), `tests/test_demo_report.py` (+1 resize theo hparams).
+
+### 16.4 Phân tách nguồn gốc độ sụt US→VN + báo cáo theo loại nhãn hiệu (REVIEW §4.2, §4.3, §4.5)
+
+**`eval_domain_shift.py`** — giữ 6 cột cũ (ACCEPTANCE nhánh 12, sort theo `delta`), thêm:
+
+| cột | loại bỏ khỏi so sánh | phần còn lại đo |
+|---|---|---|
+| `delta` | — | quy ước ghi nhãn + ký tự chưa học + hình ảnh |
+| `delta_nocase` (+`_lo/_hi`) | hoa/thường | ký tự chưa học + hình ảnh |
+| `delta_base` | hoa/thường + dấu | hình ảnh (chấm dễ cho chữ có dấu) |
+| `delta_plain_nocase` (+`_lo/_hi`) | chỉ nhóm VN **không dấu**, bỏ hoa/thường | hình ảnh — ước lượng sạch nhất |
+
+Kèm `acc_*` từng mức, `acc_vn_plain_nocase`/`n_vn_plain`, `acc_vn_diac_nocase`/`n_vn_diac`.
+Nhóm rỗng → ô trống. Các cột mới tính lại từ `pred/gt` nên dùng được với CSV cũ.
+
+`bootstrap_delta_ci(k_us, n_us, k_vn, n_vn, n_boot=2000, seed=1111, alpha=0.05)`: CI 95%
+percentile của `acc_vn − acc_us`. Lấy mẫu `Binomial(n, k/n)/n` cho từng phía — tương đương
+chính xác với bootstrap lấy lại n mẫu 0/1 có hoàn lại, nhưng không phải lặp từng mẫu.
+⚠️ Khi accuracy một phía đúng bằng 0 hoặc 1, CI phía đó suy biến (độ rộng 0) — đặc tính của
+percentile bootstrap, không phải lỗi.
+
+**`report.py`** — giữ hai bảng cũ, thêm:
+- *Ba mức so khớp + độ bao phủ*: `coverage` (từ cột `in_scope`; CSV cũ ghi "–", không coi
+  là 100%), accuracy tuyệt đối / bỏ hoa-thường / bỏ cả dấu.
+- *Phân tách nguồn gốc độ sụt*: 4 delta ở trên, CI cạnh delta, `n VN không dấu / có dấu`.
+- *Theo loại nhãn hiệu*: accuracy (bỏ hoa/thường) theo `drawing_kind` — tách
+  `standard_character` (chữ đánh máy, dễ) khỏi `stylized_words`/`design_with_words`.
+
+Phạm vi bài toán (REVIEW §4.3): đồ án vẫn là **nhận dạng một dòng chữ trên cả ảnh nhãn hiệu**,
+không có bước phát hiện vùng chữ. Bảng theo `drawing_kind` là cách đo mức ảnh hưởng của giới
+hạn này; tăng chiều rộng đầu vào làm được bằng override `model.img_size=[32,256]` (evaluate
+và demo đọc `img_size` từ ckpt từ 16.3).
+
+Test: `tests/test_domain_shift.py` (+4: phân tách 4 nguồn, CI bao delta + hẹp lại khi n tăng
++ tất định, cột mới/ô trống, báo cáo chỉ có header), `tests/test_demo_report.py` (+3: bảng
+ba mức + coverage + drawing_kind, CSV cũ, nối `eval_domain_shift` → `report`).
+
+### 16.5 Chất lượng tập VN: crawl, lọc trùng, đơn đã cấp, duyệt tay (REVIEW §4.7)
+
+**`fetch_vn.VnClient.iter_rows(limit, ..., max_empty_pages=5, registered_only=False, dedupe=True)`**
+
+| Bộ lọc (theo thứ tự) | Lý do trong `client.skipped` |
+|---|---|
+| không chữ hoặc không ảnh | `unusable` |
+| `registered_only` và chưa có `registration_no` (mới là đơn) | `unregistered` |
+| trùng `dedupe_key(word_mark)` = bỏ khoảng trắng + HOA (`ENGLISH 1984` ≡ `English1984`) | `duplicate_label` |
+
+Dừng khi đủ `limit` / hết trang / `max_pages` / **`max_empty_pages` trang liên tiếp** không có
+hàng mới. Bản cũ dừng ngay ở trang đầu tiên không có hàng dùng được — một trang toàn nhãn hình
+là chuyện bình thường. `vn_report.json` thêm `skipped`, `registered_only`, `n_registered`.
+CLI: `--registered-only`, `--no-dedupe`. Mặc định vẫn nhận cả đơn chưa cấp (không biết trước
+tỉ lệ đơn đã cấp trong `query=*:*`); số `n_registered` cho biết tập thực tế gồm gì.
+
+Sửa kèm: cột CSV thô `reg_no` → `registration_no` (khớp khoá của `parse_rows`; trước đây
+`DictWriter(extrasaction="ignore")` ghi rỗng số đăng ký cho mọi dòng). Danh sách cột giờ
+sinh từ `_FIELDS` để không lệch lần nữa.
+
+**`vn_review.py`** (mới) — vòng duyệt tay, trạng thái nằm trong CSV:
+
+| Lệnh | Vào | Ra |
+|---|---|---|
+| `make --n 300 [--seed] [--overwrite]` | `processed/split_test_vn.csv` | `processed/review_vn.csv` (`visible_text` điền sẵn = `word_mark`) + `review_vn.html` (ảnh cạnh nhãn, nhãn được escape) |
+| *(người duyệt sửa `visible_text`; để trống = bỏ mẫu)* | | |
+| `apply` | `review_vn.csv` | `split_test_vn_verified.csv` (nhãn NFC đã sửa, bỏ dòng trống) + `review_vn_report.json` (`n_same/n_fixed/n_dropped`, `label_noise_rate`) |
+
+`make` từ chối ghi đè `review_vn.csv` đã có (tránh mất công duyệt dở). Mẫu tất định theo
+`seed` (sắp theo serial trước khi lấy mẫu).
+
+Test: `tests/test_vn.py` (+5: qua trang rỗng đơn lẻ, dừng sau `max_empty_pages`, lọc trùng +
+`registered_only`, `dedupe_key`, giữ số đăng ký), `tests/test_vn_review.py` (mới, 4 test).
+
+### 16.6 Fine-tune từ trọng số pretrained của parseq (REVIEW §4.6)
+
+`pretrained: <tên>` của `third_party/parseq/train.py` nạp **strict** → `size mismatch` với
+charset VN. Thay vào đó, `src/trademark_ocr/pretrained.py`:
+
+| Hàm | Việc |
+|---|---|
+| `finetune(target, init_from=None, **kwargs)` | factory làm `model._target_`: dựng lớp `target` với `kwargs`, nạp một phần `init_from`; `target`/`init_from` **không** vào hparams → ckpt là ckpt của lớp thật |
+| `load_matching(module, state_dict)` | chép tensor trùng tên **và** kích thước; trả `{loaded, skipped_shape, missing, unexpected}` |
+| `_read_state(init_from)` | file `.pt` (state dict) / `.ckpt` (lấy `state_dict`), hoặc tên bản phát hành parseq qua `torch.hub` |
+
+Đích nạp chọn theo dữ liệu: bản `parseq` là state dict của `system.model`, bản `crnn`/`trba`
+và ckpt Lightning là cấp system → chọn module có nhiều tên khoá trùng hơn. Không khớp tensor
+nào → `ValueError` (tránh "fine-tune" mà thực ra train từ đầu).
+
+Config: `tm_crnn_ft`, `tm_trba_ft`, `tm_parseq_ft` = bản sao `tm_*` với
+`_target_: trademark_ocr.pretrained.finetune`, `target: <lớp>`, `init_from: <tên>`,
+`model.name: *_ft` (run dir `runs/*_ft/`). `scripts/05_train.sh crnn_ft|trba_ft|parseq_ft`,
+`scripts/06_eval.sh` quét cả 3. `evaluate.resolve_model_class` nhận ra `FINETUNE_TARGET` trong
+`config.yaml` và dùng `model.target`.
+
+**Kiểm chứng với trọng số thật** (tải bản phát hành v1.0.0 qua `torch.hub`, charset VN):
+
+| init_from | nạp | bỏ (phụ thuộc charset) | thiếu / thừa |
+|---|---|---|---|
+| `parseq` | 172 | `head.weight`, `head.bias`, `text_embed.embedding.weight` | 0 / 0 |
+| `crnn` | 44 | `model.rnn.1.linear.{weight,bias}` | 0 / 0 |
+| `trba` | 250 | `model.Prediction.generator.{weight,bias}`, `model.Prediction.char_embeddings.weight` | 0 / 0 |
+
+Lưu ý: lớp ra khởi tạo ngẫu nhiên và gần như không có mẫu chữ có dấu trong tập US, nên
+fine-tune giúp phần đọc hình, không giúp phát chữ có dấu (xem 16.4 — đọc ở cột "bỏ cả dấu").
+`lr` giữ như bản train từ đầu; là siêu tham số cần thử (fine-tune thường cần lr nhỏ hơn).
+
+Test (`tests/test_pretrained.py`, offline — "pretrained" giả bằng PARSeq nhỏ charset 36):
+strict load lỗi (tái hiện), `load_matching` bỏ đúng 3 tensor, factory từ file `.pt` và từ
+ckpt Lightning, từ chối file không khớp, `tm_parseq_ft` instantiate được với
+`init_from=null`, `evaluate` giải `FINETUNE_TARGET` ra `PARSeq`.
+
+### 16.7 Dọn dẹp: đường dẫn mặc định, alias script, ghim parseq, notebook Colab (REVIEW §4.6, §4.8)
+
+| Việc | Trước | Sau |
+|---|---|---|
+| `DATA_ROOT` mặc định | `/media/zaibachkhoa/...` lặp ở 10 module, 4 config, 5 script | `trademark_ocr.DEFAULT_DATA_ROOT` = env hoặc `<repo>/data`; config `${oc.env:DATA_ROOT,data}`; script `${DATA_ROOT:-$REPO_ROOT/data}`; 2 notebook EDA dùng `Path.cwd().parent / 'data'` (output cũ giữ nguyên) |
+| `05_train.sh svtrctc` (README) | `unknown model` | `svtr\|svtrctc` → `tm_svtrctc` |
+| parseq | clone HEAD, không ghim | `scripts/00_get_parseq.sh` clone + checkout `PARSEQ_COMMIT=1902db0…` (SHA đầy đủ trong script) |
+| `requirements.txt` | có `aiohttp` (không dùng) | bỏ |
+| DESIGN bảng module / model zoo | `models_svtr.py` | `svtr_ctc.py` |
+| log `evaluate` | `[evaluate] checkpoints / …` (tên thư mục) | `[evaluate] <lớp model> / …` |
+| `docs/colab/` | chỉ `.gitkeep` | `00_setup` (clone repo + `00_get_parseq` + test nhanh), `01_download_data` (runtime CPU; ảnh US tải về ổ máy ảo, chỉ chép `raw/meta`, `raw/images_us.tar`, `processed/`, `lmdb/` lên Drive vì thư mục Drive nhiều file dễ timeout; VN làm thẳng trên Drive → duyệt tay → LMDB; bản cũ ghi thẳng vào Drive giữ ở `01_download_data_old.ipynb`), `02_train` (chép LMDB ra đĩa máy ảo, `05_train.sh <MODEL>`), `03_eval` (`06_eval.sh` → `final_summary.md`) |
+
+⚠️ Đổi mặc định `DATA_ROOT`: máy nào trước đây dựa vào mặc định `/media/...` mà không
+`export DATA_ROOT` thì giờ sẽ đọc/ghi `<repo>/data` — ACCEPTANCE đã `export` ở bước cài đặt.
+
+Test (`tests/test_repo_hygiene.py`, mới): không còn đường dẫn máy cụ thể trong
+`src/scripts/configs/docs`; `DEFAULT_DATA_ROOT` theo env hoặc `<repo>/data` (subprocess);
+`05_train.sh` nhận `svtr`/`svtrctc`/`parseq_ft`; mọi lệnh `05_train.sh <tên>` trong README có
+trong script; clone parseq đúng SHA ghim; không còn `aiohttp`; 4 notebook Colab hợp lệ và chỉ
+trỏ tới script/module có thật.
+
+### 16.8 Chạy toàn bộ trên một máy: `scripts/09_full_pipeline_cpu.sh` (viết lại)
+
+Bản đầu (commit `da3964d`, viết cho máy khác) không chạy được từ đầu tới cuối: clone repo qua SSH
+vào `~/projects` (máy không có khoá GitHub), parseq không ghim commit, `pip install … || true`
+nuốt lỗi khi Python hệ thống không có pip, `01_get_meta.sh` không `--limit` (= tải cả 688 số
+gazette), có 1 ảnh là bỏ qua tải ảnh, `build_lmdb` thiếu `--subset` (argparse lỗi → `set -e` dừng),
+bỏ build khi `data.mdb` đã có (đúng lỗi "LMDB 500 mẫu"), hướng dẫn dùng `--num-workers` mà script
+không nhận, model có `last.ckpt` bất kỳ (kể cả smoke test) là bị coi đã train xong.
+
+**Thiết kế mới** — chạy ngay trong repo chứa script; 10 bước
+`setup us_meta us_images clean split lmdb vn vn_lmdb train eval`:
+
+| Cơ chế | Chi tiết |
+|---|---|
+| Kế hoạch trước, chạy sau | mọi quyết định chỉ dựa trên trạng thái file → `--dry-run` in đúng kế hoạch, không gọi mạng/Python, không tạo file |
+| Dấu bước | `$DATA_ROOT/.pipeline/<bước>` chứa tham số (vd `rows=60000`); chạy lại khi: thiếu dấu, tham số đổi, bước phụ thuộc mới hơn hoặc sẽ chạy lại lần này, hoặc `--only` |
+| Phụ thuộc | us_meta → us_images → clean → split → lmdb; vn → vn_lmdb (+ `split_test_vn_verified.csv` mới hơn); setup theo `<venv>/.pipeline_setup` (accelerator) và `requirements.txt` |
+| setup | `python3 -m venv`, torch từ index CPU khi không GPU, `requirements.txt`, `pip install -e .`; luôn `00_get_parseq.sh` |
+| Model | run mới nhất có `last.ckpt`: `DONE` → bỏ; chưa `DONE` → `ckpt_path=` train tiếp, **giữ** `max_epochs`/`batch_size` trong `<run>/pipeline_train.env` (lịch OneCycle khôi phục từ ckpt đã cố định tổng số bước); không có → run mới tại `hydra.run.dir` do script đặt |
+| `--max-hours H` | run mới: `train_utils --benchmark` đo giây/batch train+val thật → `epochs_for_budget` chọn số epoch ≤ `--max-epochs` vừa 85% ngân sách (`benchmark.json`); trần `+trainer.max_time` = 115% ngân sách (train tiếp: cộng thời gian đã train đọc từ Timer trong ckpt) |
+| `DONE` | đánh khi `05_train.sh` thoát 0 **và** (không có ngân sách hoặc tiến trình kết thúc trước 97% trần). Không dựa vào epoch trong `last.ckpt`: pytorch-lightning 2.6 chỉ ghi `last.ckpt` khi lượt đó có lưu top-k (parseq `save_top_k=3`), nên nó có thể đứng ở epoch cũ dù đã train đủ |
+| Lỗi không chặn cả đêm | train một model lỗi → ghi lại, model kế vẫn train, eval vẫn chạy, thoát 1 ở cuối; crawl/LMDB VN lỗi → cảnh báo, eval chỉ có `test_us` (`06_eval.sh` bỏ tập test thiếu LMDB) |
+| Chạy dài | log `$DATA_ROOT/logs/pipeline_<giờ>.log` (gồm cả kế hoạch); tự chạy lại dưới `systemd-inhibit --what=sleep:idle` nếu hệ thống cho phép |
+| Kiểm tham số | cờ/bước/model lạ, `--from` + `--only`, số sai định dạng → thoát 2 trước khi làm gì |
+
+`train_utils.py` thêm: `benchmark(cfg)` (đo cả thời gian chờ dataloader; tắt `init_from` để
+không tải mạng), `epochs_for_budget(...)`, `ckpt_progress(path)` (epoch, global_step, giây đã
+train theo Timer); CLI `--benchmark --budget-hours --max-epochs --json-out`, `--ckpt-info`.
+
+Test: golden-file `tests/test_golden.py` + `tests/{input,expect}/testcase1..27` (20 kế hoạch
+`--dry-run`, 4 phép tính ngân sách, 3 lần chạy `06_eval.sh` với Python giả; lệnh
+git/curl/wget/python bị thay bằng stub, dry-run gọi tới là fail); `tests/test_train_utils.py`
++4 (benchmark thật không tải mạng, `ckpt_progress` trên fit thật, `last.ckpt` không tiến khi
+không có top-k, override `max_time`).
+
+Phụ: `06_eval.sh` bỏ tập test thiếu LMDB thay vì dừng; viết lại `HUONG_DAN_PIPELINE_CPU.md`,
+sửa markdown hỏng trong `CACH_CHAY_TRAIN_CPU.md` và hai lỗi gõ trong
+`BAO_CAO_TONG_KET_DAT_LIEU_HUAN_LUYEN.md`; xoá `trademark_data_min.tar.gz` (file nén rỗng 45 byte).
+
+### 16.9 Sau lần chạy đầu (04→05/11): model "chưa học được", báo cáo lẫn file cũ
+
+Lần chạy thật đầu tiên (`docs/nhat_ky_chay.md`) xong lúc 02:38 nhưng `final_summary.md` sai ba chỗ:
+`parseq_ft` 0% (ngân sách 3h trên CPU chỉ đủ 2 epoch, `val_accuracy` 0,0000 cả hai epoch, loss
+5,39 → 3,27 vẫn đang giảm) mà vẫn được ghi `DONE` và đưa vào bảng như kết quả; dòng `crnn` 200
+mẫu là file 16/10 của máy cũ (`report.py` gom mọi `reports/*.csv`); `char-accuracy` âm (−1,26)
+vì CER > 1 khi model đoán dài hơn nhãn.
+
+| Sửa | Chi tiết |
+|---|---|
+| `UNDERTRAINED` | train đủ epoch xong, `train_utils --train-verdict <run>` đọc `val_accuracy` trong tên các checkpoint top-k; tốt nhất < 1% (`MIN_VAL_ACCURACY`) → ghi `UNDERTRAINED` thay vì `DONE`. Không đọc được (không ckpt nào mang `val_accuracy`) → `DONE` như cũ |
+| Kế hoạch | run mới nhất `UNDERTRAINED` → `skip` kèm gợi ý; **không** tự train lại (cùng ngân sách ra cùng kết quả, mất một đêm); `--retrain` → run mới |
+| Cảnh báo sớm | `epochs_for_budget` thêm `too_few_epochs` = số epoch < min(3, `--max-epochs`) — chỉ khi ngân sách là giới hạn; pipeline in `[WARN]` ngay sau benchmark và nhắc lại ở cuối log |
+| `06_eval.sh` | chọn `last.ckpt` mới nhất của run **không** `UNDERTRAINED` (lùi về run cũ hơn); chọn xong mới dọn báo cáo: không `--only` → chuyển mọi file trong `reports/` vào `reports/archive/<giờ>/`; `--only` → chỉ file của model được đánh giá lại; không model nào dùng được → thoát 1, báo cáo cũ nguyên vẹn. `REPORTS_DIR` đổi được thư mục báo cáo |
+| Metric / báo cáo | `char_accuracy = max(0, 1 − CER)` (CER gốc giữ ở cột `cer`); `final_summary.md` ghi giờ máy kèm độ lệch UTC |
+| Log | `PYTHONUNBUFFERED=1`: lần đầu log đứng im 13 phút ở `us_meta` vì stdout Python qua `tee` bị đệm theo khối |
+
+Không sửa: SWA của `parseq/train.py` (bên thứ ba) bật từ 75% số epoch — với 2 epoch nó thay lịch
+OneCycle bằng LR cố định ngay epoch thứ hai. Không phải nguyên nhân chính (loss vẫn giảm đều) và
+hết tác động khi đủ epoch.
+
+Test: golden `testcase28..44` (3 kế hoạch với `UNDERTRAINED`, 5 `verdict`, 2 ngân sách, 5 lần chạy
+`06_eval.sh` gồm archive và lùi run, 2 `metrics`); expect của `testcase21..26` cập nhật (thêm
+`too_few_epochs`; đường dẫn báo cáo theo `REPORTS_DIR`). Runner luôn đặt `REPORTS_DIR` vào thư mục
+tạm: khi viết tính năng, một lần chạy test trước khi có dòng đó đã chuyển `reports/` thật vào
+archive (đã trả lại nguyên vẹn).
+
+### 16.10 `05_train.sh` kiểm đúng thư mục LMDB sẽ được đọc
+
+Colab 05/11: LMDB giải nén ra `/content/lmdb_root/lmdb` (đọc nhanh), `DATA_ROOT` trên Drive (giữ
+checkpoint), lệnh có `data.root_dir=/content/lmdb_root/lmdb` — script vẫn dừng ở "thiếu LMDB ở
+…/trademark_data/lmdb" vì luôn kiểm `$DATA_ROOT/lmdb/train`, bỏ qua override. Ngược lại, override
+trỏ vào thư mục chưa giải nén thì lọt qua và chỉ lỗi trong `train.py` sau khi đã nạp model.
+
+Sửa: dịch cờ trước, rồi kiểm `<root>/train` **và** `<root>/val` với `<root>` = giá trị
+`data.root_dir=` (nhận cả `+`/`++`) nếu có, không thì `$DATA_ROOT/lmdb`; dòng `checkpoint ->` in
+`hydra.run.dir=` nếu có. Test: golden `testcase45..50` (kind `train_sh`, Python giả).
+
+### 16.11 Đồ thị train (kiểm tra overfit): `trademark_ocr.train_curves`
+
+Câu hỏi 05/11: vẽ accuracy train/test theo epoch để xem overfit có phải sửa code train không.
+Không: `third_party/parseq/train.py` đã ghi TensorBoard vào chính thư mục run
+(`events.out.tfevents.*`): `loss` mỗi batch (`log_every_n_steps: 1`), `val_loss`/`val_accuracy`/
+`val_NED` mỗi epoch, `epoch` ở mọi bước. Chỉ thiếu **accuracy trên tập train** (parseq không đo) —
+đo thêm phải can thiệp `validation_step` của parseq, nơi `val_accuracy` quyết định checkpoint, nên
+không làm; overfit đọc từ cặp loss train ↔ val_loss. Accuracy trên tập test theo epoch cố ý không
+đo: tập val giữ vai trò đó, test chỉ chấm một lần ở cuối.
+
+Module mới chỉ đọc log, không đụng code train:
+- Gộp nhiều file events của một run (train tiếp sau khi bị cắt): file sau thắng, điểm của file
+  trước từ `global_step` đầu của file sau trở đi bị bỏ (nhánh đã làm lại).
+- Loss train của epoch = trung bình loss các batch có `epoch` đó; tính trên ảnh đã augment, có
+  dropout, nên thường cao hơn val_loss — đọc xu hướng, không so độ lớn.
+- Điểm validate có `epoch >= trainer.max_epochs` (đọc `config/config.yaml`) là lượt SWA: Lightning
+  chạy thêm một lượt tính lại BatchNorm cho trọng số trung bình (CRNN có BatchNorm) rồi validate.
+  Đánh dấu `swa`, vẽ marker rỗng cùng hoành độ epoch cuối, không tính "tốt nhất"/overfit
+  (crnn_ft 04/11: 72,59% sau SWA, 74,07% ở epoch 8; `last.ckpt` là epoch 8).
+- Nối run `--continue` (16.12) với run cha theo `continue_from` (tương đối `runs/`), cắt run cha ở
+  `init_epoch`, đánh số epoch dồn bằng `epoch_offset`; đường đứt "train tiếp" ở chỗ nối.
+- `overfit_check`: `co_dau_hieu` khi val_loss thấp nhất ở epoch k, sau đó ≥ 2 epoch và epoch cuối
+  cao hơn đáy > 5% trong khi loss train epoch cuối thấp hơn ở k; `chua_thay` khi đáy ở epoch
+  cuối/kế cuối; `di_ngang` còn lại; `chua_du` khi < 3 epoch.
+- Chọn run: mới nhất (theo tên thư mục) có ít nhất một điểm `val_accuracy`; model không có log nào
+  nằm trong `skipped` kèm lý do.
+
+Ra `reports/figures/train_curves_<model>.png` (2 ô: loss — thang log khi max/min > 3; accuracy val),
+`train_curves.json`, `train_curves.md`. `06_eval.sh` gọi ở cuối (lỗi chỉ WARN). `reports/figures/`
+là thư mục con nên bước chuyển báo cáo cũ vào `archive/` (chỉ chuyển file) không đụng tới. Màu
+train/val lấy hai slot đầu của bảng categorical đã kiểm CVD/tương phản. Test: golden
+`testcase51..59`, `70` (kind `curves`: runner tự sinh file events bằng `SummaryWriter`), và
+`06_eval.sh` (`testcase25/26/38–41`) có thêm lệnh `train_curves`.
+
+### 16.12 Train thêm epoch từ một run đã xong: `09_full_pipeline_cpu.sh --continue`
+
+Yêu cầu 05/11: crnn_ft 8 epoch còn đang tốt lên (val_loss giảm tới epoch cuối) — train thêm từ
+checkpoint cũ, không làm lại từ đầu, trên một máy khác yếu hơn. Lightning `ckpt_path=` (cách
+"train tiếp" sẵn có, dùng cho run bị cắt) **không** dùng được cho run đã xong: lịch OneCycleLR khôi
+phục từ checkpoint giữ `total_steps` của 8 epoch (đã chạy hết, bước kế tiếp báo lỗi "Tried to step
+… times"), và SWA đã thay lịch LR bằng SWALR từ epoch 6.
+
+Cách làm: run MỚI, nạp **toàn bộ** trọng số từ `last.ckpt` của run cũ qua factory
+`trademark_ocr.pretrained.finetune` (`init_from` nhận sẵn file `.ckpt`; cùng kiến trúc, cùng charset
+nên nạp đủ — smoke 05/11: "nạp 46 tensor, bỏ 0"), optimizer + lịch OneCycle mới cho phần còn thiếu
+(warm restart: LR khởi động lại tới đỉnh rồi giảm, val có thể chững 1–2 epoch đầu). Config `*_ft`
+chỉ cần `model.init_from=<ckpt>`; config train từ đầu chuyển `model._target_` sang factory,
+`+model.target=<lớp>` (bảng `model_class` trong script; `evaluate.py` đọc `model.target`).
+
+- `--max-epochs` là **tổng** epoch tính dồn; run mới train `max_epochs − đã train` (hoặc ít hơn theo
+  `--max-hours`). Đã train = `epoch_offset` của run cũ + epoch của `last.ckpt` + 1, chặn ở
+  `max_epochs` của run cũ (lượt SWA lọt top-3 thì `last.ckpt` mang epoch = max_epochs). Epoch của
+  `last.ckpt` đọc từ tên file top-k (`epoch=E-…ckpt`, E lớn nhất) — dry-run không gọi Python;
+  `last.ckpt` chỉ được ghi cùng một bản top-k nên đó là bản mới nhất.
+- Chạy lại cùng lệnh: đủ tổng → skip; run mới bị cắt → nhánh "train tiếp" (ckpt_path) như mọi run;
+  run cũ là UNDERTRAINED cũng train tiếp được (parseq_ft 2 epoch).
+- `pipeline_train.env` của run mới: `max_epochs`, `batch_size`, `continue_from` (tương đối
+  `$DATA_ROOT/runs`, để chép run giữa hai máy), `init_epoch`, `epoch_offset`, `init_ckpt`.
+- Đổi `--batch-size` khi train tiếp được: lịch LR mới, và parseq nhân LR theo `batch_size/256`.
+- `--continue` + `--retrain` → thoát 2; model chưa có run nào → skip, không âm thầm train từ đầu.
+
+Test: golden `testcase60..69` (dry-run); phần chạy thật kiểm tay bằng Python giả (override, file
+env) và smoke 2 batch thật cho cả `crnn_ft` lẫn `crnn` (factory) với `init_from` = checkpoint thật.
+
+### 16.13 Đường dẫn có dấu cách trong override Hydra
+
+Máy C (07/11) để repo ở `/media/…/GenAI 2025/đồ án chuyên ngành 1`. Override
+`hydra.run.dir=/media/…/GenAI 2025/…` vỡ grammar của Hydra (`OverrideParseException`), dù bash đã
+truyền nguyên một đối số: Hydra tự tách theo dấu cách bên trong giá trị.
+
+- `09_full_pipeline_cpu.sh` bọc ngoặc kép mọi đường dẫn nó đưa vào override: `hydra.run.dir`,
+  `ckpt_path`, `model.init_from`, `+model.init_from`. Hydra tự bỏ lớp ngoặc khi đọc giá trị (kiểm
+  bằng `OverridesParser`).
+- `05_train.sh` dùng chính các giá trị đó cho việc của bash (kiểm thư mục LMDB, in `checkpoint ->`),
+  nên bỏ một lớp `"…"`/`'…'` trước (hàm `unquote`). Không bỏ thì `-d "\"…/lmdb\"/train"` sai và báo
+  thiếu LMDB oan.
+- Lệnh gửi sang `train.py` giữ nguyên ngoặc.
+
+Test: golden `testcase71..75` (`train_sh`: ngoặc kép, ngoặc đơn, `+data.root_dir`, thư mục thiếu,
+`hydra.run.dir`/`ckpt_path` có dấu cách). Phía `09` chưa có golden cho lệnh train thật (kind `plan`
+chỉ in kế hoạch): bằng chứng là log máy C chạy được với đường dẫn bọc ngoặc, cộng phép thử
+`OverridesParser`.

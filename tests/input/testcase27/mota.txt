@@ -1,0 +1,14 @@
+testcase27 — Không có checkpoint nào: thoát 1
+=============================================
+
+MỤC ĐÍCH
+    Không có model nào thì eval phải báo lỗi rõ, không lập báo cáo rỗng.
+
+ĐẦU VÀO
+    Không có run nào.
+
+KỲ VỌNG
+    Không gọi Python; thoát 1, stderr có 'không tìm thấy checkpoint'.
+
+VÌ SAO QUAN TRỌNG
+    Nếu cả đêm train lỗi, sáng ra phải thấy lỗi chứ không phải final_summary.md trống trơn.

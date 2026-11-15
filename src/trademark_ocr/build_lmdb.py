@@ -6,6 +6,9 @@
 - khoá ``image-{idx:09d}``     : bytes ảnh (PNG) — parseq mở lại bằng ``PIL``.
 - khoá ``label-{idx:09d}``     : chuỗi nhãn **UTF-8** (ta lưu NFC; config sẽ đặt
   ``data.normalize_unicode: false`` để không mất dấu).
+- khoá ``meta-{idx:09d}``      : JSON ``{"serial_number", "drawing_kind"}`` (chỉ trường có
+  giá trị) — **của đồ án**, parseq không đọc; ``evaluate`` dùng để truy ngược mẫu về
+  serial/ảnh gốc và tách kết quả theo ``drawing_kind``. Đọc bằng :func:`read_meta`.
 - ``idx`` bắt đầu từ **1**.
 
 Vị trí (khớp ``strhub/data/module.py::SceneTextDataModule``)
@@ -23,16 +26,15 @@ from __future__ import annotations
 
 import argparse
 import csv
-import os
+import json
 import sys
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
 import lmdb
 
-DEFAULT_DATA_ROOT: str = os.environ.get(
-    "DATA_ROOT", "/media/zaibachkhoa/AC84-F995/trademark_data"
-)
+from trademark_ocr import DEFAULT_DATA_ROOT
+
 
 #: subset -> hàm tạo đường dẫn (root, name)
 def lmdb_path(data_root: Path | str, subset: str, name: str = "trademark") -> Path:
@@ -44,6 +46,16 @@ def lmdb_path(data_root: Path | str, subset: str, name: str = "trademark") -> Pa
     if subset.startswith("test"):
         return root / "test" / subset
     raise ValueError(f"subset không hợp lệ: {subset!r}")
+
+
+#: cột của split CSV được chép vào khoá ``meta-*`` (xem docstring module)
+META_FIELDS: tuple[str, ...] = ("serial_number", "drawing_kind")
+
+
+def read_meta(txn: Any, idx: int) -> dict[str, str]:
+    """Đọc khoá ``meta-{idx}``; ``{}`` khi LMDB build trước nhánh 16 (chưa có khoá này)."""
+    raw = txn.get(f"meta-{idx:09d}".encode())
+    return json.loads(raw.decode("utf-8")) if raw else {}
 
 
 def split_csv_path(data_root: Path | str, subset: str) -> Path:
@@ -76,21 +88,39 @@ def create_lmdb(
         map_size = max(1 << 30, int(total * 1.3) + (1 << 20))
     env = lmdb.open(str(out_dir), map_size=map_size, subdir=True, readonly=False)
     written = 0
-    with env.begin(write=True) as txn:
-        for i, row in enumerate(rows, start=1):
+    # NOTICE:
+    # Transaction được quản lý tay, không dùng `with env.begin(write=True) as txn`.
+    # Commit theo lô phải mở transaction mới, nhưng `with` chỉ gọi __exit__ của transaction
+    # ban đầu → lô cuối + `num-samples` không được commit, LMDB ≥ commit_every mẫu đọc ra 0
+    # (REVIEW.md §4.1, tests/test_lmdb.py::test_create_lmdb_commits_tail_after_intermediate_commit).
+    #
+    # `num-samples` được ghi trong lô CUỐI: nếu dừng giữa chừng, các lô trước đã commit nhưng
+    # không có `num-samples` → parseq báo lỗi ngay thay vì đọc một tập thiếu mẫu.
+    txn = env.begin(write=True)
+    try:
+        for row in rows:
             img = _resolve_image(row["image_path"], Path(data_root))
             if not img.exists():
                 continue
             idx = written + 1
             txn.put(f"image-{idx:09d}".encode(), img.read_bytes())
             txn.put(f"label-{idx:09d}".encode(), row["word_mark"].encode("utf-8"))
+            meta = {k: row[k] for k in META_FIELDS if row.get(k)}
+            if meta:
+                txn.put(f"meta-{idx:09d}".encode(),
+                        json.dumps(meta, ensure_ascii=False).encode("utf-8"))
             written += 1
             if commit_every and written % commit_every == 0:
                 txn.commit()
                 txn = env.begin(write=True)
         txn.put("num-samples".encode(), str(written).encode())
-    env.sync()
-    env.close()
+        txn.commit()
+    except BaseException:
+        txn.abort()
+        raise
+    finally:
+        env.sync()
+        env.close()
     return {"out": str(out_dir), "num_samples": written,
             "skipped": len(rows) - written, "map_size": map_size}
 

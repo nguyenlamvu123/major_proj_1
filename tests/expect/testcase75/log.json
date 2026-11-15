@@ -1,0 +1,5 @@
+[
+  "[05_train] model=crnn_ft config=tm_crnn_ft overrides: trainer.max_epochs=20 +data.root_dir=\"<WORK>/thư mục có dấu cách/lmdb\"",
+  "[05_train] PYTHON=<PYTHON>  DATA_ROOT=<DATA_ROOT>  LMDB=<WORK>/thư mục có dấu cách/lmdb",
+  "[05_train] checkpoint -> <DATA_ROOT>/runs/crnn_ft/<timestamp>/"
+]

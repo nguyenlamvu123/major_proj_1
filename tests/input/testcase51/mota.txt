@@ -1,0 +1,14 @@
+testcase51 — Run 3 epoch: gom loss train theo epoch, epoch đánh số từ 1
+=======================================================================
+
+MỤC ĐÍCH
+    Đọc log TensorBoard của một run bình thường và ra bảng theo epoch.
+
+ĐẦU VÀO
+    crnn_ft, 3 epoch × 4 bước; loss mỗi bước; val_loss/val_accuracy/val_NED ở bước cuối mỗi epoch; DONE.
+
+KỲ VỌNG
+    loss train = trung bình 4 bước (4,5 / 1,75 / 1,0); epoch 1..3; tốt nhất epoch 3 = 60%; kết luận 'chua_thay' vì val_loss giảm tới epoch cuối.
+
+VÌ SAO QUAN TRỌNG
+    Đây là số liệu đi vào báo cáo: gom sai bước/epoch là đồ thị sai mà không ai thấy.

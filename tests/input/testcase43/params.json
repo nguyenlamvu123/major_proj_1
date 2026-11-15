@@ -1,0 +1,10 @@
+{
+  "kind": "metrics",
+  "desc": "Đoán dài hơn nhãn (CER > 1): char_accuracy = 0, không âm",
+  "preds": [
+    "ABCDEFGHIJ"
+  ],
+  "gts": [
+    "AB"
+  ]
+}

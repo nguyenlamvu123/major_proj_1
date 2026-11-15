@@ -37,6 +37,8 @@ checkpoints/
 # ---- Logs / reports generated ----
 reports/*.csv
 reports/*.json
+# 06_eval.sh chuyển bộ báo cáo cũ vào đây mỗi lần eval
+reports/archive/
 !reports/.gitkeep
 *.log
 
@@ -44,3 +46,6 @@ reports/*.json
 .DS_Store
 .idea/
 .vscode/
+
+# bộ test golden-file: actual/ sinh ra mỗi lần chạy
+tests/actual/

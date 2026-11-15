@@ -1,0 +1,83 @@
+{
+  "models": {
+    "crnn_ft": {
+      "run": "crnn_ft/2026-11-06_08-00-00",
+      "status": "DONE",
+      "segments": [
+        {
+          "run": "crnn_ft/2026-11-06_08-00-00",
+          "first_epoch": 1,
+          "last_epoch": 6,
+          "continued_from": null
+        }
+      ],
+      "epochs": [
+        {
+          "epoch": 1,
+          "run": "crnn_ft/2026-11-06_08-00-00",
+          "train_loss": 1.5,
+          "val_loss": 1.0,
+          "val_accuracy": 40.0,
+          "val_NED": 80.0,
+          "swa": false
+        },
+        {
+          "epoch": 2,
+          "run": "crnn_ft/2026-11-06_08-00-00",
+          "train_loss": 1.0,
+          "val_loss": 0.7,
+          "val_accuracy": 55.0,
+          "val_NED": 80.0,
+          "swa": false
+        },
+        {
+          "epoch": 3,
+          "run": "crnn_ft/2026-11-06_08-00-00",
+          "train_loss": 0.8,
+          "val_loss": 0.6,
+          "val_accuracy": 60.0,
+          "val_NED": 80.0,
+          "swa": false
+        },
+        {
+          "epoch": 4,
+          "run": "crnn_ft/2026-11-06_08-00-00",
+          "train_loss": 0.6,
+          "val_loss": 0.605,
+          "val_accuracy": 61.0,
+          "val_NED": 80.0,
+          "swa": false
+        },
+        {
+          "epoch": 5,
+          "run": "crnn_ft/2026-11-06_08-00-00",
+          "train_loss": 0.5,
+          "val_loss": 0.61,
+          "val_accuracy": 61.0,
+          "val_NED": 80.0,
+          "swa": false
+        },
+        {
+          "epoch": 6,
+          "run": "crnn_ft/2026-11-06_08-00-00",
+          "train_loss": 0.4,
+          "val_loss": 0.612,
+          "val_accuracy": 61.0,
+          "val_NED": 80.0,
+          "swa": false
+        }
+      ],
+      "best": {
+        "epoch": 4,
+        "val_accuracy": 61.0
+      },
+      "overfit": {
+        "verdict": "di_ngang",
+        "best_val_loss_epoch": 3,
+        "text": "val_loss thấp nhất ở epoch 3 (0,6000), 3 epoch sau đó đi ngang (epoch cuối 0,6120, +2%) — gần bão hoà, chưa rõ overfit"
+      },
+      "figure": "train_curves_crnn_ft.png"
+    }
+  },
+  "skipped": {}
+}

@@ -1,0 +1,60 @@
+{
+  "kind": "plan",
+  "desc": "--max-hours 3: chọn epoch theo đo tốc độ; train tiếp thì cộng thêm ngân sách",
+  "args": [
+    "--accelerator",
+    "cpu",
+    "--max-hours",
+    "3"
+  ],
+  "state": {
+    "stamps": {
+      "us_meta": [
+        "rows=60000",
+        600
+      ],
+      "us_images": [
+        "-",
+        500
+      ],
+      "clean": [
+        "-",
+        400
+      ],
+      "split": [
+        "seed=1111",
+        300
+      ],
+      "lmdb": [
+        "-",
+        200
+      ],
+      "vn": [
+        "limit=2000",
+        150
+      ],
+      "vn_lmdb": [
+        "split=unverified",
+        100
+      ]
+    },
+    "venv": {
+      "python": true,
+      "stamp": [
+        "accelerator=cpu",
+        0
+      ]
+    },
+    "runs": [
+      {
+        "model": "parseq_ft",
+        "ts": "2026-11-04_23-00-00",
+        "ckpt_age": 30,
+        "env": {
+          "max_epochs": 6,
+          "batch_size": 64
+        }
+      }
+    ]
+  }
+}

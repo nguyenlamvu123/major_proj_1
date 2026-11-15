@@ -1,0 +1,551 @@
+{
+  "models": {
+    "crnn_ft": {
+      "run": "crnn_ft/2026-11-07_20-44-52",
+      "status": "DONE",
+      "segments": [
+        {
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "first_epoch": 1,
+          "last_epoch": 20,
+          "continued_from": null
+        }
+      ],
+      "epochs": [
+        {
+          "epoch": 1,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 9.5351,
+          "val_loss": 3.384,
+          "val_accuracy": 0.0,
+          "val_NED": 0.0,
+          "swa": false
+        },
+        {
+          "epoch": 2,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 2.9972,
+          "val_loss": 1.7728,
+          "val_accuracy": 0.4568,
+          "val_NED": 42.3385,
+          "swa": false
+        },
+        {
+          "epoch": 3,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 1.23,
+          "val_loss": 0.7039,
+          "val_accuracy": 55.4462,
+          "val_NED": 84.0123,
+          "swa": false
+        },
+        {
+          "epoch": 4,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.8218,
+          "val_loss": 0.5779,
+          "val_accuracy": 63.2818,
+          "val_NED": 86.2473,
+          "swa": false
+        },
+        {
+          "epoch": 5,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.7191,
+          "val_loss": 0.5244,
+          "val_accuracy": 66.2684,
+          "val_NED": 87.2928,
+          "swa": false
+        },
+        {
+          "epoch": 6,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.6644,
+          "val_loss": 0.4916,
+          "val_accuracy": 68.6578,
+          "val_NED": 87.8131,
+          "swa": false
+        },
+        {
+          "epoch": 7,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.629,
+          "val_loss": 0.469,
+          "val_accuracy": 70.3795,
+          "val_NED": 88.3935,
+          "swa": false
+        },
+        {
+          "epoch": 8,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.6042,
+          "val_loss": 0.4542,
+          "val_accuracy": 71.0119,
+          "val_NED": 88.6624,
+          "swa": false
+        },
+        {
+          "epoch": 9,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.5845,
+          "val_loss": 0.4448,
+          "val_accuracy": 71.8552,
+          "val_NED": 88.9323,
+          "swa": false
+        },
+        {
+          "epoch": 10,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.5689,
+          "val_loss": 0.4352,
+          "val_accuracy": 72.7688,
+          "val_NED": 89.2114,
+          "swa": false
+        },
+        {
+          "epoch": 11,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.5596,
+          "val_loss": 0.4276,
+          "val_accuracy": 73.085,
+          "val_NED": 89.3837,
+          "swa": false
+        },
+        {
+          "epoch": 12,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.5476,
+          "val_loss": 0.4238,
+          "val_accuracy": 73.2256,
+          "val_NED": 89.3635,
+          "swa": false
+        },
+        {
+          "epoch": 13,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.5391,
+          "val_loss": 0.4197,
+          "val_accuracy": 73.8229,
+          "val_NED": 89.5898,
+          "swa": false
+        },
+        {
+          "epoch": 14,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.5359,
+          "val_loss": 0.4164,
+          "val_accuracy": 74.2094,
+          "val_NED": 89.6844,
+          "swa": false
+        },
+        {
+          "epoch": 15,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.5324,
+          "val_loss": 0.4144,
+          "val_accuracy": 74.35,
+          "val_NED": 89.7347,
+          "swa": false
+        },
+        {
+          "epoch": 16,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.5386,
+          "val_loss": 0.4119,
+          "val_accuracy": 74.4905,
+          "val_NED": 89.6689,
+          "swa": false
+        },
+        {
+          "epoch": 17,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.5334,
+          "val_loss": 0.4075,
+          "val_accuracy": 74.4554,
+          "val_NED": 89.7936,
+          "swa": false
+        },
+        {
+          "epoch": 18,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.5241,
+          "val_loss": 0.4034,
+          "val_accuracy": 75.3338,
+          "val_NED": 89.8566,
+          "swa": false
+        },
+        {
+          "epoch": 19,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.5076,
+          "val_loss": 0.395,
+          "val_accuracy": 75.8257,
+          "val_NED": 90.008,
+          "swa": false
+        },
+        {
+          "epoch": 20,
+          "run": "crnn_ft/2026-11-07_20-44-52",
+          "train_loss": 0.5012,
+          "val_loss": 0.3896,
+          "val_accuracy": 76.3528,
+          "val_NED": 90.2712,
+          "swa": false
+        }
+      ],
+      "best": {
+        "epoch": 20,
+        "val_accuracy": 76.3528
+      },
+      "overfit": {
+        "verdict": "chua_thay",
+        "best_val_loss_epoch": 20,
+        "text": "chưa thấy overfit: val_loss vẫn giảm tới epoch 20 (0,3896); model còn học thêm được"
+      },
+      "figure": "train_curves_crnn_ft.png"
+    },
+    "parseq_ft": {
+      "run": "parseq_ft/2026-11-05_20-59-08",
+      "status": "DONE",
+      "segments": [
+        {
+          "run": "parseq_ft/2026-11-05_20-59-08",
+          "first_epoch": 1,
+          "last_epoch": 7,
+          "continued_from": null
+        }
+      ],
+      "epochs": [
+        {
+          "epoch": 1,
+          "run": "parseq_ft/2026-11-05_20-59-08",
+          "train_loss": 2.1533,
+          "val_loss": 0.5365,
+          "val_accuracy": 84.2586,
+          "val_NED": 94.4721,
+          "swa": false
+        },
+        {
+          "epoch": 2,
+          "run": "parseq_ft/2026-11-05_20-59-08",
+          "train_loss": 0.3033,
+          "val_loss": 0.4813,
+          "val_accuracy": 87.8074,
+          "val_NED": 95.6004,
+          "swa": false
+        },
+        {
+          "epoch": 3,
+          "run": "parseq_ft/2026-11-05_20-59-08",
+          "train_loss": 0.2492,
+          "val_loss": 0.4797,
+          "val_accuracy": 88.6507,
+          "val_NED": 95.9731,
+          "swa": false
+        },
+        {
+          "epoch": 4,
+          "run": "parseq_ft/2026-11-05_20-59-08",
+          "train_loss": 0.2224,
+          "val_loss": 0.4792,
+          "val_accuracy": 89.3886,
+          "val_NED": 96.178,
+          "swa": false
+        },
+        {
+          "epoch": 5,
+          "run": "parseq_ft/2026-11-05_20-59-08",
+          "train_loss": 0.2041,
+          "val_loss": 0.4791,
+          "val_accuracy": 89.494,
+          "val_NED": 96.2756,
+          "swa": false
+        },
+        {
+          "epoch": 6,
+          "run": "parseq_ft/2026-11-05_20-59-08",
+          "train_loss": 0.1963,
+          "val_loss": 0.4927,
+          "val_accuracy": 89.4589,
+          "val_NED": 96.2291,
+          "swa": false
+        },
+        {
+          "epoch": 7,
+          "run": "parseq_ft/2026-11-05_20-59-08",
+          "train_loss": 0.1883,
+          "val_loss": 0.4969,
+          "val_accuracy": 89.1427,
+          "val_NED": 96.2335,
+          "swa": false
+        }
+      ],
+      "best": {
+        "epoch": 5,
+        "val_accuracy": 89.494
+      },
+      "overfit": {
+        "verdict": "di_ngang",
+        "best_val_loss_epoch": 5,
+        "text": "val_loss thấp nhất ở epoch 5 (0,4791), 2 epoch sau đó đi ngang (epoch cuối 0,4969, +4%) — gần bão hoà, chưa rõ overfit"
+      },
+      "figure": "train_curves_parseq_ft.png"
+    },
+    "svtrctc": {
+      "run": "svtrctc/2026-11-06_04-21-57",
+      "status": "DONE",
+      "segments": [
+        {
+          "run": "svtrctc/2026-11-06_04-21-57",
+          "first_epoch": 1,
+          "last_epoch": 10,
+          "continued_from": null
+        }
+      ],
+      "epochs": [
+        {
+          "epoch": 1,
+          "run": "svtrctc/2026-11-06_04-21-57",
+          "train_loss": 6.196,
+          "val_loss": 3.4441,
+          "val_accuracy": 0.0,
+          "val_NED": 0.0,
+          "swa": false
+        },
+        {
+          "epoch": 2,
+          "run": "svtrctc/2026-11-06_04-21-57",
+          "train_loss": 3.3263,
+          "val_loss": 2.4724,
+          "val_accuracy": 0.7379,
+          "val_NED": 36.3448,
+          "swa": false
+        },
+        {
+          "epoch": 3,
+          "run": "svtrctc/2026-11-06_04-21-57",
+          "train_loss": 2.0051,
+          "val_loss": 0.8851,
+          "val_accuracy": 50.4568,
+          "val_NED": 78.4455,
+          "swa": false
+        },
+        {
+          "epoch": 4,
+          "run": "svtrctc/2026-11-06_04-21-57",
+          "train_loss": 1.309,
+          "val_loss": 0.7054,
+          "val_accuracy": 61.3844,
+          "val_NED": 82.2532,
+          "swa": false
+        },
+        {
+          "epoch": 5,
+          "run": "svtrctc/2026-11-06_04-21-57",
+          "train_loss": 1.1181,
+          "val_loss": 0.6392,
+          "val_accuracy": 64.863,
+          "val_NED": 83.768,
+          "swa": false
+        },
+        {
+          "epoch": 6,
+          "run": "svtrctc/2026-11-06_04-21-57",
+          "train_loss": 0.9806,
+          "val_loss": 0.5984,
+          "val_accuracy": 68.1307,
+          "val_NED": 84.3154,
+          "swa": false
+        },
+        {
+          "epoch": 7,
+          "run": "svtrctc/2026-11-06_04-21-57",
+          "train_loss": 0.8959,
+          "val_loss": 0.5807,
+          "val_accuracy": 69.22,
+          "val_NED": 84.928,
+          "swa": false
+        },
+        {
+          "epoch": 8,
+          "run": "svtrctc/2026-11-06_04-21-57",
+          "train_loss": 0.8486,
+          "val_loss": 0.5627,
+          "val_accuracy": 69.747,
+          "val_NED": 85.0983,
+          "swa": false
+        },
+        {
+          "epoch": 9,
+          "run": "svtrctc/2026-11-06_04-21-57",
+          "train_loss": 0.8139,
+          "val_loss": 0.5439,
+          "val_accuracy": 71.0822,
+          "val_NED": 86.0845,
+          "swa": false
+        },
+        {
+          "epoch": 10,
+          "run": "svtrctc/2026-11-06_04-21-57",
+          "train_loss": 0.791,
+          "val_loss": 0.5325,
+          "val_accuracy": 71.8201,
+          "val_NED": 85.9256,
+          "swa": false
+        },
+        {
+          "epoch": 10,
+          "run": "svtrctc/2026-11-06_04-21-57",
+          "train_loss": null,
+          "val_loss": 0.5611,
+          "val_accuracy": 70.52,
+          "val_NED": 85.3602,
+          "swa": true
+        }
+      ],
+      "best": {
+        "epoch": 10,
+        "val_accuracy": 71.8201
+      },
+      "overfit": {
+        "verdict": "chua_thay",
+        "best_val_loss_epoch": 10,
+        "text": "chưa thấy overfit: val_loss vẫn giảm tới epoch 10 (0,5325); model còn học thêm được"
+      },
+      "figure": "train_curves_svtrctc.png"
+    },
+    "trba_ft": {
+      "run": "trba_ft/2026-11-05_08-28-47",
+      "status": "DONE",
+      "segments": [
+        {
+          "run": "trba_ft/2026-11-05_08-28-47",
+          "first_epoch": 9,
+          "last_epoch": 20,
+          "continued_from": null
+        }
+      ],
+      "epochs": [
+        {
+          "epoch": 9,
+          "run": "trba_ft/2026-11-05_08-28-47",
+          "train_loss": 0.3649,
+          "val_loss": 0.4863,
+          "val_accuracy": 84.7505,
+          "val_NED": 93.6201,
+          "swa": false
+        },
+        {
+          "epoch": 10,
+          "run": "trba_ft/2026-11-05_08-28-47",
+          "train_loss": 0.3529,
+          "val_loss": 0.527,
+          "val_accuracy": 84.6803,
+          "val_NED": 93.6377,
+          "swa": false
+        },
+        {
+          "epoch": 11,
+          "run": "trba_ft/2026-11-05_08-28-47",
+          "train_loss": 0.343,
+          "val_loss": 0.475,
+          "val_accuracy": 85.137,
+          "val_NED": 93.6145,
+          "swa": false
+        },
+        {
+          "epoch": 12,
+          "run": "trba_ft/2026-11-05_08-28-47",
+          "train_loss": 0.3284,
+          "val_loss": 0.4677,
+          "val_accuracy": 85.8398,
+          "val_NED": 93.8781,
+          "swa": false
+        },
+        {
+          "epoch": 13,
+          "run": "trba_ft/2026-11-05_08-28-47",
+          "train_loss": 0.32,
+          "val_loss": 0.493,
+          "val_accuracy": 85.5938,
+          "val_NED": 93.7754,
+          "swa": false
+        },
+        {
+          "epoch": 14,
+          "run": "trba_ft/2026-11-05_08-28-47",
+          "train_loss": 0.3125,
+          "val_loss": 0.5033,
+          "val_accuracy": 85.8749,
+          "val_NED": 93.9993,
+          "swa": false
+        },
+        {
+          "epoch": 15,
+          "run": "trba_ft/2026-11-05_08-28-47",
+          "train_loss": 0.3058,
+          "val_loss": 0.5045,
+          "val_accuracy": 86.0506,
+          "val_NED": 94.0209,
+          "swa": false
+        },
+        {
+          "epoch": 16,
+          "run": "trba_ft/2026-11-05_08-28-47",
+          "train_loss": 0.3036,
+          "val_loss": 0.4775,
+          "val_accuracy": 86.1911,
+          "val_NED": 94.0558,
+          "swa": false
+        },
+        {
+          "epoch": 17,
+          "run": "trba_ft/2026-11-05_08-28-47",
+          "train_loss": 0.3,
+          "val_loss": 0.4756,
+          "val_accuracy": 86.2966,
+          "val_NED": 93.9632,
+          "swa": false
+        },
+        {
+          "epoch": 18,
+          "run": "trba_ft/2026-11-05_08-28-47",
+          "train_loss": 0.2995,
+          "val_loss": 0.4842,
+          "val_accuracy": 86.2614,
+          "val_NED": 94.0313,
+          "swa": false
+        },
+        {
+          "epoch": 19,
+          "run": "trba_ft/2026-11-05_08-28-47",
+          "train_loss": 0.2952,
+          "val_loss": 0.473,
+          "val_accuracy": 86.7182,
+          "val_NED": 93.9936,
+          "swa": false
+        },
+        {
+          "epoch": 20,
+          "run": "trba_ft/2026-11-05_08-28-47",
+          "train_loss": 0.2938,
+          "val_loss": 0.4639,
+          "val_accuracy": 86.4722,
+          "val_NED": 93.88,
+          "swa": false
+        }
+      ],
+      "best": {
+        "epoch": 19,
+        "val_accuracy": 86.7182
+      },
+      "overfit": {
+        "verdict": "chua_thay",
+        "best_val_loss_epoch": 20,
+        "text": "chưa thấy overfit: val_loss vẫn giảm tới epoch 20 (0,4639); model còn học thêm được"
+      },
+      "figure": "train_curves_trba_ft.png"
+    }
+  },
+  "skipped": {}
+}

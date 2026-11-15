@@ -1,0 +1,9 @@
+{
+  "kind": "verdict",
+  "desc": "parseq_ft 04/11: hai checkpoint 0% -> undertrained",
+  "ckpts": [
+    "epoch=0-step=801-val_accuracy=0.0000-val_NED=4.1513.ckpt",
+    "epoch=1-step=1602-val_accuracy=0.0000-val_NED=7.0307.ckpt",
+    "last.ckpt"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "kind": "curves",
+  "desc": "UNDERTRAINED 2 epoch, 0%: 'chua_du', không có 'tốt nhất'",
+  "runs": [
+    {
+      "model": "parseq_ft",
+      "ts": "2026-11-05_00-27-27",
+      "max_epochs": 2,
+      "files": {
+        "UNDERTRAINED": "val_accuracy tốt nhất 0.0% sau 2 epoch\n"
+      },
+      "events": [
+        {
+          "name": "events.out.tfevents.1000.h.1.0",
+          "steps_per_epoch": 2,
+          "epochs": [
+            {
+              "e": 0,
+              "loss": [
+                5.4,
+                4.6
+              ],
+              "val": [
+                3.84,
+                0.0,
+                4.15
+              ]
+            },
+            {
+              "e": 1,
+              "loss": [
+                3.6,
+                3.4
+              ],
+              "val": [
+                3.26,
+                0.0,
+                7.03
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

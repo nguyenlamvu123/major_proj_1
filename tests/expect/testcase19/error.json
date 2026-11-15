@@ -1,0 +1,4 @@
+{
+  "code": 2,
+  "stderr_contains": "--from và --only không dùng cùng nhau"
+}

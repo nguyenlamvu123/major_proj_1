@@ -1,0 +1,12 @@
+[
+  "[plan] setup            | skip   | không chọn",
+  "[plan] us_meta          | skip   | không chọn",
+  "[plan] us_images        | skip   | không chọn",
+  "[plan] clean            | skip   | không chọn",
+  "[plan] split            | skip   | không chọn",
+  "[plan] lmdb             | skip   | không chọn",
+  "[plan] vn               | skip   | không chọn",
+  "[plan] vn_lmdb          | skip   | không chọn",
+  "[plan] train:crnn_ft    | skip   | chưa có run nào có checkpoint để train tiếp — bỏ --continue để train từ đầu",
+  "[plan] eval             | run    | 06_eval.sh --device cpu (mọi model có checkpoint) + báo cáo"
+]

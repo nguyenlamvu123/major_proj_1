@@ -1,0 +1,11 @@
+{
+  "kind": "plan",
+  "desc": "--from train: bỏ qua mọi bước trước train",
+  "args": [
+    "--accelerator",
+    "cpu",
+    "--from",
+    "train"
+  ],
+  "state": {}
+}

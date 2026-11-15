@@ -1,0 +1,14 @@
+testcase31 — parseq_ft 04/11: hai checkpoint 0% -> undertrained
+===============================================================
+
+MỤC ĐÍCH
+    Tái hiện đúng thư mục checkpoints của parseq_ft đêm 04/11.
+
+ĐẦU VÀO
+    epoch=0 và epoch=1 đều val_accuracy=0.0000, cộng last.ckpt.
+
+KỲ VỌNG
+    verdict 'undertrained', best_val_accuracy 0.0, n_scored_ckpt 2 (last.ckpt không tính).
+
+VÌ SAO QUAN TRỌNG
+    Đây là ca thật đã lọt vào báo cáo thành 'kết quả' 0% — pipeline phải nhận ra để không ghi DONE.

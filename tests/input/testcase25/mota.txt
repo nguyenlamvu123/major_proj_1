@@ -1,0 +1,14 @@
+testcase25 — Chỉ có LMDB test_us: bỏ test_vn, vẫn lập báo cáo
+=============================================================
+
+MỤC ĐÍCH
+    Crawl VN lỗi trong đêm không được làm hỏng bước eval/báo cáo.
+
+ĐẦU VÀO
+    crnn_ft có last.ckpt; chỉ có lmdb/test/test_us/data.mdb.
+
+KỲ VỌNG
+    evaluate chỉ gọi cho test_us; có dòng 'bỏ qua crnn_ft / test_vn'; vẫn gọi eval_domain_shift, error_analysis, report; thoát 0.
+
+VÌ SAO QUAN TRỌNG
+    Trước đây evaluate dừng (SystemExit) khi thiếu LMDB và set -e làm mất luôn báo cáo của cả đêm.

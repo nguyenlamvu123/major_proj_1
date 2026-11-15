@@ -1,0 +1,4 @@
+{
+  "code": 2,
+  "stderr_contains": "--continue (train thêm từ run cũ) và --retrain (train lại từ đầu) không dùng cùng nhau"
+}

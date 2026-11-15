@@ -1,0 +1,11 @@
+{
+  "kind": "plan",
+  "desc": "Model lạ: thoát 2",
+  "args": [
+    "--accelerator",
+    "cpu",
+    "--models",
+    "crnn,resnet"
+  ],
+  "state": {}
+}

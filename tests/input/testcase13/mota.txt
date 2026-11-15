@@ -1,0 +1,14 @@
+testcase13 — --python có sẵn: không dựng venv
+=============================================
+
+MỤC ĐÍCH
+    --python nghĩa là môi trường do người dùng tự lo: bước setup không bao giờ chạy.
+
+ĐẦU VÀO
+    DATA_ROOT trống; --python /usr/bin/python3.
+
+KỲ VỌNG
+    setup 'skip' 'dùng --python /usr/bin/python3'; các bước khác 'run'.
+
+VÌ SAO QUAN TRỌNG
+    Tránh cài đè thư viện vào Python của người dùng (vd Colab, conda).

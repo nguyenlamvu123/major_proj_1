@@ -1,0 +1,17 @@
+[
+  "data/.pipeline/clean",
+  "data/.pipeline/lmdb",
+  "data/.pipeline/split",
+  "data/.pipeline/us_images",
+  "data/.pipeline/us_meta",
+  "data/.pipeline/vn",
+  "data/.pipeline/vn_lmdb",
+  "data/runs/crnn_ft/2026-11-04_21-58-41/DONE",
+  "data/runs/crnn_ft/2026-11-04_21-58-41/checkpoints/last.ckpt",
+  "data/runs/crnn_ft/2026-11-04_21-58-41/pipeline_train.env",
+  "data/runs/parseq_ft/2026-11-05_00-27-27/UNDERTRAINED",
+  "data/runs/parseq_ft/2026-11-05_00-27-27/checkpoints/last.ckpt",
+  "data/runs/parseq_ft/2026-11-05_00-27-27/pipeline_train.env",
+  "venv/.pipeline_setup",
+  "venv/bin/python"
+]

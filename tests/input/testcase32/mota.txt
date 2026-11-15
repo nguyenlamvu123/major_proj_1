@@ -1,0 +1,14 @@
+testcase32 — crnn_ft 04/11: top-3 tới 74,07% -> ok
+==================================================
+
+MỤC ĐÍCH
+    Model học tốt không bị đánh dấu nhầm.
+
+ĐẦU VÀO
+    Ba checkpoint top-3 của crnn_ft đêm 04/11 (72,63 / 73,05 / 74,07%) + last.ckpt.
+
+KỲ VỌNG
+    verdict 'ok', best_val_accuracy 74.0689 (lấy max, không lấy file cuối theo thứ tự tên).
+
+VÌ SAO QUAN TRỌNG
+    Đánh dấu nhầm model tốt là UNDERTRAINED thì eval bỏ mất kết quả chính của đồ án.

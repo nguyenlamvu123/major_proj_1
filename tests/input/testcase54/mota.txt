@@ -1,0 +1,14 @@
+testcase54 — --continue: nối run cũ (tới epoch của checkpoint đã nạp) với run mới
+=================================================================================
+
+MỤC ĐÍCH
+    Run tạo bởi 09_full_pipeline_cpu.sh --continue phải vẽ liền với run nó nạp trọng số.
+
+ĐẦU VÀO
+    Run cũ 5 epoch + lượt SWA, last.ckpt ở epoch 3 (init_epoch=3); run mới (đang train) ghi continue_from tương đối, epoch_offset=4, 3 epoch; init_ckpt là đường dẫn máy khác.
+
+KỲ VỌNG
+    Epoch 1..4 từ run cũ (bỏ epoch 5 và điểm SWA của run cũ), epoch 5..7 từ run mới; 2 đoạn, đoạn 2 có continued_from; tốt nhất epoch 7 = 66%.
+
+VÌ SAO QUAN TRỌNG
+    Không nối thì đồ thị run mới bắt đầu lại từ epoch 1 và người đọc không thấy model đã train 4 epoch trước đó; đường dẫn tương đối để mang run giữa hai máy vẫn nối được.

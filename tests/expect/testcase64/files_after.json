@@ -1,0 +1,16 @@
+[
+  "data/.pipeline/clean",
+  "data/.pipeline/lmdb",
+  "data/.pipeline/split",
+  "data/.pipeline/us_images",
+  "data/.pipeline/us_meta",
+  "data/.pipeline/vn",
+  "data/.pipeline/vn_lmdb",
+  "data/runs/parseq_ft/2026-11-05_00-27-27/UNDERTRAINED",
+  "data/runs/parseq_ft/2026-11-05_00-27-27/checkpoints/epoch=0-step=801-val_accuracy=0.0000-val_NED=4.1513.ckpt",
+  "data/runs/parseq_ft/2026-11-05_00-27-27/checkpoints/epoch=1-step=1602-val_accuracy=0.0000-val_NED=7.0307.ckpt",
+  "data/runs/parseq_ft/2026-11-05_00-27-27/checkpoints/last.ckpt",
+  "data/runs/parseq_ft/2026-11-05_00-27-27/pipeline_train.env",
+  "venv/.pipeline_setup",
+  "venv/bin/python"
+]

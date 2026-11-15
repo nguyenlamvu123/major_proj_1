@@ -1,0 +1,19 @@
+[
+  "# Đường cong huấn luyện",
+  "",
+  "Sinh tự động bởi `python -m trademark_ocr.train_curves` từ log TensorBoard của từng run. `epoch` đánh số từ 1, tính dồn qua các lần train tiếp. Loss train tính trên ảnh đã augment nên thường cao hơn val_loss — so **xu hướng** hai đường, không so độ lớn.",
+  "",
+  "## crnn_ft",
+  "",
+  "Run `crnn_ft/2026-11-04_21-58-41` — **train xong** (`DONE`).",
+  "",
+  "![crnn_ft](train_curves_crnn_ft.png)",
+  "",
+  "| epoch | loss train | val_loss | val_accuracy (%) | val 1−NED (%) | ghi chú |",
+  "|---|---|---|---|---|---|",
+  "| 1 | 4,5000 | 2,0000 | 10,00 | 50,00 |  |",
+  "| 2 | 1,7500 | 1,0000 | 50,00 | 80,00 |  |",
+  "| 3 | 1,0000 | 0,8000 | 60,00 | 85,00 | tốt nhất |",
+  "",
+  "**Kết luận:** chưa thấy overfit: val_loss vẫn giảm tới epoch 3 (0,8000); model còn học thêm được."
+]

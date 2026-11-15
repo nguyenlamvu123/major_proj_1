@@ -1,0 +1,14 @@
+testcase47 — data.root_dir trỏ tới thư mục chưa giải nén -> thoát 1, báo đúng đường dẫn
+=======================================================================================
+
+MỤC ĐÍCH
+    Kiểm thư mục train.py SẼ đọc, không phải $DATA_ROOT/lmdb.
+
+ĐẦU VÀO
+    DATA_ROOT/lmdb đầy đủ, nhưng data.root_dir trỏ tới <WORK>/lmdb_root/lmdb chưa tồn tại (quên chạy tar).
+
+KỲ VỌNG
+    Thoát 1 trước khi gọi Python; stderr nêu <WORK>/lmdb_root/lmdb/train.
+
+VÌ SAO QUAN TRỌNG
+    Bản cũ cho qua (vì $DATA_ROOT/lmdb có) rồi train.py lỗi muộn sau khi đã tải trọng số và nạp model.

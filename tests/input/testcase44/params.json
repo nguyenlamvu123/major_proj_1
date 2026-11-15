@@ -1,0 +1,12 @@
+{
+  "kind": "metrics",
+  "desc": "Đoán bình thường: char_accuracy = 1 − CER như cũ",
+  "preds": [
+    "HELLO",
+    "WORD"
+  ],
+  "gts": [
+    "HELLO",
+    "WORLD"
+  ]
+}

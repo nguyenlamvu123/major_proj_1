@@ -1,0 +1,20 @@
+{
+  "kind": "eval_sh",
+  "desc": "Chỉ có LMDB test_us: bỏ test_vn, vẫn lập báo cáo",
+  "args": [
+    "--only",
+    "crnn_ft"
+  ],
+  "state": {
+    "runs": [
+      {
+        "model": "crnn_ft",
+        "ts": "2026-11-05_03-00-00",
+        "ckpt_age": 10
+      }
+    ],
+    "files": {
+      "lmdb/test/test_us/data.mdb": 10
+    }
+  }
+}

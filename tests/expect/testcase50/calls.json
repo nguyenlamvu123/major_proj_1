@@ -1,0 +1,3 @@
+[
+  "<REPO>/third_party/parseq/train.py --config-dir <REPO>/configs/hydra --config-name tm_parseq_ft trainer.max_epochs=8 hydra.run.dir=<DATA_ROOT>/runs/parseq_ft/2026-11-05_21-00-00 ckpt_path=<DATA_ROOT>/runs/parseq_ft/2026-11-05_21-00-00/checkpoints/last.ckpt"
+]

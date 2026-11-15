@@ -1,0 +1,16 @@
+{
+  "kind": "train_sh",
+  "desc": "+data.root_dir=\"…\" (tiền tố +) bọc ngoặc kép: cũng được nhận và bỏ ngoặc",
+  "args": [
+    "crnn_ft",
+    "--max-epochs",
+    "20",
+    "+data.root_dir=\"<WORK>/thư mục có dấu cách/lmdb\""
+  ],
+  "state": {
+    "files": {
+      "../thư mục có dấu cách/lmdb/train/trademark/data.mdb": 10,
+      "../thư mục có dấu cách/lmdb/val/data.mdb": 10
+    }
+  }
+}

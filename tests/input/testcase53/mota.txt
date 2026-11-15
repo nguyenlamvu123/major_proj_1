@@ -1,0 +1,14 @@
+testcase53 — Run bị cắt rồi train tiếp: file events sau thay nhánh đã bỏ
+========================================================================
+
+MỤC ĐÍCH
+    Pipeline train tiếp từ last.ckpt (ckpt_path=) ghi thêm một file events vào cùng thư mục run.
+
+ĐẦU VÀO
+    File 1: epoch 0..3 (epoch 3 loss 9, val 40%); file 2 (ghi sau) bắt đầu lại từ epoch 3: val 55%, rồi epoch 4.
+
+KỲ VỌNG
+    Epoch 4 (1-based) lấy số của file 2: loss train 0,65, val 55%; điểm epoch 3 cũ của file 1 bị bỏ; epoch 1..3 giữ từ file 1; trạng thái 'chưa xong'.
+
+VÌ SAO QUAN TRỌNG
+    last.ckpt có thể cũ hơn epoch cuối đã chạy nên epoch bị làm lại: gộp nguyên hai file sẽ ra hai điểm cùng epoch và trung bình loss lẫn hai nhánh.
