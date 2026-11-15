@@ -44,6 +44,7 @@ import re
 import sys
 import time
 import unicodedata
+from collections import Counter
 from pathlib import Path
 from typing import Any, Callable, Iterator
 from urllib.parse import urljoin
@@ -123,6 +124,20 @@ def usable(row: dict[str, str]) -> bool:
     return bool(row.get("word_mark")) and bool(row.get("image_url"))
 
 
+def dedupe_key(label: str) -> str:
+    """Khoá so trùng nhãn VN: bỏ mọi khoảng trắng + chữ HOA (giữ dấu).
+
+    Before:
+    - "ENGLISH 1984", "English1984"
+    - "Luân  Hồi"
+
+    After:
+    - "ENGLISH1984"
+    - "LUÂNHỒI"
+    """
+    return "".join(label.split()).upper()
+
+
 def next_url(html: str) -> str | None:
     """URL hành vi 'trang kế' trong panel kết quả (None nếu hết trang)."""
     m = _NEXT_BEH_RE.search(html) or _NEXT_HREF_RE.search(html)
@@ -157,6 +172,8 @@ class VnClient:
         self.form_id: str | None = None
         self.submit_path: str | None = None
         self.base_url: str | None = None
+        #: số hàng bị bỏ theo lý do trong lần ``iter_rows`` gần nhất (ghi vào vn_report.json)
+        self.skipped: Counter[str] = Counter()
 
     def _abs(self, rel: str) -> str:
         return rel if rel.startswith("http") else self.public + rel.lstrip("./")
@@ -205,29 +222,55 @@ class VnClient:
         return len(r.content)
 
     def iter_rows(self, limit: int, query: str = "*:*",
-                  max_pages: int = 200,
+                  max_pages: int = 200, max_empty_pages: int = 5,
+                  registered_only: bool = False, dedupe: bool = True,
                   log=lambda *_: None):
-        """Sinh các hàng *usable* (có chữ + ảnh) tới khi đủ ``limit``."""
+        """Sinh các hàng *usable* (có chữ + ảnh) tới khi đủ ``limit`` (0 = không giới hạn).
+
+        Bộ lọc theo thứ tự, lý do bỏ đếm trong ``self.skipped``: ``unusable`` (không chữ
+        hoặc không ảnh) → ``unregistered`` (chỉ khi ``registered_only``: chưa có số đăng ký,
+        tức mới là đơn) → ``duplicate_label`` (trùng :func:`dedupe_key` với hàng đã nhận).
+
+        Dừng khi: đủ ``limit``, hết trang, quá ``max_pages``, hoặc ``max_empty_pages`` trang
+        LIÊN TIẾP không có hàng mới. Một trang rỗng đơn lẻ (toàn nhãn hình) là bình thường —
+        bản cũ dừng ngay ở đó (REVIEW.md §4.7); chuỗi trang rỗng thì thường là vòng lặp phân
+        trang (server trả lại trang cũ, mọi id đã thấy).
+        """
+        self.skipped = Counter()
         panel = self.search(query)
-        seen: set[str] = set()
+        seen_ids: set[str] = set()
+        seen_labels: set[str] = set()
         got = 0
         page = 0
+        empty_streak = 0
         while panel and page < max_pages:
             page += 1
             rows = parse_rows(panel)
             new = 0
             for row in rows:
-                if not usable(row) or row["serial_number"] in seen:
+                if row["serial_number"] in seen_ids:
                     continue
-                seen.add(row["serial_number"])
+                seen_ids.add(row["serial_number"])
+                if not usable(row):
+                    self.skipped["unusable"] += 1
+                    continue
+                if registered_only and not row.get("registration_no"):
+                    self.skipped["unregistered"] += 1
+                    continue
+                key = dedupe_key(row["word_mark"])
+                if dedupe and key in seen_labels:
+                    self.skipped["duplicate_label"] += 1
+                    continue
+                seen_labels.add(key)
                 new += 1
                 yield row
                 got += 1
                 if limit and got >= limit:
                     return
             log(f"[vn] trang {page}: {len(rows)} hàng ({new} dùng được, tổng {got})")
+            empty_streak = 0 if new else empty_streak + 1
             nxt = next_url(panel)
-            if not nxt or new == 0:
+            if not nxt or empty_streak >= max_empty_pages:
                 return
             panel = self.fetch_page(nxt)
 
@@ -258,8 +301,9 @@ def write_outputs(rows: list[dict[str, str]], *, data_root: "Path",
     (root / "processed").mkdir(parents=True, exist_ok=True)
 
     marks = root / "raw" / "vn_marks.csv"
-    cols = ["serial_number", "word_mark", "n_chars", "application_no", "filing_date",
-            "publication_date", "reg_no", "applicant", "nice_class", "status",
+    # Tên cột = khoá của parse_rows (_FIELDS); DictWriter bỏ qua khoá lạ nên lệch tên là
+    # mất dữ liệu im lặng (bản cũ ghi "reg_no" → số đăng ký luôn rỗng).
+    cols = ["serial_number", "word_mark", "n_chars", *(k for k in _FIELDS if k != "word_mark"),
             "image_url", "image_path"]
     with marks.open("w", encoding="utf-8", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore")
@@ -291,7 +335,8 @@ def write_outputs(rows: list[dict[str, str]], *, data_root: "Path",
 
 def run(*, limit: int = 300, query: str = "*:*", data_root: "Path | str" = None,
         out_dir: "Path | str | None" = None, device: str = "cpu",
-        verify_only: bool = False, log=print) -> dict[str, object]:
+        verify_only: bool = False, registered_only: bool = False, dedupe: bool = True,
+        log=print) -> dict[str, object]:
     root = Path(data_root) if data_root else Path(DEFAULT_DATA_ROOT)
     images = Path(out_dir) if out_dir else root / "raw" / "images_vn"
 
@@ -305,7 +350,8 @@ def run(*, limit: int = 300, query: str = "*:*", data_root: "Path | str" = None,
 
     client = VnClient(sleep=0.15)
     rows: list[dict[str, str]] = []
-    for row in client.iter_rows(limit, query=query, log=log):
+    for row in client.iter_rows(limit, query=query, registered_only=registered_only,
+                                dedupe=dedupe, log=log):
         dest = images / f"{row['serial_number']}.jpg"
         try:
             client.download(row["image_url"], dest)
@@ -316,6 +362,11 @@ def run(*, limit: int = 300, query: str = "*:*", data_root: "Path | str" = None,
             if str(dest).startswith(str(root)) else str(dest)
         rows.append(row)
     report = write_outputs(rows, data_root=root, log=log)
+    report["skipped"] = dict(client.skipped)
+    report["registered_only"] = registered_only
+    report["n_registered"] = sum(bool(r.get("registration_no")) for r in rows)
+    (root / "raw" / "vn_report.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     report.update(verify_images(images))
     log(f"[vn] verify: {report['ok']}/{report['total']} ảnh mở được "
         f"({report['ratio']*100:.1f}%)")
@@ -331,13 +382,18 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--data-root", default=str(DEFAULT_DATA_ROOT))
     ap.add_argument("--out-dir", default=None, help="thư mục ảnh (mặc định raw/images_vn)")
     ap.add_argument("--verify", action="store_true", help="chỉ kiểm tra ảnh đã tải")
+    ap.add_argument("--registered-only", action="store_true",
+                    help="chỉ nhận nhãn hiệu ĐÃ cấp văn bằng (có số đăng ký), bỏ đơn đang xét")
+    ap.add_argument("--no-dedupe", dest="dedupe", action="store_false",
+                    help="giữ cả nhãn trùng chữ (mặc định bỏ, so bằng dedupe_key)")
     return ap
 
 
 def main(argv: "list[str] | None" = None) -> int:
     a = build_parser().parse_args(argv)
     res = run(limit=a.limit, query=a.query, data_root=a.data_root,
-              out_dir=a.out_dir, verify_only=a.verify)
+              out_dir=a.out_dir, verify_only=a.verify,
+              registered_only=a.registered_only, dedupe=a.dedupe)
     if a.verify and res.get("total") and res["ratio"] < 0.95:
         return 1
     return 0
