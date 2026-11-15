@@ -68,6 +68,9 @@ python -c "import json,os;r=json.load(open(os.environ['DATA_ROOT']+'/processed/c
 ```
 **Pass khi**: `clean_report.json` tồn tại, in ra `keep_ratio` (0<x≤1),
 report liệt kê lý do rớt (no_text / too_long / unsupported_char / missing_image).
+> Lọc theo thứ tự: no_text → too_short → too_long → unsupported_char → missing_image →
+> bad_image → duplicate_label; report luôn có đủ 7 khoá. Output `processed/clean.csv`
+> (`image_path` tương đối so với `$DATA_ROOT`).
 
 ## 05-split-build_data — split + LMDB
 

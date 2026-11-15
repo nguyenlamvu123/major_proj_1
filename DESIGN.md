@@ -446,3 +446,60 @@ Chạy lại: ``downloaded: 0 new, skipped: 200 existing``. Verify: **200/200 = 
 `download_one` (200/404/too_small/not_image/corrupt), `run()` ghi index + cập nhật meta,
 resume không tải lại, ghi nhận `missing` + cờ `--retry-missing`, `--limit`, biến thể
 `--size`, `verify` đạt/không đạt ngưỡng, index rỗng an toàn, `update_meta_status`.
+
+## Nhánh 04-clean-label — `src/trademark_ocr/clean.py`
+
+**Trách nhiệm**: chuẩn hoá nhãn + lọc mẫu không dùng được + **ghép metadata với ảnh**,
+sinh tập "sạch" cho nhánh chia split.
+
+### Đầu vào / đầu ra
+
+| | Đường dẫn |
+|---|---|
+| vào | `$DATA_ROOT/raw/meta/us_marks.csv` (nhánh 02) + `raw/images_us/index.csv` & `{serial}.png` (nhánh 03) |
+| ra | `$DATA_ROOT/processed/clean.csv` + `$DATA_ROOT/processed/clean_report.json` |
+
+`clean.csv` (7 cột): `serial_number, image_path, word_mark, n_chars, drawing_kind,
+mark_drawing_cd, publication_date`. ⚠️ `image_path` là **tương đối so với DATA_ROOT**
+(`raw/images_us/{serial}.png`) để dùng được cả local và Colab (chỉ khác gốc DATA_ROOT).
+
+### Thứ tự lọc & lý do rớt (cố định trong report)
+
+`no_text` → `too_short` → `too_long` → `unsupported_char` → `missing_image` →
+`bad_image` → `duplicate_label`. Report **luôn có đủ 7 khoá** (0 nếu không rớt) để
+ACCEPTANCE/so sánh ổn định.
+
+- `duplicate_label`: bỏ nhãn trùng (nhiều đơn cùng chữ, ví dụ "APPLE") — **giữ 1 mẫu**.
+  Có thể tắt bằng `--no-dedupe`. (Dedup theo *chuỗi nhãn*, không theo serial.)
+- `missing_image`/`bad_image`: ảnh chưa tải (ngoài `--limit` của nhánh 03) hoặc file hỏng
+  (đã kiểm bằng `probe_image` của nhánh 03).
+
+### Hàm chính
+
+| Hàm | Vai trò |
+|---|---|
+| `normalize_label(text, charset)` | NFC + gộp space; trả `(label, reason)` |
+| `clean_row(row, index, data_root, ...)` | lọc 1 dòng → `(clean_row, reason)` |
+| `clean(meta_rows, index, data_root, ...)` | lọc tất cả → `(kept, report)` |
+| `write_clean_csv(rows, path)` | ghi CSV nguyên tử |
+| `run(meta_path, index_path, out_path, report_path, data_root, ...)` | điều phối + ghi report |
+
+`report` gồm: `total, kept, keep_ratio, drop_reasons{7}, by_drawing_kind, label_len{min,max,mean}, params`.
+
+### CLI
+
+```bash
+python3 -m trademark_ocr.clean --limit 5000
+python3 -c "import json,os;r=json.load(open(os.environ['DATA_ROOT']+'/processed/clean_report.json'));print(r['keep_ratio'])"
+```
+
+### Số liệu thực đo (5000 dòng, 5000 ảnh có sẵn)
+
+`kept 4840/5000`, **`keep_ratio = 0.968`**, chỉ rớt `duplicate_label: 160` (do nhánh 02
+đã lọc sẵn các lý do text). Phân bố loại hình: `standard_character 3341`,
+`design_with_words 853`, `stylized_words 410`, `typeset_old 236`; độ dài nhãn
+min 2 / max 25 / mean 10.65.
+
+**Test** (`tests/test_clean.py`, 11 test, offline): NFC+gộp space, lần lượt từng nhánh lý
+do rớt, nhánh `missing_image`/`bad_image` (file hỏng), `require_image=False`,
+dedupe bật/tắt, `--limit`, `run()` ghi CSV+report, roundtrip `write_clean_csv`.
