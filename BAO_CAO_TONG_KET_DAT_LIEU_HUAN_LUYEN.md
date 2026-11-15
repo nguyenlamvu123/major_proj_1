@@ -1,6 +1,6 @@
 # Tổng kết: Dữ liệu train/test và quá trình huấn luyện
 
-*Tài liệu được sinh tự động từ repo tại nhánh `16-fix-review` (HEAD `077a81b`) và dữ liệu thực tế trên máy.*
+*Tài liệu tổng hợp cho nhánh `16-fix-review`, cập nhật lần cuối **15/11/2026** từ dữ liệu thực tế trong `data/` và kết quả đánh giá trong `reports/`.*
 
 ## 1. Nguồn dữ liệu (train / test)
 
@@ -10,18 +10,27 @@
 
 Dữ liệu **không có sẵn một gói tải cố định** mà được thu thập trực tiếp từ **USPTO EOG/TMOG REST API** (công khai, không cần API key) rồi tái lập bằng pipeline các nhánh `02`, `03`, `04`, `05`.
 
-| Thành phần | Link / lệnh tải |
-|---|---|
-| Mã nguồn + script tái lập dữ liệu | `https://github.com/nguyenlamvu123/major_proj_1.git` (nhánh `16-fix-review`) |
-| Notebook tải & chuẩn bị dữ liệu (Colab, CPU) | `docs/colab/01_download_data.ipynb` |
-| Metadata USPTO (text, 18 cột) | `python -m trademark_ocr.fetch_meta --limit 6000` → `$DATA_ROOT/raw/meta/us_marks.csv` |
-| Ảnh nhãn hiệu USPTO (CDN) | `python -m trademark_ocr.fetch_images` → `$DATA_ROOT/raw/images_us/` |
-| Làm sạch + chia tập + đóng gói LMDB | `python -m trademark_ocr.clean && python -m trademark_ocr.split --seed 1111 && python -m trademark_ocr.build_lmdb --subset <train|val|test_us>` |
-| API metadata | `https://tm-eog-service.uspto.gov/eog-rest-service/api/external/search/publications` |
-| API ảnh (CDN) | `https://cdn.uspto.gov/img/{serial}/{publicationDate}/original` |
-| Bản đóng gói sẵn (nếu phát hành) | **TODO: chèn link Drive/HuggingFace của gói `trademark_data`** — dữ liệu lớn nằm ngoài Git |
+> **Phạm vi mục 1.1:** số liệu **5.000 ảnh** dưới đây là **bản thử nghiệm cục bộ** từ 5.000 dòng metadata đầu (một issue), dùng để kiểm chứng pipeline. **Bản huấn luyện đầy đủ** là các LMDB ở mục 1.3 (train **51.230** mẫu); ảnh của bản đầy đủ đã **nhúng trong `data.mdb`**, không nằm trong `raw/images_us/`.
 
-> `DATA_ROOT = /media/zaibachkhoa/AC84-F995/trademark_data`. Trên Colab, dữ liệu US được tải vào ổ máy ảo `/content/trademark_data` rồi sao lưu `raw/meta/`, `raw/images_us.tar`, `processed/`, `lmdb/` lên `MyDrive/trademark_data/`.
+**Nguồn USPTO:** đây là một luồng thu thập dữ liệu (data pipeline) chuẩn để xây dựng cơ sở dữ liệu nhãn hiệu từ Cơ quan Sáng chế và Nhãn hiệu Hoa Kỳ
+
+**Lý do chọn nguồn:**
+(1) công khai, **không cần API key**;
+(2) API trả đúng trường cần và phân trang nhẹ hơn nhiều so với tải XML gazette 80–105 MB/issue;
+(3) có sẵn **nhãn chữ + mã loại hình** để lọc nhãn hiệu có chữ;
+(4) metadata và ảnh khớp nhau qua serial/ngày công bố nên tái lập được. Các nguồn thay thế (`bulkdata.uspto.gov`, `trademarks.reedtech.com`) đã ngừng hoạt động; `api.uspto.gov` yêu cầu API key.
+
+| Thành phần                                                                                                                  | Link / lệnh tải                                                                        |
+|-----------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| Mã nguồn + script tái lập dữ liệu                                                                                           | `https://github.com/nguyenlamvu123/major_proj_1.git` (nhánh `16-fix-review`)           |
+| PUBLICATIONS_ENDPOINT của API metadata, src/trademark_ocr/fetch_meta.py gửi GET requests để lấy danh sách issue gazette     | `https://tm-eog-service.uspto.gov/eog-rest-service/api/external/search/publications`   |
+| SEARCH_ENDPOINT của API metadata, src/trademark_ocr/fetch_meta.py gửi POST requests để tải bản ghi nhãn hiệu của từng issue | `https://tm-eog-service.uspto.gov/eog-rest-service/api/external/search/all`            |
+| Ảnh USPTO, src/trademark_ocr/fetch_images.py gửi GET requests tới CDN | https://cdn.uspto.gov/img/{serial_number}/{publicationDate}/{size} trong đó serial_number, publication_date lấy từ metadata (us_marks.csv)           |
+| Notebook tải & chuẩn bị dữ liệu (Colab, CPU)                                                                                | `docs/colab/01_download_data.ipynb`                                                    |
+| Metadata USPTO (text, 18 cột)                                                                                               | `python -m trademark_ocr.fetch_meta --limit 6000` → `$DATA_ROOT/raw/meta/us_marks.csv` |
+| Ảnh nhãn hiệu USPTO (CDN)                                                                                                   | `python -m trademark_ocr.fetch_images` → `$DATA_ROOT/raw/images_us/`                   |
+
+> Trên máy hiện tại, dữ liệu nằm trong `data/` của repo (tức `DATA_ROOT="$PWD/data"`); `/media/zaibachkhoa/AC84-F995/trademark_data` là nơi lưu bản thử nghiệm 5.000 ảnh ban đầu. Trên Colab, dữ liệu US được tải vào ổ máy ảo `/content/trademark_data` rồi sao lưu `raw/meta/`, `raw/images_us.tar`, `processed/`, `lmdb/` lên `MyDrive/trademark_data/`.
 
 #### Mô tả dữ liệu
 
@@ -33,7 +42,7 @@ Dữ liệu **không có sẵn một gói tải cố định** mà được thu 
     - **PARSeq**: **218** = 217 ký tự + `EOS` (head bỏ `BOS`/`PAD`).
     - **TRBA**: **220** logits = 217 ký tự + `EOS` + `BOS` + `PAD`; chỉ dự đoán ký tự + `EOS` (`PAD` bị ignore, `BOS` chỉ làm input).
 - **Metadata**: `raw/meta/us_marks.csv` — **6000 dòng**, 18 cột (chủ yếu `serial_number`, `word_mark`, `mark_drawing_cd`, `drawing_kind`, `publication_date`, `owner`, `us_class`, `image_url`…). Thống kê: `raw/meta/us_marks.csv.stats.json`.
-- **Ảnh**: `raw/images_us/{serial_number}.png` — **5002 ảnh** tải từ CDN USPTO, trung bình ~45 KB/ảnh. Sổ đăng ký ảnh: `raw/images_us/index.csv` (trạng thái `ok`/`missing`, kích thước, sha1…).
+- **Ảnh**: `raw/images_us/{serial_number}.png` — **5000 ảnh rời (bản thử nghiệm)** tải từ CDN USPTO (trung bình ~33 KB/ảnh); **1000 dòng metadata còn lại** có `image_status=pending` do lần chạy `fetch_images` chỉ xử lý 5000 dòng đầu, không phải ảnh lỗi. Sổ đăng ký ảnh: `raw/images_us/index.csv` (5000 dòng `ok`, kích thước, sha1…).
 - **Nhãn chữ**: Unicode **NFC**, giữ nguyên hoa/thường và dấu, độ dài 2–25 ký tự (mean ≈ 10.65), bảng ký tự 217 ký tự (`configs/hydra/charset/charset_vi.yaml`).
 - **Phân bố theo loại nhãn hiệu** (trong 4840 mẫu sạch): `standard_character` 3341, `design_with_words` 853, `stylized_words` 410, `typeset_old` 236.
 - **Lưu ý**: nhãn USPTO hầu như viết HOA; ảnh nhãn hiệu thường là ảnh nguyên (logo/nhiều dòng), không phải ảnh dòng chữ đã cắt.
@@ -65,7 +74,7 @@ Kết quả: **giữ 4840/5000** (`keep_ratio = 0.968`), chỉ rớt **160 `dupl
 | Thành phần | Vị trí (dưới `DATA_ROOT`) | Số lượng / ghi chú |
 |---|---|---|
 | Metadata thô | `raw/meta/us_marks.csv` + `.stats.json` | 6000 dòng, 18 cột |
-| Ảnh gốc | `raw/images_us/` + `index.csv` | 5002 ảnh PNG/JPG từ CDN USPTO |
+| Ảnh gốc | `raw/images_us/` + `index.csv` | 5000 ảnh PNG từ CDN USPTO (1000 metadata còn `pending`) |
 | Dữ liệu đã làm sạch | `processed/clean.csv` + `clean_report.json` | **4840** mẫu (giữ 96.8%) |
 | Chia tập | `processed/split_train.csv` (4356), `split_val.csv` (242), `split_test_us.csv` (242) | 90/5/5 theo nhóm nhãn, seed 1111, overlap = 0 |
 | EDA | `processed/eda_figures/` (`fig_*.png`) | Nhánh 06 |
@@ -74,45 +83,66 @@ Kết quả: **giữ 4840/5000** (`keep_ratio = 0.968`), chỉ rớt **160 `dupl
 
 Thu thập bằng scraper **WIPO Publish** (nhánh 11), đã được cải thiện ở nhánh `16-fix-review` (§16.5: crawl qua trang trống, dedupe, lọc `registered-only`, công cụ duyệt tay).
 
-| Thành phần | Vị trí | Ghi chú |
-|---|---|---|
-| Metadata VN | `raw/vn_marks.csv` + `raw/vn_report.json` | Kết quả crawl từ WIPO Publish. Có fix ở nhánh 16.5: sửa mismatch cột `reg_no` / `registration_no` |
-| Ảnh VN | `raw/images_vn/*.jpg` | Ảnh thumbnail từ WIPO Publish |
-| Split test VN | `processed/split_test_vn.csv` (50 dòng), `processed/test_vn.txt` | **50 mẫu** hiện tại. Sau khi chuẩn bị đủ dữ liệu, cần tăng lên ~1–2k và duyệt tay bằng `vn_review` |
+**Nguồn WIPO Publish:** cổng tra cứu nhãn hiệu công khai của **IP Vietnam** (Cục Sở hữu trí tuệ) chạy trên nền **WIPO Publish** (`https://wipopublish.ipvietnam.gov.vn/wopublish-search`). Mỗi bản ghi cung cấp nhãn chữ `rs-MK`, số đơn, ngày nộp/công bố, số đăng ký, chủ đơn, nhóm Nice, trạng thái và **ảnh thumbnail** của nhãn.
+
+**Lý do chọn nguồn:**
+(1) là nguồn **công khai, chính thống** cho nhãn hiệu Việt Nam;
+(2) có **cả nhãn chữ và ảnh** nên dùng trực tiếp làm tập test domain shift US→VN;
+(3) nhãn tiếng Việt **có dấu, phân biệt hoa/thường**, khác phân bố USPTO (hầu như viết HOA, ít dấu) → kiểm tra khả năng tổng quát của mô hình;
+(4) không cần API key/đăng ký, dù phải crawl Wicket/AJAX và chấp nhận TLS tự ký.
+
+| Thành phần | Link / lệnh tải |
+|---|---|
+| Mã nguồn + script tái lập dữ liệu VN | `https://github.com/nguyenlamvu123/major_proj_1.git` (nhánh `16-fix-review`), `src/trademark_ocr/fetch_vn.py` |
+| Notebook tải & chuẩn bị dữ liệu (Colab, CPU) | `docs/colab/01_download_data.ipynb` — mục **VN — crawl, duyệt tay, LMDB** |
+| Metadata + ảnh VN | `python -m trademark_ocr.fetch_vn --limit 50` → `$DATA_ROOT/raw/vn_marks.csv`, `raw/vn_report.json`, `raw/images_vn/<id>.jpg` (đã fix mismatch `reg_no`/`registration_no`) |
+| Split test VN | cùng lệnh trên ghi `processed/split_test_vn.csv` (**50 dòng**, mục tiêu ~1–2k) + `processed/test_vn.txt`; đóng gói LMDB: `python -m trademark_ocr.build_lmdb --subset test_vn` |
+| Duyệt tay nhãn VN | `python -m trademark_ocr.vn_review make --n 50` → `processed/review_vn.csv`, `review_vn.html`; sửa xong chạy `python -m trademark_ocr.vn_review apply` → `split_test_vn_verified.csv`, `review_vn_report.json` |
+| Endpoint khởi tạo phiên (GET) | `GET https://wipopublish.ipvietnam.gov.vn/wopublish-search/public/trademarks?query=*:*` → lấy form id, URL behavior `searchSubmitLink`, `Wicket.Ajax.baseUrl` (TLS tự ký → `verify=False`) |
+| Endpoint tìm kiếm (POST AJAX) | `POST <searchSubmitLink behavior URL>`; headers `Wicket-Ajax: true`, `Wicket-Ajax-BaseURL`, `X-Requested-With: XMLHttpRequest`; body `<fid>_hf_0=&intelligentSearchInput=&searchSubmitLink=Tra+cuu` → panel **50 hàng/trang** |
+| Phân trang (GET AJAX) | `GET <navigator-next URL>` với cùng header AJAX → tải trang kế tiếp |
+| Ảnh thumbnail (GET) | `GET https://wipopublish.ipvietnam.gov.vn/wopublish-search/service/trademarks/application/{id}/thumbnail?noLogo=true&disclaimer=Combined` → JPEG |
 
 ### 1.3 Định dạng LMDB dùng để huấn luyện/đánh giá
 
 Toàn bộ dữ liệu đưa về định dạng **LMDB** theo layout của parseq (nhánh 05). Đã sửa bug quan trọng ở nhánh `16-fix-review` (16.1): quản lý transaction thủ công, commit đúng batch cuối + ghi `num-samples` (trước đây bị lỗi khi >=1000 mẫu).
 
-| Tập | Đường dẫn LMDB | `num-samples` | Ghi chú |
-|---|---|---|---|
-| Train | `lmdb/train/trademark/` | `500` | *Lưu ý*: trên máy hiện tại chỉ có **500** mẫu trong LMDB train (trong khi `split_train.csv` có 4356 dòng). Nguyên nhân có thể do build LMDB giới hạn/test, hoặc build trước đó. Cần kiểm tra lại `build_lmdb`. |
-| Val | `lmdb/val/` | `200` | So khớp gần đúng với `split_val.csv` (243) |
-| Test US | `lmdb/test/test_us/` | `200` | Gần đúng với `split_test_us.csv` (243) |
-| Test VN | `lmdb/test/test_vn/` | `50` | Đúng với `split_test_vn.csv` (50) |
+LMDB = *Lightning Memory-Mapped Database* — cơ sở dữ liệu key-value nhúng, lưu trong 2 file `data.mdb` + `lock.mdb`, truy cập qua memory-mapping nên đọc nhanh và nhiều worker có thể đọc đồng thời.
 
-> **Quan trọng:** Để train đầy đủ với toàn bộ `train/trademark`, cần build lại LMDB từ `split_train.csv` + ảnh tương ứng theo đúng pipeline (nhánh 05). Trên máy hiện tại, thực tế đang có **train LMDB 500 mẫu**.
+Bản LMDB dùng để huấn luyện trên Colab:
+
+| Tập | Đường dẫn LMDB | `num-samples` |
+|---|---|---|
+| Train | `data/lmdb/train/trademark/` | `51230` |
+| Val | `data/lmdb/val/` | `2846` |
+| Test US | `data/lmdb/test/test_us/` | `2847` |
+| Test VN | `data/lmdb/test/test_vn/` | `2000` |
+
+> **Phân biệt bản dữ liệu:** mục 1.1–1.2 mô tả bản thử nghiệm (5.000 ảnh rời US, 50 mẫu VN); các LMDB trong bảng trên là **bản huấn luyện đầy đủ** trên Colab (56.923 mẫu US + 2.000 mẫu VN), với ảnh **nhúng trực tiếp trong `data.mdb`**.
 
 ## 2. Quá trình huấn luyện
 
 ### 2.1 Mô hình sử dụng
 
-Repo tích hợp với **[baudm/parseq](https://github.com/baudm/parseq)** (clone vào `third_party/parseq`, không fork, không sửa). Trên nhánh `16-fix-review`, đã thêm các cấu hình và hỗ trợ fine-tune:
+Repo tích hợp với **[baudm/parseq](https://github.com/baudm/parseq)** (clone vào `third_party/parseq`, không fork, không sửa). Trên nhánh `16-fix-review` có **7 cấu hình huấn luyện** trên cùng một LMDB: **4 mô hình train từ đầu** và **3 biến thể fine-tune**.
 
-| Mô hình | Config | Kiểu | Ghi chú |
-|---|---|---|---|
-| **CRNN** | `configs/hydra/tm_crnn.yaml` | CTC baseline (ResNet + BiLSTM) | Train từ đầu |
-| **TRBA** | `configs/hydra/tm_trba.yaml` | Attention-based (TPS + ResNet + BiLSTM + Attn) | Train từ đầu |
-| **PARSeq** | `configs/hydra/tm_parseq.yaml` | Transformer (Vision Encoder + Permuted Autoregressive Sequence) | Train từ đầu |
-| **SVTR-CTC** | `configs/hydra/tm_svtrctc.yaml` | SVTR (Vision Transformer cho STR) | Đã **sửa kiến trúc** ở nhánh 16.2: `merging stride (2,1)`, gộp chiều cao, positional embedding → **32 cột thời gian** thay vì 64 cột sai trước đó. **Checkpoint cũ không tương thích**, cần train lại. |
-| **CRNN-FT / TRBA-FT / PARSeq-FT** | `tm_crnn_ft.yaml`, `tm_trba_ft.yaml`, `tm_parseq_ft.yaml` | Fine-tune từ **pretrained weights tương ứng của từng kiến trúc** (`crnn` / `trba` / `parseq`, huấn luyện trên REBU-SynText/COCO-Text) | Thêm ở nhánh 16.6, khớp charset tiếng Việt (NFC, 218 class CTC/charset phù hợp). |
+| # | Cấu hình | Config (trong `configs/hydra/`) | Kiến trúc / loss | Khởi tạo | Ghi chú |
+|---|---|---|---|---|---|
+| 1 | **CRNN** | `tm_crnn.yaml` | ResNet + BiLSTM + CTC | Từ đầu | Dùng `strhub.models.crnn` của parseq |
+| 2 | **TRBA** | `tm_trba.yaml` | TPS + ResNet + BiLSTM + Attention | Từ đầu | Dùng `strhub.models.trba` của parseq |
+| 3 | **PARSeq** | `tm_parseq.yaml` | Transformer encoder-decoder (Permuted Autoregressive Sequence) | Từ đầu | Dùng `strhub.models.parseq` của parseq |
+| 4 | **SVTR-CTC** | `tm_svtrctc.yaml` | SVTR-Lite + CTC; 32 cột thời gian (sửa ở 16.2) | Từ đầu | **Tự viết** trong `src/trademark_ocr/svtr_ctc.py`; không có pretrained trong parseq; checkpoint cũ **không tương thích** |
+| 5 | **CRNN-FT** | `tm_crnn_ft.yaml` | CRNN + CTC | Pretrained `crnn` của parseq | Run riêng, `init_from: crnn` |
+| 6 | **TRBA-FT** | `tm_trba_ft.yaml` | TRBA | Pretrained `trba` của parseq | Run riêng, `init_from: trba` |
+| 7 | **PARSeq-FT** | `tm_parseq_ft.yaml` | PARSeq | Pretrained `parseq` của parseq | Run riêng, `init_from: parseq` |
 
-**Vai trò của từng thành phần trong đồ án:**
-
+**Điểm chung:** cả 7 cấu hình dùng chung `data/lmdb/train/trademark`, cùng charset 217 ký tự và cùng đầu ra `word_mark`. Trong đó:  
 - **CTC (Connectionist Temporal Classification)** — không phải một mô hình riêng mà là **hàm loss + cách giải mã** cho bài toán chuỗi: căn chuỗi đặc trưng ảnh với chuỗi nhãn mà không cần căn chỉnh từng ký tự, dùng token `blank` rồi gộp các bước lặp khi decode. Trong đồ án, CTC là **nhánh baseline/đối chứng**: **CRNN + CTC** (baseline cổ điển) và **SVTR-CTC** (Transformer + CTC, hiện đại hơn). Đầu ra 218 logits = 217 ký tự + `blank`.
 - **TRBA (TPS + ResNet + BiLSTM + Attention)** — mô hình **attention-based** đại diện cho hướng decoder tự hồi quy: TPS hiệu chỉnh biến dạng ảnh, ResNet + BiLSTM trích đặc trưng, decoder attention sinh ký tự lần lượt và dùng `EOS` để dừng. Vai trò: **so sánh trực tiếp với nhánh CTC**, train từ đầu trên cùng charset và cùng tập dữ liệu.
 - **PARSeq (Permuted Autoregressive Sequence)** — mô hình **Transformer encoder-decoder** đại diện SOTA trong 4 mô hình, dùng permutation language modeling để học ngữ cảnh hai chiều khi train. Vai trò kép: (1) **ứng viên được kỳ vọng** cho kết quả tốt nhất; (2) kho trọng số pretrained của `baudm/parseq` cung cấp bản tương ứng từng kiến trúc (`crnn`, `trba`, `parseq`) để khởi tạo `crnn_ft` / `trba_ft` / `parseq_ft` — chỉ nạp các tensor cùng tên và cùng kích thước, bỏ phần head phụ thuộc charset (DESIGN 16.6).
-- **CRNN** là baseline tối giản (CNN + BiLSTM + CTC); **SVTR-CTC** là nhánh CTC hiện đại (Vision Transformer) để kiểm chứng CTC vẫn cạnh tranh khi kiến trúc encoder tốt hơn. Cả 4 mô hình dùng **cùng đầu vào ảnh nhãn hiệu, cùng đầu ra chuỗi `word_mark`, cùng charset 217 ký tự**; khác nhau ở kiến trúc, loss và cách giải mã. Các biến thể `*_ft` không phải kiến trúc mới mà là **cùng mô hình, khởi tạo từ pretrained** để so sánh công bằng giữa "train từ đầu" và "fine-tune".
+- **CRNN** là baseline tối giản (CNN + BiLSTM + CTC); **SVTR-CTC** là nhánh CTC hiện đại (Vision Transformer) để kiểm chứng CTC vẫn cạnh tranh khi kiến trúc encoder tốt hơn. Cả 4 mô hình dùng **cùng đầu vào ảnh nhãn hiệu, cùng đầu ra chuỗi `word_mark`, cùng charset 217 ký tự**; khác nhau ở kiến trúc, loss và cách giải mã. Các biến thể `*_ft` không phải kiến trúc mới mà là **cùng mô hình, khởi tạo từ pretrained** để so sánh công bằng giữa "train từ đầu" và "fine-tune".  
+- **SVTR-CTC** là kiến trúc tự viết thêm trong `src/trademark_ocr/svtr_ctc.py`, chỉ dùng chung framework train/data của parseq.
+- Các biến thể `*_ft` **không phải kiến trúc mới** và là **run riêng**, không nối tiếp checkpoint train-from-scratch: nạp pretrained weights tương ứng (`crnn`/`trba`/`parseq` của parseq, huấn luyện trên REBU-SynText/COCO-Text), bỏ head phụ thuộc charset rồi fine-tune trên dữ liệu nhãn hiệu.
 
 **Bảng ký tự:** Tiếng Việt Unicode NFC, cấu hình tại `configs/charset/charset_vi.yaml` và `src/trademark_ocr/charset.py`. Đã đảm bảo `charset_test == charset_train` và xử lý đúng 2 bẫy parseq: `normalize_unicode: false`, `remove_whitespace: false`.
 
@@ -120,10 +150,14 @@ Repo tích hợp với **[baudm/parseq](https://github.com/baudm/parseq)** (clon
 
 Huấn luyện chạy trực tiếp `third_party/parseq/train.py` qua Hydra (`--config-dir configs/hydra --config-name ...`).
 
+Cả 7 cấu hình đọc **train LMDB** tại `data/lmdb/train/trademark` (hoặc `$DATA_ROOT/lmdb/train/trademark`); và đánh giá tại `val`/`test_us`/`test_vn`. Mỗi lần chạy chỉ khác `--config-name`.
+
 **Chuẩn bị môi trường:**
 
 ```bash
-export DATA_ROOT=/media/zaibachkhoa/AC84-F995/trademark_data
+# Bản LMDB tải trong repo: không đặt DATA_ROOT để dùng mặc định data/lmdb
+unset DATA_ROOT
+# export DATA_ROOT=/đường/dẫn/trademark_data   # chỉ khi dữ liệu nằm ngoài repo
 export PYTHONPATH=$PWD/compat:$PWD/src:$PWD/third_party/parseq
 ```
 
@@ -143,16 +177,16 @@ python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_p
 python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_svtrctc
 ```
 
-**Fine-tune từ trọng số pretrained:**
+**Fine-tune (khởi tạo từ pretrained tương ứng):**
 
 ```bash
-# PARSeq-FT
+# PARSeq-FT — init_from: parseq
 python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_parseq_ft
 
-# CRNN-FT
+# CRNN-FT — init_from: crnn
 python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_crnn_ft
 
-# TRBA-FT
+# TRBA-FT — init_from: trba
 python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_trba_ft
 ```
 
@@ -165,42 +199,81 @@ python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_c
 
 Các cờ hay dùng: `--batch-size 64` → `model.batch_size=64`; `--max-epochs 20` → `trainer.max_epochs=20`; `--num-workers 0` → `data.num_workers=0`; `--lr 7e-4` → `model.lr=7e-4`; `--devices 1` → `trainer.devices=1`.
 
-Checkpoint được lưu tại: `$DATA_ROOT/runs/<model>/<YYYY-MM-DD_HH-MM-SS>/checkpoints/last.ckpt` (kèm `config/config.yaml`).
+Checkpoint được lưu tại: `$DATA_ROOT/runs/<model>/<YYYY-MM-DD_HH-MM-SS>/checkpoints/last.ckpt` (hoặc `data/runs/...` nếu không đặt `DATA_ROOT`), kèm `config/config.yaml`. Riêng các run parseq chỉ lưu `config/hydra.yaml` + `config/overrides.yaml`; `evaluate.py` vẫn nhận đúng lớp PARSeq qua tên thư mục nên **không cần** `config.yaml`.
 
 ### 2.3 Kết quả huấn luyện hiện tại
 
-> **Lưu ý (05/11/2026):** mục 2.3 và 2.4 mô tả các checkpoint cũ ngày 16/10, train trên 500 mẫu.
-> Từ 04/11 các model được train lại trên toàn bộ 51.230 mẫu: quá trình train và đồ thị ở **mục 2.5**,
-> cách train thêm epoch ở **mục 2.6**, nhật ký từng lần chạy và số liệu test ở
-> [`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md).
+Cả 7 cấu hình ở mục 2.1 đọc chung `data/lmdb/train/trademark` (**51.230** mẫu); `val` (2.846), `test_us` (2.847) và `test_vn` (2.000) chỉ dùng để theo dõi/đánh giá, **không** đưa vào train. Trạng thái tới **15/11/2026**:
 
-Trên máy hiện đang có các checkpoint từ **các lần chạy trước** (ngày 2026-10-16):
+| # | Cấu hình | Đã train trên bản đầy đủ | Epoch | val_accuracy tốt nhất | Test US | Test VN (bỏ hoa/thường) | Ghi chú |
+|---|---|---|---|---|---|---|---|
+| 1 | **CRNN** | Chưa | — | — | — | — | Chỉ có checkpoint cũ 16/10 trên bản 500 mẫu |
+| 2 | **TRBA** | Chưa | — | — | — | — | Chỉ có checkpoint cũ 16/10 trên bản 500 mẫu |
+| 3 | **PARSeq** | Chưa | — | — | — | — | Chỉ có checkpoint cũ 16/10 trên bản 500 mẫu |
+| 4 | **SVTR-CTC** | Có | 10 | 71,82% | 69,4% | 11,4% (16,4%) | Train từ đầu; checkpoint chấm test là model sau SWA (`data/runs/svtrctc/2026-11-06_04-21-57/`) |
+| 5 | **CRNN-FT** | Có | 20 | 76,35% | 74,9% | 19,4% (28,6%) | `data/runs/crnn_ft/2026-11-07_20-44-52/`; bản 8 epoch cũ: 73,0% / 18,3% |
+| 6 | **TRBA-FT** | Có | 20 | 86,72% | 84,2% | 23,9% (36,1%) | `data/runs/trba_ft/2026-11-05_08-28-47/` |
+| 7 | **PARSeq-FT** | Có | 7 | 89,49% | 88,7% | 27,6% (41,1%) | Tốt nhất hiện tại; `data/runs/parseq_ft/2026-11-05_20-59-08/` |
 
-| Model | Thư mục run | Checkpoint | Trạng thái |
-|---|---|---|---|
-| **crnn** | `runs/crnn/2026-10-16_00-43-02/`, `runs/crnn/2026-10-16_00-51-24/` | `checkpoints/last.ckpt` | Đã có (2 phiên) |
-| **trba** | `runs/trba/2026-10-16_01-04-44/` | `checkpoints/last.ckpt` | Đã có |
-| **parseq** | `runs/parseq/2026-10-16_01-06-47/` | `checkpoints/last.ckpt` | Đã có |
-| **svtrctc** | `runs/svtrctc/2026-10-16_01-14-21/` | `checkpoints/last.ckpt` | Đã có (kiến trúc **cũ** trước khi sửa ở nhánh 16.2) |
-
-**Lưu ý quan trọng về kết quả hiện tại:**
-- Các checkpoint này được huấn luyện với phiên bản code **trước nhánh `16-fix-review`**. Sau khi sửa SVTR (16.2), **kiến trúc SVTR-CTC đã thay đổi hoàn toàn**, vì vậy checkpoint `svtrctc` cũ **không thể nạp lại** nếu dùng code nhánh 16-fix-review.
-- Do LMDB train hiện tại chỉ có **500 mẫu**, các mô hình này chỉ được huấn luyện với **quy mô rất nhỏ** (chứ không phải toàn bộ tập train).
-- Hiện tại **chưa có checkpoint fine-tune** (`crnn_ft`/`trba_ft`/`parseq_ft`) trên máy.
+**Cách đọc bảng:**
+- **Chưa train trên bản đầy đủ** nghĩa là cấu hình đã có sẵn và từng chạy trên bản thử nghiệm 500 mẫu (16/10), nhưng chưa có lần chạy nào trên 51.230 mẫu; các checkpoint 16/10 không còn trong `data/runs/` của repo.
+- `val_accuracy` là tỉ lệ đọc đúng **toàn bộ chuỗi** trên tập val 2.846 ảnh, lấy mức cao nhất trong run.
+- Cột **Test** là accuracy strict trên bộ test đầy đủ; số trong ngoặc là accuracy khi bỏ qua hoa/thường (cách đọc công bằng hơn cho nhãn VN).
+- `last.ckpt` là epoch **gần nhất lọt top-3 val**, không nhất thiết là epoch cuối hay epoch tốt nhất; chi tiết ở mục 2.5.
+- Cả bốn checkpoint đã chấm test đều nằm trong `data/runs/` của repo. `parseq_ft` và `svtrctc` được ghép ngày 15/11 từ các bản tải trên máy train; `NGUON_FILE.txt` trong mỗi thư mục run ghi rõ file nào lấy từ đâu và file nào còn thiếu.
+- Đường cong từng epoch, nhận xét overfit và lịch sử từng phiên train ở **mục 2.5** và [`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md); bảng test đầy đủ (theo loại nhãn hiệu, độ sụt US→VN) ở **mục 2.4**.
 
 ### 2.4 Đánh giá hiện tại
 
 Chạy trực tiếp `python -m trademark_ocr.evaluate` (module `src/trademark_ocr/evaluate.py`) cho từng checkpoint, sau đó tổng hợp bằng `trademark_ocr.eval_domain_shift` và `trademark_ocr.report`. Nhánh `16-fix-review` đã sửa đánh giá để **trung thực hơn** (16.3): chấm **mọi mẫu**, giữ `gt` gốc, thêm `in_scope`/`coverage`, `idx` truy ngược được, và 3 mức đánh giá `strict` / `nocase` / `base` (bỏ dấu).
 
-**Kết quả hiện tại (từ `reports/final_summary.md`):**
+> **Nguồn số liệu:** cả bốn model được chấm lại trên **cùng một máy** ngày **15/11/2026**: `bash scripts/06_eval.sh` cho `crnn_ft`, `trba_ft`, rồi `bash scripts/06_eval.sh --only parseq_ft,svtrctc` → `reports/*.csv`, `reports/*.summary.json`, `reports/domain_shift.csv`, `reports/final_summary.md`. `parseq_ft` (checkpoint epoch 6) và `svtrctc` (model sau SWA) nay đã có trong `data/runs/`; số của hai model này **trùng khớp** với lần chấm 06/11 trên máy train ([`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md), lần 2), tức kết quả tái lập được. Bộ test: US 2.847 ảnh, VN 2.000 ảnh.
 
-| Model | Dataset | n | accuracy (strict) | 1−NED | char-accuracy | Ghi chú |
+**Bảng 1 — Accuracy trên bộ test đầy đủ (xếp theo US):**
+
+| Model | US strict | US 1−NED | VN strict | VN bỏ hoa/thường | VN 1−NED | coverage VN |
 |---|---|---|---|---|---|---|
-| crnn | US (test_us) | 200 | 0.0000 | 0.0009 | -0.2315 | Trên checkpoint chưa train đủ / quy mô nhỏ |
-| crnn | VN (test_vn) | 36 | 0.0000 | 0.0115 | -0.1906 | Chỉ 36/50 mẫu vào được do giới hạn đánh giá trước đây; nhánh 16 đã sửa để đánh giá toàn bộ |
-| **Domain shift (US→VN)** | crnn | acc_us=0.0, acc_vn=0.0, delta=0.0000 | n_us=200, n_vn=36 | Phân tách độ sụt US→VN theo hoa/thường/dấu/hình ảnh đã được bổ sung ở nhánh 16.4 (`eval_domain_shift` nâng cấp) |
+| **parseq_ft** | **88,69%** | 0,957 | **27,60%** | **41,05%** | 0,534 | 77,8% |
+| **trba_ft** | 84,23% | 0,930 | 23,85% | 36,05% | 0,485 | 77,8% |
+| **crnn_ft** | 74,89% | 0,897 | 19,40% | 28,55% | 0,392 | 77,8% |
+| **svtrctc** | 69,37% | 0,848 | 11,40% | 16,40% | 0,275 | 77,8% |
 
-> **Kết luận về kết quả:** Các con số trên **không phản ánh chất lượng huấn luyện thực tế**. Lý do chính: (1) huấn luyện chỉ với **500/4356** mẫu train, (2) các checkpoint là phiên chạy nhỏ/không đầy đủ, (3) tập VN hiện tại chỉ **50 mẫu** chưa được duyệt tay nhiều. Để có kết quả đúng theo đề tài, cần train với **toàn bộ tập dữ liệu** trên **GPU**.
+- `coverage 77,8%` = tỉ lệ mẫu VN model **có thể** đọc đúng: 425 nhãn dài quá 25 ký tự, 83 nhãn có ký tự ngoài bảng 217 ký tự. Các mẫu ngoài phạm vi vẫn bị tính là sai.
+- Trên US, strict và bỏ hoa/thường trùng nhau (nhãn USPTO luôn viết hoa), nên chỉ hiện một cột.
+- Trong phạm vi VN (1.556 mẫu), xét mức bỏ hoa/thường: `parseq_ft` **52,8%**, `trba_ft` **46,3%**, `crnn_ft` **36,7%**, `svtrctc` **21,1%** — cao hơn cột strict vì đã loại nhãn quá dài/ký tự lạ.
+- `svtrctc` được chấm trên `last.ckpt` = **model sau SWA** (epoch 10, val 70,52%), không phải `epoch=9` (val 71,82%); đây là checkpoint Lightning đã ghi và đúng với mô tả ở mục 2.5. Nếu chấm `epoch=9`, số US có thể cao hơn khoảng 1 điểm.
+
+**Bảng 2 — Sụt giảm US → VN:**
+
+| Model | Δ accuracy | Δ bỏ hoa/thường (CI 95%) | Δ bỏ cả dấu | Δ VN không dấu | Đọc đúng 558 nhãn VN có dấu (strict / bỏ hoa/thường) |
+|---|---|---|---|---|---|
+| **parseq_ft** | −0,611 | −0,476 [−0,502; −0,453] | −0,431 | −0,319 [−0,347; −0,291] | 1/558 (0,2%) / 2/558 (0,4%) |
+| **trba_ft** | −0,604 | −0,482 [−0,506; −0,458] | −0,448 | −0,342 [−0,371; −0,313] | 0/558 / 0/558 |
+| **crnn_ft** | −0,555 | −0,463 [−0,490; −0,439] | −0,447 | −0,353 [−0,384; −0,323] | 0/558 / 0/558 |
+| **svtrctc** | −0,580 | −0,530 [−0,554; −0,507] | −0,524 | −0,466 [−0,495; −0,440] | 0/558 / 0/558 |
+
+- Δ bỏ hoa/thường loại phần sai do quy ước ghi nhãn (US viết hoa, VN viết thường).
+- Δ bỏ cả dấu loại thêm phần sai do chưa học chữ có dấu.
+- **Δ VN không dấu** (1.442 nhãn) là ước lượng sạch nhất cho khác biệt **hình ảnh**, vì đã loại cả quy ước hoa/thường lẫn dấu.
+- Cột cuối: chỉ `parseq_ft` đọc đúng **1 nhãn** ở mức strict và **2 nhãn** khi bỏ hoa/thường; ba model còn lại **0/558**.
+
+**Bảng 3 — Theo loại nhãn hiệu (US, bỏ hoa/thường):**
+
+| Model | `standard_character` (2.288) | `typeset_old` (29) | `stylized_words` (112) | `design_with_words` (418) |
+|---|---|---|---|---|
+| **parseq_ft** | 98,3% | 96,6% | **67,9%** | **40,9%** |
+| **trba_ft** | 96,4% | 96,6% | 58,0% | 23,7% |
+| **crnn_ft** | 87,0% | 96,6% | 42,9% | 15,6% |
+| **svtrctc** | 83,9% | 89,7% | 13,4% | 3,4% |
+
+**Nhận xét:**
+
+1. **`parseq_ft` tốt nhất ở mọi cột**, kể cả nhóm khó nhất `design_with_words` (40,9% so với 23,7% / 15,6% / 3,4%). Đây là lý do mô hình này được chọn làm kết quả chính của đồ án.
+2. **Fine-tune thắng train-from-scratch**: `svtrctc` (từ đầu, 10 epoch) chỉ 69,4% US, trong khi `crnn_ft` cùng họ CTC đạt 74,9% và `trba_ft` 84,2%. Lợi thế lớn nhất nằm ở ảnh có hình vẽ (`design_with_words`).
+3. **Khoảng cách giữa các model thu hẹp trên nhãn dễ**: ở `standard_character`, cả bốn đều 83,9–98,3%; khác biệt chủ yếu đến từ nhãn cách điệu và có hình.
+4. **Chữ có dấu gần như không đọc được** (`parseq_ft` 1/558 ở mức strict, 2/558 khi bỏ hoa/thường; ba model còn lại 0/558): dữ liệu train USPTO gần như không có dấu. Đây là hạn chế của **dữ liệu**, không phải lỗi pipeline hay overfit — và là hướng cải thiện rõ nhất nếu bổ sung dữ liệu tiếng Việt.
+5. **Val và test cùng nguồn US rất sát nhau**: `parseq_ft` 89,46% → 88,69%, `trba_ft` 86,47% → 84,23%, `crnn_ft` 76,35% → 74,89%, `svtrctc` (SWA) 70,52% → 69,37%. Chênh 1–2 điểm, tức tập val đại diện tốt cho test US, không có dấu hiệu overfit.
+6. **Số test VN nên đọc kèm cảnh báo**: nhãn VN **chưa được duyệt tay** và 22,2% mẫu nằm ngoài phạm vi model (quá dài/ký tự lạ), nên accuracy VN là **cận dưới**, không phải chất lượng thật của model trên tiếng Việt.
 
 ### 2.5 Đường cong huấn luyện và kiểm tra overfit
 
@@ -227,14 +300,14 @@ augment, chỉ so **xu hướng** của hai đường, không so độ lớn. Mo
 thấp nhất ở epoch k, sau đó ít nhất 2 epoch, epoch cuối cao hơn mức thấp nhất trên 5%, trong khi
 loss train vẫn giảm, thì là "có dấu hiệu overfit".
 
-#### Tổng hợp các model đã train (cập nhật 10/11/2026)
+#### Tổng hợp các model đã train (cập nhật 15/11/2026)
 
 | Model | Train | val tốt nhất | Checkpoint đem chấm test | Test US | Test VN (bỏ hoa/thường) | Đường cong |
 |---|---|---|---|---|---|---|
 | `parseq_ft` | 7 epoch, CPU, 7,3 giờ | **89,49%** (epoch 5) | epoch 6 (val 89,46%) | **88,7%** | **27,6%** (41,1%) | gần bão hoà, chưa rõ overfit |
 | `trba_ft` | 20 epoch, Colab GPU T4, 4 phiên | **86,72%** (epoch 19) | epoch 20 (val 86,47%) | **84,2%** | **23,9%** (36,1%) | chưa overfit, gần bão hoà |
 | `crnn_ft` | 20 epoch, CPU, train lại từ đầu (epoch 16–20 batch 8) | **76,35%** (epoch 20) | epoch 20 (val 76,35%) | **74,9%** | **19,4%** (28,6%) | chưa overfit, còn học được |
-| `crnn_ft` (bản 8 epoch, 04/11) | 8 epoch, CPU, 2,5 giờ | 74,07% (epoch 8) | epoch 8 (val 74,07%) | 73,0% | 18,3% (27,0%) | chưa overfit; đã thay bằng bản 20 epoch |
+| `crnn_ft` (bản 8 epoch, 04/11) | 8 epoch, CPU, 2,5 giờ | 74,07% (epoch 8) | epoch 8 (val 74,07%) | 73,0% | 18,3% (27,0%) | chưa overfit; giữ để so sánh với bản 20 epoch |
 | `svtrctc` | 10 epoch, CPU, 2,7 giờ, train từ đầu | 71,82% (epoch 10) | model sau SWA (val 70,52%) | 69,4% | 11,4% (16,4%) | chưa overfit, còn học được |
 
 Test US: 2.847 ảnh. Test VN: 2.000 ảnh, **chưa duyệt tay** nhãn.
@@ -284,9 +357,7 @@ thật sự được chấm. Chọn checkpoint chỉ dựa trên tập val, khô
    đây không phải một lần train "sạch" với một batch duy nhất.
 4. **Khởi đầu chậm hơn bản 8 epoch** (epoch 2: 0,5% so với 60,9%): parseq nhân learning rate với
    batch/256, nên batch 16 có learning rate đỉnh nhỏ hơn 4 lần so với batch 64.
-5. **Số test (eval 10/11, checkpoint epoch 20):** test US **74,9%**, test VN **19,4%** (28,6% khi bỏ
-   hoa/thường). So với bản 8 epoch: US +1,9 điểm, VN +1,1 điểm (bỏ hoa/thường +1,6). Test US thấp
-   hơn val 1,5 điểm.
+5. **Test:** US **74,9%** (val 76,35% của checkpoint, chênh 1,5 điểm), VN **19,4%** (bỏ hoa/thường 28,6%). So với bản 8 epoch (73,0% / 18,3%), 12 epoch thêm được **+1,9 điểm US** và **+1,1 điểm VN**. Chi tiết ở mục 2.4.
 
 ##### Bản 8 epoch (04/11/2026, batch 64) — giữ để so sánh
 
@@ -393,8 +464,11 @@ thật sự được chấm. Chọn checkpoint chỉ dựa trên tập val, khô
    - Sau epoch cuối, Lightning chạy thêm một lượt qua tập train để tính lại BatchNorm cho model SWA.
      Lượt này được ghi thành checkpoint, và lọt top-3 vì hơn epoch 8 (69,75%).
    - Hệ quả: số test của svtrctc có thể thấp hơn một chút so với nếu chấm epoch 10.
-4. **Test:** US 69,4%, VN 11,4% (16,4% bỏ hoa/thường): thấp nhất trong ba model. Kém rõ nhất ở nhãn
-   có hình vẽ (`design_with_words`, US: 3,4% so với 14,4% của crnn_ft và 40,9% của parseq_ft).
+4. **Test:** US 69,4%, VN 11,4% (16,4% bỏ hoa/thường): thấp nhất trong bốn model. Kém rõ nhất ở nhãn
+   có hình vẽ (`design_with_words`, US: 3,4% so với 15,6% của crnn_ft và 40,9% của parseq_ft).
+5. **Đồ thị đủ 10 epoch** sau khi bổ sung `events.out.tfevents.*` từ máy train ngày 15/11. Không có
+   log này thì `train_curves` bỏ qua svtrctc; số val theo epoch vẫn đối chiếu được với
+   [`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md).
 
 #### TRBA fine-tune (`trba_ft`) — 20 epoch trên Colab GPU T4, 05–07/11/2026
 
@@ -431,15 +505,13 @@ thật sự được chấm. Chọn checkpoint chỉ dựa trên tập val, khô
    SWA". Checkpoint dùng để test là epoch 20 (val 86,47%), kém epoch tốt nhất 0,25 điểm.
 5. **Tốc độ:** khoảng 25–33 phút/epoch trên T4 (batch 64). Có lẽ khâu đọc và augment ảnh trên CPU
    của Colab mới là chỗ nghẽn, không phải GPU (chưa đo riêng).
-6. **Số test (eval 10/11, checkpoint epoch 20):** test US **84,2%**, test VN **23,9%** (36,1% khi bỏ
-   hoa/thường). Ở cả hai tập, trba_ft đứng thứ hai, sau parseq_ft (88,7% / 27,6%). Test US thấp hơn
-   val của checkpoint 2,2 điểm, còn với parseq_ft khoảng cách này là 0,8 điểm.
+6. **Test:** US **84,2%** (val 86,47%, chênh 2,2 điểm — bình thường), VN **23,9%** (bỏ hoa/thường 36,1%). Ở cả hai tập, trba_ft đứng thứ hai sau parseq_ft (88,7% / 27,6%); khoảng cách val–test của parseq_ft chỉ 0,8 điểm. Chi tiết ở mục 2.4.
 
 **Vẽ lại / cập nhật đồ thị.** `bash scripts/06_eval.sh` (hoặc bước `eval` của
 `09_full_pipeline_cpu.sh`) tự vẽ lại sau mỗi lần đánh giá. Vẽ riêng, không cần đánh giá:
 
 ```bash
-.venv/bin/python -m trademark_ocr.train_curves --out-dir reports/figures
+python3 -m trademark_ocr.train_curves --out-dir reports/figures
 # chỉ vài model:  --models crnn_ft,parseq_ft     thư mục runs khác:  --runs /đường/dẫn/runs
 ```
 
@@ -473,8 +545,7 @@ bash scripts/09_full_pipeline_cpu.sh --from train --models crnn_ft --continue --
 đầu 20 epoch** (mục 2.5) thay vì dùng `--continue`. Cơ chế `--continue` vẫn dùng được cho lần sau.
 **Kế hoạch ban đầu:** crnn_ft 8 → 20 epoch, chạy trên một máy Ubuntu khác (yếu hơn). Từng bước, gồm cả
 cách mang dữ liệu và checkpoint qua lại giữa hai máy, ở
-[`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md) mục "Việc tiếp theo → 4". Kết quả sẽ được bổ sung vào
-mục 2.5 sau khi train xong. svtrctc (10 epoch, chưa bão hoà) cũng có thể train thêm theo cách này.
+[`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md) mục "Việc tiếp theo → 4". Kết quả cuối cùng (20 epoch, val 76,35%) đã có ở mục 2.5. svtrctc (10 epoch, chưa bão hoà) cũng có thể train thêm theo cách này.
 
 **Phân biệt với train tiếp một run bị ngắt.** `trba_ft` trên Colab dừng ở epoch 8/20 (rồi bị ngắt
 thêm 3 lần nữa trước khi xong 20 epoch) vì hết hạn mức
@@ -490,10 +561,11 @@ trên Colab ở [`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md) mục "Việc ti�
 ```bash
 # 1) Thiết lập môi trường
 cd "/media/zaibachkhoa/education/GenAI 2025/đồ án chuyên ngành 1"
-export DATA_ROOT=/media/zaibachkhoa/AC84-F995/trademark_data
-export PYTHONPATH=$PWD/compat:$PWD/src:$PWD/third_party/parseq
+export DATA_ROOT="$PWD/data"
+export PYTHONPATH="$PWD/compat:$PWD/src:$PWD/third_party/parseq"
 
 # 2) Đánh giá toàn bộ model có checkpoint (CPU)
+#    gọn hơn: bash scripts/06_eval.sh --device cpu --batch-size 8 --num-workers 0
 for m in crnn trba parseq svtrctc crnn_ft trba_ft parseq_ft; do
   ckpt=$(ls -dt "$DATA_ROOT/runs/$m"/*/checkpoints/last.ckpt 2>/dev/null | head -1)
   [ -z "$ckpt" ] && continue
@@ -514,7 +586,7 @@ python third_party/parseq/train.py --config-dir configs/hydra --config-name tm_s
   model.batch_size=64 trainer.max_epochs=20
 
 # 4) Demo suy luận
-python -m trademark_ocr.demo_app --ckpt $DATA_ROOT/runs/parseq/<ts>/checkpoints/last.ckpt --image demo_images/*.png
+python -m trademark_ocr.demo_app --ckpt data/runs/parseq_ft/2026-11-05_20-59-08/checkpoints/last.ckpt --image demo_images/*.png
 ```
 
-**Tài liệu tham khảo:** `README.md`, `DESIGN.md` (mục 01–16), `ACCEPTANCE.md` (mục 01–16), `REVIEW.md`, `docs/colab/*.ipynb`.
+**Tài liệu tham khảo:** `README.md`, `DESIGN.md` (mục 01–16), `ACCEPTANCE.md` (mục 01–16), `REVIEW.md`, `docs/colab/*.ipynb`, [`docs/nhat_ky_chay.md`](docs/nhat_ky_chay.md), `reports/final_summary.md`, `reports/figures/train_curves.md`.
