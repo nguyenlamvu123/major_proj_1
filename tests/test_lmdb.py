@@ -137,3 +137,48 @@ def test_parseq_lmdbdataset_reads_our_lmdb(tmp_path):
     img, label = ds[1]
     assert label == "ĐÔNG Á"          # parseq giữ đúng dấu khi tắt normalize
     assert isinstance(img, Image.Image) and img.size == (64, 32)
+
+
+# --------------------------------------------------------------------------
+# Hồi quy: LMDB ≥ commit_every mẫu (REVIEW.md §4.1)
+# --------------------------------------------------------------------------
+
+def _tiny_rows(tmp_path, n):
+    img = tmp_path / "one.png"
+    _png(img, size=(8, 4))
+    return [{"image_path": str(img), "word_mark": f"MARK{i:05d}",
+             "serial_number": f"{30000000 + i}", "drawing_kind": "stylized_words"}
+            for i in range(n)]
+
+
+def test_create_lmdb_commits_tail_after_intermediate_commit(tmp_path):
+    # ROOT CAUSE:
+    #
+    # Với >= commit_every mẫu, LMDB đọc lại ra 0 mẫu (parseq: int(None) -> TypeError).
+    # create_lmdb gán lại `txn` BÊN TRONG `with env.begin(write=True) as txn:`; `with`
+    # giữ __exit__ của transaction CŨ (đã commit) nên transaction mới — chứa phần đuôi và
+    # khoá `num-samples` — không bao giờ được commit và bị huỷ khi env.close().
+    #
+    #   with env.begin(write=True) as txn:
+    #       ... txn.commit(); txn = env.begin(write=True)
+    #       txn.put(b"num-samples", ...)          # mất
+    #
+    # Đã sửa bằng cách tự quản transaction: commit theo lô, commit lô cuối + num-samples
+    # tường minh, abort nếu có ngoại lệ.
+    out = tmp_path / "lmdb"
+    res = create_lmdb(_tiny_rows(tmp_path, 7), out, data_root=tmp_path, commit_every=3)
+    got = list(iter_lmdb(out))
+    assert res["num_samples"] == 7
+    assert [lab for _i, lab, _img in got] == [f"MARK{i:05d}" for i in range(7)]
+
+
+def test_create_lmdb_default_batch_over_1000_readable_by_parseq(tmp_path):
+    from strhub.data.dataset import LmdbDataset
+
+    out = tmp_path / "lmdb"
+    res = create_lmdb(_tiny_rows(tmp_path, 1500), out, data_root=tmp_path)
+    assert res["num_samples"] == 1500
+    ds = LmdbDataset(str(out), CHARSET_VI, max_label_len=25,
+                     remove_whitespace=False, normalize_unicode=False)
+    assert len(ds) == 1500
+    assert ds.labels[-1] == "MARK01499"
