@@ -255,6 +255,15 @@ python -c "import lmdb,os;e=lmdb.open(os.environ['DATA_ROOT']+'/lmdb/train/trade
 ```
 **Pass khi**: test xanh; `num-samples` in ra đúng bằng số dòng `split_train.csv` (không phải `None`).
 
+### 16.2 SVTR-CTC: trục thời gian theo chiều ngang
+
+```bash
+pytest -q tests/test_svtr.py
+python -m trademark_ocr.train_utils --config tm_svtrctc --dry-run
+```
+**Pass khi**: test xanh (`seq_len == 32` @ 32×128, 32×64 bị từ chối); dry-run in `[dry-run] OK`.
+> Thay cho số liệu nhánh 09 (`seq_len=64`). Checkpoint SVTR cũ phải train lại.
+
 ---
 
 ## Ghi chú chung

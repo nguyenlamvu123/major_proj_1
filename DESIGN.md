@@ -720,6 +720,9 @@ Cấu hình: `embed_dim=192`, `depths=[2,2]`, `num_heads=6`, `mlp_ratio=4`,
 `img_size=[32,128]` ⇒ `L = 4×16 = 64`. Class **tự kiểm tra** lúc `__init__` bằng 1 forward
 dummy và `assert L >= max_label_length` (báo lỗi rõ nếu vi phạm), đồng thời lưu `self.seq_len`.
 
+> ⚠️ Đã sửa ở **16.2**: bản này trải phẳng lưới 4×16 theo hàng nên thực chất chỉ có 16 cột
+> < 25 ký tự. Hiện tại `Merging` stride (2,1) + gộp chiều cao → `L = W/4 = 32` cột.
+
 ### Bẫy đã bắt được
 
 `CTCSystem`/`BaseSystem` **không** định nghĩa `training_step` (CRNN và TRBA tự khai báo).
@@ -978,3 +981,20 @@ lỗi ngay, thay vì âm thầm đọc một tập thiếu mẫu.
 
 Test hồi quy (`tests/test_lmdb.py`): `commit_every=3` với 7 mẫu (đọc lại đủ, đúng thứ tự)
 và 1.500 mẫu với mặc định 1.000, đọc bằng `LmdbDataset` thật của parseq.
+
+### 16.2 `svtr_ctc.SVTRNet` — trục thời gian CTC theo chiều ngang (REVIEW §4.4)
+
+| Thành phần | Trước | Sau |
+|---|---|---|
+| `Merging` | `Conv3×3 stride 2` (giảm cả rộng) | `Conv3×3 stride (2,1)` — chỉ giảm cao |
+| Sau các stage | `view(b, h*w, c)` (trải theo hàng) | `mean(dim=2)` — gộp cao về 1, mỗi cột = 1 bước |
+| Vị trí | không có | `pos_embed` học được `(1, C, ceil(H/4), ceil(W/4))` cộng sau stem |
+| `L` @ 32×128 | 64 (= 4 lần quét × 16 cột) | **32 cột** |
+
+`L` giờ chỉ phụ thuộc chiều rộng (`ceil(W/4)`): ảnh cao hơn không thêm bước, ảnh rộng gấp đôi
+thì gấp đôi bước. `assert L >= max_label_length` vì thế mới thực sự kiểm số cột — `img_size`
+32×64 (16 cột) bị từ chối lúc dựng model. Tham số: 2.338.085 (thêm ~49k của `pos_embed`).
+Checkpoint SVTR cũ (chỉ có bản smoke 2 batch) **không** nạp được vào kiến trúc mới.
+
+Test hồi quy (`tests/test_svtr.py`): `L` theo chiều rộng ở 3 kích thước, từ chối 32×64,
+có `pos_embed`; hai test cũ khoá `seq_len == 64` đổi thành 32.

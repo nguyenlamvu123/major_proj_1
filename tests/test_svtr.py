@@ -44,7 +44,7 @@ def test_forward_logits_shape(model, images):
     assert logits.ndim == 3
     assert logits.shape[0] == 2
     assert logits.shape[2] > len(CHARSET_VI)
-    assert logits.shape[1] == model.seq_len == 64     # 4x16 timestep
+    assert logits.shape[1] == model.seq_len == 32     # W/4 cột, chiều cao đã gộp về 1
 
 
 def test_seq_len_covers_max_label_length(model):
@@ -112,4 +112,45 @@ def test_training_step_defined_on_class():
 
 def test_seq_len_satisfies_ctc_capacity(model):
     """CTC cần L >= max_target_length (len nhãn + có thể khoảng trắng bị CTC gộp)."""
-    assert model.seq_len == 64 >= model.max_label_length == 25
+    assert model.seq_len == 32 >= model.max_label_length == 25
+
+
+# --------------------------------------------------------------------------
+# Hồi quy: trục thời gian CTC phải là chiều ngang (REVIEW.md §4.4)
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("img_size,want_len", [
+    ((32, 128), 32),
+    ((64, 128), 32),     # cao gấp đôi -> KHÔNG thêm bước thời gian
+    ((32, 256), 64),     # rộng gấp đôi -> gấp đôi bước thời gian
+])
+def test_ctc_steps_follow_image_width_only(img_size, want_len):
+    # ROOT CAUSE:
+    #
+    # Bản cũ giảm cả chiều rộng ở Merging (stride 2) rồi trải phẳng lưới H×W theo HÀNG:
+    # 32×128 -> 4×16 -> 64 bước = 4 lần quét trái→phải, mỗi lần chỉ 16 cột < 25 ký tự.
+    # Kiểm tra `L >= max_label_length` vẫn qua (64 >= 25) nên lỗi bị che.
+    #
+    #   Merging: Conv2d(dim, dim, 3, 2, 1);  x.view(b, h * w, c)
+    #
+    # Đã sửa như SVTR gốc: Merging stride (2, 1) chỉ giảm chiều cao, rồi gộp chiều cao về 1
+    # (trung bình) -> mỗi bước thời gian là một cột ảnh, L = W/4.
+    #   Merging: Conv2d(dim, dim, 3, (2, 1), 1);  x.mean(dim=2)
+    m = SVTRNet(img_size=img_size, num_classes=10, drop_path_rate=0.0).eval()
+    with torch.no_grad():
+        logits = m(torch.zeros(1, 3, *img_size))
+    assert logits.shape == (1, want_len, 10)
+
+
+def test_rejects_config_with_fewer_columns_than_max_label_length(cfg):
+    """32×64 chỉ có 16 cột < 25 ký tự: phải báo lỗi ngay lúc dựng model."""
+    kwargs = {k: v for k, v in cfg.model.items() if k not in ("_target_", "_convert_", "name")}
+    kwargs["img_size"] = [32, 64]
+    with pytest.raises(AssertionError, match="max_label_length"):
+        SVTRCTC(**kwargs)
+
+
+def test_attention_receives_position_information():
+    """Không có positional embedding thì self-attention bất biến với hoán vị cột."""
+    m = SVTRNet(img_size=(32, 128), num_classes=10, drop_path_rate=0.0)
+    assert any("pos_embed" in name for name, _ in m.named_parameters())

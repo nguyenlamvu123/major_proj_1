@@ -9,7 +9,7 @@ model:
   _convert_: all
   name: svtrctc
   _target_: trademark_ocr.svtr_ctc.SVTRCTC
-  img_size: [32, 128]          # [H, W] -> L = 4x16 = 64 timestep (>= max_label_length)
+  img_size: [32, 128]          # [H, W] -> L = W/4 = 32 cột/timestep (>= max_label_length)
   max_label_length: 25
   batch_size: 64
   weight_decay: 0.0
