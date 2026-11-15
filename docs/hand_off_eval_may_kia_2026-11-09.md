@@ -1,5 +1,8 @@
 # Hướng dẫn bàn giao: eval `crnn_ft` + `trba_ft` (bộ test 2847/2000) trên máy kia
 
+> **Đã xong 10/11** trên máy chính. Kết quả ở `docs/nhat_ky_chay.md`, lần 5. Số epoch dưới đây lấy
+> theo tên file checkpoint, đếm từ 0 (`epoch=19` là epoch 20 trong báo cáo).
+
 *Tài liệu cho AI/người thực hiện trên **máy kia** (máy có sẵn test LMDB đúng bộ eval 2847/2000). Cập nhật: 2026-11-09, repo `nguyenlamvu123/major_proj_1`, nhánh `16-fix-review` (HEAD lúc bàn giao: `d376096`).*
 
 ## 1. Mục tiêu

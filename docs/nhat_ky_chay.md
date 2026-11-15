@@ -4,28 +4,18 @@ Mỗi lần chạy thật `scripts/09_full_pipeline_cpu.sh` (hoặc train/eval t
 nhất ở trên**: lệnh, thời gian từng bước, kết quả, cái gì sai, đã sửa gì, việc tiếp theo. Log đầy đủ
 nằm ở `data/logs/pipeline_<giờ>.log` (không đưa vào git).
 
-## Tình trạng 4 mô hình (cập nhật 09/11)
+## Tình trạng 4 mô hình (cập nhật 10/11)
 
 | Kiến trúc | Biến thể | Trạng thái | Kết quả test |
 |---|---|---|---|
-| CRNN (CTC, 8,4 M) | `crnn_ft` | ✅ train lại **từ đầu 20 epoch** trên máy C (CPU, 07–08/11, lần 4): val **76,35%** (epoch 20), vẫn chưa overfit. ⚠️ **Checkpoint chưa mang về** (`checkpoints/` trống) → chưa eval. Bản 8 epoch (lần 1, val 74,07%) vẫn là bản đang được chấm | (bản 8 epoch) US **73,0%**; VN **18,3%** (27,0% bỏ hoa/thường; 0% trên nhãn có dấu) |
+| CRNN (CTC, 8,4 M) | `crnn_ft` | ✅ train lại **từ đầu 20 epoch** trên máy C (CPU, 07–08/11, lần 4): val **76,35%** (epoch 20), vẫn chưa overfit. Đã mang checkpoint về, có `DONE`, eval 10/11 (lần 5). Thay bản 8 epoch (lần 1: US 73,0%, VN 18,3%) | US **74,9%**; VN **19,4%** (28,6% bỏ hoa/thường) |
 | PARSeq (24 M) | `parseq_ft` | ✅ xong — CPU, 7 epoch (lần 2); val gần bão hoà từ epoch 4–5, train thêm khó được gì | US **88,7%**; VN **27,6%** (41,1% bỏ hoa/thường) |
 | SVTR-CTC (2,3 M) | `svtr` (từ đầu, không có pretrained) | ✅ xong — CPU, 10 epoch (lần 2); val_loss vẫn giảm, train thêm được bằng `--continue` | US **69,4%**; VN **11,4%** (16,4% bỏ hoa/thường) |
-| TRBA (50 M) | `trba_ft` | ✅ **20/20 epoch** trên Colab T4, 4 phiên (05–07/11, lần 3); val tốt nhất **86,72%** (epoch 19), `last.ckpt` = epoch 20 (86,47%); đã mang về, có `DONE`. Chưa eval | — |
+| TRBA (50 M) | `trba_ft` | ✅ **20/20 epoch** trên Colab T4, 4 phiên (05–07/11, lần 3); val tốt nhất **86,72%** (epoch 19), `last.ckpt` = epoch 20 (86,47%); đã mang về, có `DONE`, eval 10/11 (lần 5) | US **84,2%**; VN **23,9%** (36,1% bỏ hoa/thường) |
 
 Bản train từ đầu `crnn`, `trba`, `parseq` chưa lên kế hoạch (chỉ cần nếu muốn so fine-tune với
-train từ đầu). `reports/final_summary.md` là bản của lần 2 (06/11 07:10): 3 model trên test US
-(2.847 mẫu) và test VN (2.000 mẫu **chưa duyệt tay**). Chưa có trba_ft và crnn_ft 20 epoch.
-
-**Việc cần làm tiếp (09/11):**
-1. crnn_ft 20 epoch: checkpoint chỉ có ở máy C. Eval ngay trên máy C (dự phòng Colab), mang 4 file
-   kết quả và `last.ckpt` (khoảng 135 MB) về, rồi `touch data/runs/crnn_ft/2026-11-07_20-44-52/DONE`.
-   Chi tiết ở [`docs/eval_crnn_ft_may_C.md`](eval_crnn_ft_may_C.md).
-2. trba_ft (checkpoint đã ở máy này): `bash scripts/06_eval.sh --only trba_ft`, chạy sau bước 1.
-   Chưa có `last.ckpt` của run 20 epoch thì **đừng** eval crnn_ft ở máy này, kể cả qua
-   `09_full_pipeline_cpu.sh --only eval`: eval lấy run mới nhất có checkpoint, nên sẽ chấm bản 8 epoch
-   (04/11) và ghi đè.
-3. Cập nhật số test vào `BAO_CAO_TONG_KET_DAT_LIEU_HUAN_LUYEN.md` mục 2.5 (các ô "chờ eval").
+train từ đầu). `reports/final_summary.md` là bản của lần 5 (10/11 08:36): đủ 4 model ở bảng trên,
+trên test US (2.847 mẫu) và test VN (2.000 mẫu **chưa duyệt tay**).
 
 Checkpoint được chấm test là `checkpoints/last.ckpt`. Với Lightning 2.6, file này chỉ được ghi lại
 ở epoch nào lọt **top-3 val_accuracy**, nên nó là "epoch gần nhất lọt top-3", không nhất thiết là
@@ -335,8 +325,8 @@ từ A, đã ghi chú từng ô, ô train cũ đã vô hiệu hoá, có thêm ô
 ### 4. Train thêm `crnn_ft` lên 20 epoch trên một máy Ubuntu khác (yếu hơn)
 
 **Tình trạng 09/11:** máy C không có checkpoint 8 epoch nên **train lại từ đầu 20 epoch** thay vì
-`--continue` (diễn biến ở "Lần 4"). Còn thiếu: mang `checkpoints/` về (xem "Việc cần làm tiếp" ở
-đầu file). Hướng dẫn dưới đây vẫn đúng cho lần `--continue` sau.
+`--continue` (diễn biến ở "Lần 4"). Checkpoint đã mang về và eval 10/11 ("Lần 5"). Hướng dẫn dưới
+đây vẫn đúng cho lần `--continue` sau.
 
 Viết để một người hoặc một AI khác làm theo từng bước, không cần đọc phần còn lại. Nhãn **[vunl]**
 là máy hiện tại (có dữ liệu, checkpoint, các model khác); **[máy B]** là máy Ubuntu yếu hơn sẽ train.
@@ -528,6 +518,34 @@ git commit -m "16-fix-review: crnn_ft train tiếp lên 20 epoch: đồ thị + 
 
 ---
 
+## Lần 5 — eval `crnn_ft` 20 epoch + `trba_ft`, 10/11 08:33 (máy `vunl`, CPU)
+
+- **Vì sao chạy ở máy này:** máy C chỉ có tập test cũ (200/50 ảnh), không so được với bộ
+  2.847/2.000 mà các model khác đã chấm. Máy C đóng gói run crnn_ft kèm checkpoint
+  (`crnn_ft_2026-11-07_20-44-52.tar`) và viết `docs/hand_off_eval_may_kia_2026-11-09.md` (commit
+  `a7e6f3e`). Giải nén vào `data/runs/` rồi `touch …/DONE`.
+- **Lệnh:** `PYTHON=.venv/bin/python bash scripts/06_eval.sh --only crnn_ft,trba_ft`, chạy hết 3 phút
+  41 giây. Log ở `data/logs/eval_crnn_ft_trba_ft_2026-11-10_08-33-25.log`. Kết quả cũ của crnn_ft 8
+  epoch được chuyển vào `reports/archive/2026-11-10_08-33-25/`.
+- **Checkpoint được chấm:** `last.ckpt` = epoch 20 của cả hai run (val: crnn_ft 76,35%, trba_ft
+  86,47%).
+
+| model | test US | test VN | VN bỏ hoa/thường | VN bỏ cả dấu | 1−NED US / VN |
+|---|---|---|---|---|---|
+| parseq_ft (lần 2) | 88,7% | 27,6% | 41,1% | 45,8% | 0,957 / 0,534 |
+| **trba_ft** | **84,2%** | **23,9%** | 36,1% | 39,8% | 0,930 / 0,485 |
+| **crnn_ft 20 epoch** | **74,9%** | **19,4%** | 28,6% | 30,4% | 0,897 / 0,392 |
+| svtrctc (lần 2) | 69,4% | 11,4% | 16,4% | 17,2% | 0,848 / 0,275 |
+
+- Thứ hạng giống nhau ở cả hai tập: parseq_ft > trba_ft > crnn_ft > svtrctc.
+- crnn_ft 20 epoch so với bản 8 epoch: US +1,9 điểm, VN +1,1 điểm.
+- Coverage trên VN là 77,8%: 22,2% nhãn VN quá dài hoặc có ký tự ngoài charset, nên model nào cũng
+  không thể đúng những mẫu này.
+- Bước cuối của eval đã vẽ lại đồ thị train. Lần này khôi phục được mục parseq_ft và svtrctc mà lần
+  vẽ trên máy C (commit `a7e6f3e`) làm mất, và trba_ft trở lại trạng thái "train xong".
+
+---
+
 ## Lần 4 — `crnn_ft` train lại từ đầu 20 epoch, 07/11 20:04 → 08/11 (máy C, CPU)
 
 ### Bối cảnh
@@ -567,7 +585,7 @@ Val accuracy theo epoch: 0 → 0,5 → 55,5 → 63,3 → 66,3 → 68,7 → 70,4 
 - Hơn bản 8 epoch của lần 1 (74,07%) **2,3 điểm** val.
 - Khởi đầu chậm hơn lần 1 (epoch 2: 0,5% so với 60,9%). Lý do: parseq nhân learning rate với
   batch/256, nên batch 16 cho learning rate đỉnh nhỏ hơn 4 lần so với batch 64 của lần 1.
-- Chưa có số test: thiếu checkpoint (xem "Việc cần làm tiếp" ở đầu file).
+- Số test (eval 10/11, "Lần 5"): US 74,9%, VN 19,4%.
 
 ### Đã sửa
 

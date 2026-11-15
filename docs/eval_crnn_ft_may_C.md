@@ -1,5 +1,8 @@
 # Eval crnn_ft 20 epoch trên máy C (dự phòng: Colab)
 
+> **Đã xong 10/11.** Eval cuối cùng chạy ở máy chính, vì máy C chỉ có tập test cũ (200/50 ảnh).
+> Kết quả ở `docs/nhat_ky_chay.md`, lần 5. Giữ file này để tham khảo.
+
 Checkpoint của run `crnn_ft/2026-11-07_20-44-52` (20 epoch, val 76,35%) chỉ có ở máy C. Hướng dẫn
 này chấm test US + VN cho riêng checkpoint đó, rồi mang kết quả về máy chính để ghép vào báo cáo.
 

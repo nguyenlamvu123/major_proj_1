@@ -227,14 +227,14 @@ augment, chỉ so **xu hướng** của hai đường, không so độ lớn. Mo
 thấp nhất ở epoch k, sau đó ít nhất 2 epoch, epoch cuối cao hơn mức thấp nhất trên 5%, trong khi
 loss train vẫn giảm, thì là "có dấu hiệu overfit".
 
-#### Tổng hợp các model đã train (cập nhật 09/11/2026)
+#### Tổng hợp các model đã train (cập nhật 10/11/2026)
 
 | Model | Train | val tốt nhất | Checkpoint đem chấm test | Test US | Test VN (bỏ hoa/thường) | Đường cong |
 |---|---|---|---|---|---|---|
 | `parseq_ft` | 7 epoch, CPU, 7,3 giờ | **89,49%** (epoch 5) | epoch 6 (val 89,46%) | **88,7%** | **27,6%** (41,1%) | gần bão hoà, chưa rõ overfit |
-| `trba_ft` | 20 epoch, Colab GPU T4, 4 phiên | **86,72%** (epoch 19) | epoch 20 (val 86,47%) | chờ eval | chờ eval | chưa overfit, gần bão hoà |
-| `crnn_ft` | 20 epoch, CPU, train lại từ đầu (epoch 16–20 batch 8) | **76,35%** (epoch 20) | chưa mang checkpoint về | chờ eval | chờ eval | chưa overfit, còn học được |
-| `crnn_ft` (bản 8 epoch, 04/11) | 8 epoch, CPU, 2,5 giờ | 74,07% (epoch 8) | epoch 8 (val 74,07%) | 73,0% | 18,3% (27,0%) | chưa overfit; thay bằng bản 20 epoch khi có số test |
+| `trba_ft` | 20 epoch, Colab GPU T4, 4 phiên | **86,72%** (epoch 19) | epoch 20 (val 86,47%) | **84,2%** | **23,9%** (36,1%) | chưa overfit, gần bão hoà |
+| `crnn_ft` | 20 epoch, CPU, train lại từ đầu (epoch 16–20 batch 8) | **76,35%** (epoch 20) | epoch 20 (val 76,35%) | **74,9%** | **19,4%** (28,6%) | chưa overfit, còn học được |
+| `crnn_ft` (bản 8 epoch, 04/11) | 8 epoch, CPU, 2,5 giờ | 74,07% (epoch 8) | epoch 8 (val 74,07%) | 73,0% | 18,3% (27,0%) | chưa overfit; đã thay bằng bản 20 epoch |
 | `svtrctc` | 10 epoch, CPU, 2,7 giờ, train từ đầu | 71,82% (epoch 10) | model sau SWA (val 70,52%) | 69,4% | 11,4% (16,4%) | chưa overfit, còn học được |
 
 Test US: 2.847 ảnh. Test VN: 2.000 ảnh, **chưa duyệt tay** nhãn.
@@ -284,8 +284,9 @@ thật sự được chấm. Chọn checkpoint chỉ dựa trên tập val, khô
    đây không phải một lần train "sạch" với một batch duy nhất.
 4. **Khởi đầu chậm hơn bản 8 epoch** (epoch 2: 0,5% so với 60,9%): parseq nhân learning rate với
    batch/256, nên batch 16 có learning rate đỉnh nhỏ hơn 4 lần so với batch 64.
-5. **Chưa có số test:** checkpoint của run này chưa được chép về máy đánh giá. Bảng tổng hợp và số
-   test sẽ cập nhật sau khi eval.
+5. **Số test (eval 10/11, checkpoint epoch 20):** test US **74,9%**, test VN **19,4%** (28,6% khi bỏ
+   hoa/thường). So với bản 8 epoch: US +1,9 điểm, VN +1,1 điểm (bỏ hoa/thường +1,6). Test US thấp
+   hơn val 1,5 điểm.
 
 ##### Bản 8 epoch (04/11/2026, batch 64) — giữ để so sánh
 
@@ -430,7 +431,9 @@ thật sự được chấm. Chọn checkpoint chỉ dựa trên tập val, khô
    SWA". Checkpoint dùng để test là epoch 20 (val 86,47%), kém epoch tốt nhất 0,25 điểm.
 5. **Tốc độ:** khoảng 25–33 phút/epoch trên T4 (batch 64). Có lẽ khâu đọc và augment ảnh trên CPU
    của Colab mới là chỗ nghẽn, không phải GPU (chưa đo riêng).
-6. **Chưa có số test** — chờ eval trên máy đánh giá.
+6. **Số test (eval 10/11, checkpoint epoch 20):** test US **84,2%**, test VN **23,9%** (36,1% khi bỏ
+   hoa/thường). Ở cả hai tập, trba_ft đứng thứ hai, sau parseq_ft (88,7% / 27,6%). Test US thấp hơn
+   val của checkpoint 2,2 điểm, còn với parseq_ft khoảng cách này là 0,8 điểm.
 
 **Vẽ lại / cập nhật đồ thị.** `bash scripts/06_eval.sh` (hoặc bước `eval` của
 `09_full_pipeline_cpu.sh`) tự vẽ lại sau mỗi lần đánh giá. Vẽ riêng, không cần đánh giá:
