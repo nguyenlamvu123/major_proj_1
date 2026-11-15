@@ -301,6 +301,17 @@ python -m trademark_ocr.build_lmdb --subset test_vn --split-csv $DATA_ROOT/proce
 **Pass khi**: test xanh; `vn_report.json` có `skipped` (lý do bỏ) và `n_registered`;
 `review_vn_report.json` có `label_noise_rate` — con số này phải nêu trong báo cáo đồ án.
 
+### 16.6 Fine-tune từ trọng số pretrained
+
+```bash
+pytest -q tests/test_pretrained.py
+python -m trademark_ocr.train_utils --config tm_parseq_ft --dry-run -o model.init_from=null
+bash scripts/05_train.sh parseq_ft --limit-train-batches 2 --max-epochs 1 --accelerator cpu --batch-size 8 --num-workers 0
+```
+**Pass khi**: test xanh; log train có dòng
+`[pretrained] parseq: nạp 172 tensor, bỏ 3 lệch kích thước [...]`; tạo `runs/parseq_ft/<ts>/checkpoints/last.ckpt`.
+> Lần đầu cần mạng (~95 MB parseq, ~33 MB crnn, ~200 MB trba vào cache `torch.hub`).
+
 ---
 
 ## Ghi chú chung

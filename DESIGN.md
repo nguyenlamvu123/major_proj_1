@@ -1114,3 +1114,41 @@ sinh từ `_FIELDS` để không lệch lần nữa.
 
 Test: `tests/test_vn.py` (+5: qua trang rỗng đơn lẻ, dừng sau `max_empty_pages`, lọc trùng +
 `registered_only`, `dedupe_key`, giữ số đăng ký), `tests/test_vn_review.py` (mới, 4 test).
+
+### 16.6 Fine-tune từ trọng số pretrained của parseq (REVIEW §4.6)
+
+`pretrained: <tên>` của `third_party/parseq/train.py` nạp **strict** → `size mismatch` với
+charset VN. Thay vào đó, `src/trademark_ocr/pretrained.py`:
+
+| Hàm | Việc |
+|---|---|
+| `finetune(target, init_from=None, **kwargs)` | factory làm `model._target_`: dựng lớp `target` với `kwargs`, nạp một phần `init_from`; `target`/`init_from` **không** vào hparams → ckpt là ckpt của lớp thật |
+| `load_matching(module, state_dict)` | chép tensor trùng tên **và** kích thước; trả `{loaded, skipped_shape, missing, unexpected}` |
+| `_read_state(init_from)` | file `.pt` (state dict) / `.ckpt` (lấy `state_dict`), hoặc tên bản phát hành parseq qua `torch.hub` |
+
+Đích nạp chọn theo dữ liệu: bản `parseq` là state dict của `system.model`, bản `crnn`/`trba`
+và ckpt Lightning là cấp system → chọn module có nhiều tên khoá trùng hơn. Không khớp tensor
+nào → `ValueError` (tránh "fine-tune" mà thực ra train từ đầu).
+
+Config: `tm_crnn_ft`, `tm_trba_ft`, `tm_parseq_ft` = bản sao `tm_*` với
+`_target_: trademark_ocr.pretrained.finetune`, `target: <lớp>`, `init_from: <tên>`,
+`model.name: *_ft` (run dir `runs/*_ft/`). `scripts/05_train.sh crnn_ft|trba_ft|parseq_ft`,
+`scripts/06_eval.sh` quét cả 3. `evaluate.resolve_model_class` nhận ra `FINETUNE_TARGET` trong
+`config.yaml` và dùng `model.target`.
+
+**Kiểm chứng với trọng số thật** (tải bản phát hành v1.0.0 qua `torch.hub`, charset VN):
+
+| init_from | nạp | bỏ (phụ thuộc charset) | thiếu / thừa |
+|---|---|---|---|
+| `parseq` | 172 | `head.weight`, `head.bias`, `text_embed.embedding.weight` | 0 / 0 |
+| `crnn` | 44 | `model.rnn.1.linear.{weight,bias}` | 0 / 0 |
+| `trba` | 250 | `model.Prediction.generator.{weight,bias}`, `model.Prediction.char_embeddings.weight` | 0 / 0 |
+
+Lưu ý: lớp ra khởi tạo ngẫu nhiên và gần như không có mẫu chữ có dấu trong tập US, nên
+fine-tune giúp phần đọc hình, không giúp phát chữ có dấu (xem 16.4 — đọc ở cột "bỏ cả dấu").
+`lr` giữ như bản train từ đầu; là siêu tham số cần thử (fine-tune thường cần lr nhỏ hơn).
+
+Test (`tests/test_pretrained.py`, offline — "pretrained" giả bằng PARSeq nhỏ charset 36):
+strict load lỗi (tái hiện), `load_matching` bỏ đúng 3 tensor, factory từ file `.pt` và từ
+ckpt Lightning, từ chối file không khớp, `tm_parseq_ft` instantiate được với
+`init_from=null`, `evaluate` giải `FINETUNE_TARGET` ra `PARSeq`.

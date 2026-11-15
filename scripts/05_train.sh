@@ -6,7 +6,8 @@
 #   bash scripts/05_train.sh crnn --limit-train-batches 2 --max-epochs 1 --accelerator cpu
 #   bash scripts/05_train.sh parseq --max-epochs 20
 #
-# Mô hình: crnn | trba | parseq | svtr
+# Mô hình: crnn | trba | parseq | svtr  (train từ đầu)
+#          crnn_ft | trba_ft | parseq_ft  (fine-tune từ trọng số pretrained của parseq, DESIGN 16.6)
 # Checkpoint: $DATA_ROOT/runs/<model>/<timestamp>/*.ckpt
 # =====================================================================
 set -euo pipefail
@@ -20,9 +21,10 @@ case "$MODEL" in
   crnn)      CONFIG="tm_crnn" ;;
   trba)      CONFIG="tm_trba" ;;
   parseq)    CONFIG="tm_parseq" ;;
+  crnn_ft|trba_ft|parseq_ft) CONFIG="tm_$MODEL" ;;
   svtr)      CONFIG="tm_svtrctc" ;;
   tm_*)      CONFIG="$MODEL" ;;
-  *) echo "unknown model '$MODEL' (mô hình: crnn | trba | parseq | svtr)" >&2; exit 1 ;;
+  *) echo "unknown model '$MODEL' (mô hình: crnn | trba | parseq | svtr | crnn_ft | trba_ft | parseq_ft)" >&2; exit 1 ;;
 esac
 
 DATA_ROOT="${DATA_ROOT:-/media/zaibachkhoa/AC84-F995/trademark_data}"
