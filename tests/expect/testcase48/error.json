@@ -1,0 +1,4 @@
+{
+  "code": 1,
+  "stderr_contains": "thiếu LMDB ở <DATA_ROOT>/lmdb/val"
+}

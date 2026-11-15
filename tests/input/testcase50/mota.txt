@@ -1,0 +1,14 @@
+testcase50 — hydra.run.dir (pipeline train tiếp): log in đúng thư mục checkpoint
+================================================================================
+
+MỤC ĐÍCH
+    Dòng 'checkpoint ->' phải là nơi lưu thật khi có hydra.run.dir.
+
+ĐẦU VÀO
+    09_full_pipeline_cpu.sh truyền hydra.run.dir + ckpt_path của run cũ.
+
+KỲ VỌNG
+    Thoát 0; log checkpoint -> <DATA_ROOT>/runs/parseq_ft/2026-11-05_21-00-00/.
+
+VÌ SAO QUAN TRỌNG
+    Lần Colab 05/11 log in đường dẫn sai làm người dùng tìm checkpoint nhầm chỗ.

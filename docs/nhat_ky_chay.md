@@ -4,6 +4,124 @@ Mỗi lần chạy thật `scripts/09_full_pipeline_cpu.sh` (hoặc train/eval t
 nhất ở trên**: lệnh, thời gian từng bước, kết quả, cái gì sai, đã sửa gì, việc tiếp theo. Log đầy đủ
 nằm ở `data/logs/pipeline_<giờ>.log` (không đưa vào git).
 
+## Tình trạng 4 mô hình (cập nhật chiều 05/11)
+
+| Kiến trúc | Biến thể | Trạng thái | Kết quả |
+|---|---|---|---|
+| CRNN (CTC, 8,4 M) | `crnn_ft` | ✅ xong — CPU, 8 epoch (lần 1) | test US **73,0%**; VN **18,3%** (27,0% bỏ hoa/thường; 0% trên nhãn có dấu) |
+| PARSeq (24 M) | `parseq_ft` | ❌ lần 1 chỉ 2 epoch, chưa học được (`UNDERTRAINED`) → ⏳ train lại tối 05/11, CPU 9h | — |
+| SVTR-CTC (2,3 M) | `svtr` (từ đầu, không có pretrained) | ⏳ tối 05/11 nếu parseq_ft xong trước ~05:35 | — |
+| TRBA (50 M) | `trba_ft` | ⏳ Colab GPU (mục 3 bên dưới) | — |
+
+Bản train từ đầu `crnn`, `trba`, `parseq` chưa lên kế hoạch (chỉ cần nếu muốn so fine-tune với
+train từ đầu). `reports/final_summary.md` hiện vẫn là bản sai của lần 1; lần eval kế tiếp sinh lại.
+
+## Việc tiếp theo
+
+### 1. Ban ngày: duyệt tay nhãn VN
+
+Không cần chạy thêm gì, vì tối nay script tự build lại tập test VN từ bản đã duyệt.
+
+```bash
+.venv/bin/python -m trademark_ocr.vn_review make --n 300   # rồi sửa data/processed/review_vn.csv
+.venv/bin/python -m trademark_ocr.vn_review apply
+```
+
+- `make` tạo `data/processed/review_vn.csv` và `review_vn.html` (ảnh cạnh nhãn để xem nhanh).
+  Sửa cột `visible_text` thành đúng chữ nhìn thấy trong ảnh (đúng rồi thì giữ nguyên); ảnh không
+  dùng được thì để **trống**.
+- `apply` phải xong **trước 21:00**: pipeline thấy `split_test_vn_verified.csv` mới hơn thì tự
+  build lại `test_vn` trước khi train.
+- Sau khi duyệt, tập test VN chỉ còn các mẫu đã duyệt (~300, trừ dòng trống), không còn 2.000:
+  số liệu VN đúng hơn nhưng khoảng tin cậy rộng hơn. Tỉ lệ nhãn WIPO sai nằm ở
+  `data/processed/review_vn_report.json`.
+
+### 2. Tối 05/11, 21:00 (đã hẹn lịch): `parseq_ft` rồi `svtr`
+
+Lịch trong phiên Claude chạy `data/night_2026-11-05.sh` trong tmux `doan` (không nằm trong git):
+
+1. `09_full_pipeline_cpu.sh --models parseq_ft --retrain --max-hours 9`: khoảng 8 epoch × 57 phút,
+   dự kiến xong ~04:45, sau đó eval.
+2. Còn ≥ 2 giờ ngân sách trước **08:00 06/11** thì
+   `09_full_pipeline_cpu.sh --models svtr --max-hours <phần còn lại> --max-epochs 30`, rồi eval
+   lại mọi model. Ngân sách = (08:00 − lúc xong − 10 phút) / 1,15, vì trần cứng là 115% ngân sách.
+   Xong lúc 04:45 thì được 2,7h; xong sau ~05:35 thì bỏ qua svtr.
+3. Cả chuỗi nằm dưới một khoá `systemd-inhibit`. Script ép `LC_NUMERIC=C`, vì locale `vi_VN` làm
+   `awk` in `2,7` mà pipeline từ chối `--max-hours 2,7`.
+
+Log: `data/logs/night_2026-11-05.log` (quyết định của chuỗi) và hai file
+`data/logs/pipeline_2026-11-0{5,6}_*.log`. Muốn dừng: `tmux kill-session -t doan`. Lịch chỉ sống
+trong phiên Claude đang mở: thoát Claude trước 21:00 thì tự chạy tay
+`env -u DATA_ROOT tmux new-session -d -s doan "bash data/night_2026-11-05.sh"`.
+
+Sáng 06/11 đọc `reports/final_summary.md`. Nếu parseq_ft vẫn chưa học được (đủ 8 epoch mà
+`val_accuracy` < 1%), log ghi `UNDERTRAINED`, báo cáo bỏ model này; khi đó chuyển parseq_ft sang
+Colab như mục 3.
+
+### 3. `trba_ft` trên Colab GPU
+
+Train trên Colab, **eval ở máy local** để mọi model đánh giá trên đúng một bộ test. **Không** tải
+lại dữ liệu bằng `01_download_data.ipynb`: danh sách gazette USPTO thay đổi theo ngày, nên tập
+train/test sẽ khác lần 1 và không so được với `crnn_ft`/`parseq_ft`. Thay vào đó mang LMDB ở máy
+này lên.
+
+**Máy local (một lần):**
+
+```bash
+git push origin 16-fix-review                                    # Colab clone từ GitHub
+tar -C data -cf data/lmdb_trainval.tar lmdb/train lmdb/val       # ~2,2 GB; ảnh đã nén nên không nén thêm
+```
+
+Tải `data/lmdb_trainval.tar` lên Google Drive, vào thư mục `MyDrive/trademark_data/`
+(drive.google.com → Mới → Tải tệp lên).
+
+**Colab** (Runtime → Change runtime type → T4 GPU):
+
+1. `docs/colab/00_setup.ipynb`: ở cell 1 đặt `BRANCH = "16-fix-review"`. Nhánh `main` trên GitHub
+   chỉ có `detai.txt`, clone nó thì cell 3 báo thiếu `requirements.txt`. Cell 2 bỏ qua clone khi
+   thư mục đã có, nên phải clone lại sạch, nhớ **ra khỏi thư mục trước khi xoá**:
+
+   ```python
+   %cd /content
+   BRANCH = "16-fix-review"
+   !rm -rf /content/major_proj_1
+   !git clone -b {BRANCH} {REPO_URL} /content/major_proj_1
+   %cd /content/major_proj_1
+   !git log --oneline -1
+   ```
+2. Ô train (đặt cuối `00_setup` hoặc trong `02_train`, cùng phiên đã chạy cell 1–3). Bỏ ô `rsync`
+   của `02_train`, vì nó chép `trademark_data/lmdb/` cũ trên Drive, là bộ dữ liệu khác:
+
+   ```python
+   !mkdir -p /content/lmdb_root && tar -xf /content/drive/MyDrive/trademark_data/lmdb_trainval.tar -C /content/lmdb_root
+   !ls /content/lmdb_root/lmdb/train/trademark /content/lmdb_root/lmdb/val    # phải thấy data.mdb lock.mdb
+   !bash scripts/05_train.sh trba_ft --max-epochs 20 --num-workers 2 data.root_dir=/content/lmdb_root/lmdb
+   ```
+
+   - Cần code từ commit "05_train.sh: check the LMDB dir train.py will read" trở đi (dòng
+     `git log --oneline -1` ở cell 2 phải in commit đó). Code cũ kiểm `$DATA_ROOT/lmdb/train` trên
+     Drive, bỏ qua `data.root_dir=`, nên báo "thiếu LMDB ở …/trademark_data/lmdb".
+   - Đọc LMDB từ đĩa máy ảo, checkpoint ghi vào Drive. Dòng
+     `[05_train] checkpoint -> /content/drive/MyDrive/trademark_data/runs/trba_ft/<timestamp>/` là
+     nơi lưu thật.
+   - Batch giữ 64 như lần chạy CPU.
+   - Bị ngắt giữa chừng: máy ảo mới mất `/content/lmdb_root`. Chạy lại dòng `tar`, rồi thêm
+     `hydra.run.dir=<thư mục run cũ trên Drive> ckpt_path=<thư mục run cũ>/checkpoints/last.ckpt`
+     vào lệnh train.
+   - Colab miễn phí có giới hạn phiên, và để tab im lâu cũng bị ngắt. Thời gian 20 epoch trên T4
+     chưa đo; bảng ước lượng cũ ghi 2–4 giờ.
+3. Xong thì ghi lại `val_accuracy` tốt nhất (nằm trong tên file `checkpoints/epoch=…-val_accuracy=…ckpt`).
+
+**Mang về máy local:**
+
+1. Từ Drive tải `trademark_data/runs/trba_ft/<giờ>/`, chỉ cần `checkpoints/last.ckpt`, `config/`
+   và `hparams.yaml` (các checkpoint top-3 khác nặng, không cần), đặt vào
+   `data/runs/trba_ft/<giờ>/`.
+2. Nếu `val_accuracy` tốt nhất ≥ 1%: `touch data/runs/trba_ft/<giờ>/DONE`. Thiếu `DONE`, lần
+   pipeline sau có `trba_ft` trong `--models` sẽ coi là train dở và train tiếp trên CPU.
+3. Eval lại mọi model trên bộ test local, vào lúc máy rảnh (không chạy song song với train đêm):
+   `bash scripts/09_full_pipeline_cpu.sh --only eval`
+
 ---
 
 ## Lần 1 — 04/11/2026 20:59 → 05/11/2026 02:38 (máy `vunl`, CPU)
@@ -108,10 +226,4 @@ vẹn (cùng ổ đĩa, giữ giờ sửa) và xoá thư mục archive đó; run
 
 ### Việc tiếp theo
 
-1. Train lại `parseq_ft` đủ epoch — CPU cả một đêm:
-   `bash scripts/09_full_pipeline_cpu.sh --models parseq_ft --retrain --max-hours 9`
-   (≈ 8 epoch × 57 phút, xong ~7,6 giờ sau khi bắt đầu; eval chạy lại cho mọi model), hoặc GPU
-   trên Colab.
-2. `trba_ft` (50 M tham số): train trên GPU (Colab). `svtr` (2,3 M, train từ đầu): CPU một đêm.
-3. Duyệt tay nhãn VN (`python -m trademark_ocr.vn_review make --n 300` → sửa → `apply`), rồi
-   `bash scripts/09_full_pipeline_cpu.sh --from vn_lmdb` để có số liệu VN chính thức.
+Xem mục "Việc tiếp theo" ở đầu file (train lại parseq_ft, svtr, trba_ft trên Colab, duyệt tay VN).

@@ -1,0 +1,14 @@
+testcase48 — Có train nhưng thiếu val -> thoát 1 trước khi nạp model
+====================================================================
+
+MỤC ĐÍCH
+    Train cần cả tập val (validate mỗi epoch).
+
+ĐẦU VÀO
+    DATA_ROOT/lmdb chỉ có train/ (vd tar thiếu lmdb/val).
+
+KỲ VỌNG
+    Thoát 1; stderr nêu <DATA_ROOT>/lmdb/val; không gọi Python.
+
+VÌ SAO QUAN TRỌNG
+    Thiếu val thì lỗi chỉ hiện ở cuối epoch đầu — trên CPU là sau gần một giờ.

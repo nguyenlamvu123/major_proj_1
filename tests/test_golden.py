@@ -22,6 +22,10 @@ kind = "eval_sh"  scripts/06_eval.sh với PYTHON giả ghi lại lệnh; params
                   (runs + files + reports), params["args"] -> calls.json, exit.json,
                   forbidden.json, reports_after.json (file trong REPORTS_DIR sau khi chạy,
                   thư mục archive/<giờ> thay bằng archive/<TS>)
+kind = "train_sh" scripts/05_train.sh với PYTHON giả ghi lại lệnh, DATA_ROOT=<WORK>/data dựng từ
+                  params["state"]["files"] (đường dẫn có thể ra ngoài DATA_ROOT bằng "../"),
+                  params["args"] -> calls.json, exit.json, forbidden.json, log.json (các dòng
+                  "[05_train]", python giả thay bằng <PYTHON>), error.json nếu thoát khác 0
 kind = "verdict"  trademark_ocr.train_utils.train_verdict trên một run dir có các checkpoint
                   tên params["ckpts"] (file rỗng); params["kwargs"] -> result.json
 kind = "metrics"  trademark_ocr.metrics.evaluate_metrics(params["preds"], params["gts"]),
@@ -188,6 +192,26 @@ def run_case(name: str) -> Path:
         if proc.returncode != 0:
             dump(out / "error.json", {"code": proc.returncode,
                                       "stderr": normalize(proc.stderr, mapping)})
+    elif kind == "train_sh":
+        calls = out / "python_calls.txt"
+        fake_py = out / "fake_python"
+        fake_py.write_text(f'#!/bin/sh\necho "$*" >> "{calls}"\n', encoding="utf-8")
+        fake_py.chmod(0o755)
+        proc, mapping, forbidden, *_ = run_bash(
+            "05_train.sh", params.get("args", []), out=out, state=params.get("state", {}),
+            extra_env={"DATA_ROOT": "<WORK>/data", "PYTHON": str(fake_py)})
+        # python giả nằm dưới tests/actual/ (trong <REPO>) -> thay TRƯỚC khi thay <REPO>
+        mapping = {str(fake_py): "<PYTHON>", **mapping}
+        lines = calls.read_text(encoding="utf-8").splitlines() if calls.exists() else []
+        dump(out / "calls.json", [normalize(l, mapping) for l in lines])
+        dump(out / "exit.json", {"code": proc.returncode})
+        dump(out / "forbidden.json", forbidden)
+        dump(out / "log.json", [normalize(l, mapping) for l in proc.stdout.splitlines()
+                                if l.startswith("[05_train]")])
+        if proc.returncode != 0:
+            dump(out / "error.json", {"code": proc.returncode,
+                                      "stderr": normalize(proc.stderr, mapping)})
+
     elif kind == "verdict":
         from trademark_ocr.train_utils import train_verdict
         run_dir = out / "work" / "run"

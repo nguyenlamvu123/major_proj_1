@@ -1239,3 +1239,14 @@ Test: golden `testcase28..44` (3 kế hoạch với `UNDERTRAINED`, 5 `verdict`,
 `too_few_epochs`; đường dẫn báo cáo theo `REPORTS_DIR`). Runner luôn đặt `REPORTS_DIR` vào thư mục
 tạm: khi viết tính năng, một lần chạy test trước khi có dòng đó đã chuyển `reports/` thật vào
 archive (đã trả lại nguyên vẹn).
+
+### 16.10 `05_train.sh` kiểm đúng thư mục LMDB sẽ được đọc
+
+Colab 05/11: LMDB giải nén ra `/content/lmdb_root/lmdb` (đọc nhanh), `DATA_ROOT` trên Drive (giữ
+checkpoint), lệnh có `data.root_dir=/content/lmdb_root/lmdb` — script vẫn dừng ở "thiếu LMDB ở
+…/trademark_data/lmdb" vì luôn kiểm `$DATA_ROOT/lmdb/train`, bỏ qua override. Ngược lại, override
+trỏ vào thư mục chưa giải nén thì lọt qua và chỉ lỗi trong `train.py` sau khi đã nạp model.
+
+Sửa: dịch cờ trước, rồi kiểm `<root>/train` **và** `<root>/val` với `<root>` = giá trị
+`data.root_dir=` (nhận cả `+`/`++`) nếu có, không thì `$DATA_ROOT/lmdb`; dòng `checkpoint ->` in
+`hydra.run.dir=` nếu có. Test: golden `testcase45..50` (kind `train_sh`, Python giả).

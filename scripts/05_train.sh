@@ -8,7 +8,10 @@
 #
 # Mô hình: crnn | trba | parseq | svtr (= svtrctc)  (train từ đầu)
 #          crnn_ft | trba_ft | parseq_ft  (fine-tune từ trọng số pretrained của parseq, DESIGN 16.6)
-# Checkpoint: $DATA_ROOT/runs/<model>/<timestamp>/*.ckpt
+# Checkpoint: $DATA_ROOT/runs/<model>/<timestamp>/*.ckpt   (hoặc hydra.run.dir=<thư mục>)
+# LMDB: $DATA_ROOT/lmdb/{train,val}, hoặc data.root_dir=<thư mục chứa train/ và val/> — vd Colab
+#   giải nén LMDB ra đĩa máy ảo, còn DATA_ROOT (checkpoint) vẫn trên Drive:
+#   bash scripts/05_train.sh trba_ft --max-epochs 20 data.root_dir=/content/lmdb_root/lmdb
 # =====================================================================
 set -euo pipefail
 
@@ -36,10 +39,6 @@ if [ ! -d "$REPO_ROOT/third_party/parseq/strhub" ]; then
   echo "thiếu third_party/parseq — hãy chạy: bash scripts/00_get_parseq.sh" >&2
   exit 1
 fi
-if [ ! -d "$DATA_ROOT/lmdb/train" ]; then
-  echo "thiếu LMDB ở $DATA_ROOT/lmdb — hãy chạy nhánh 05 trước" >&2
-  exit 1
-fi
 
 # Dịch flag kiểu argparse -> override hydra (của parseq)
 overrides=()
@@ -59,9 +58,29 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# Kiểm thư mục LMDB mà train.py SẼ đọc, không phải một đường dẫn cố định: override
+# data.root_dir= thắng mặc định của config (${oc.env:DATA_ROOT}/lmdb). Bản cũ luôn kiểm
+# $DATA_ROOT/lmdb/train nên chặn nhầm lần chạy Colab đúng (LMDB ở /content, DATA_ROOT trên Drive)
+# và để lọt lần chạy trỏ data.root_dir= vào thư mục chưa giải nén (lỗi muộn, sau khi nạp model).
+lmdb_root="$DATA_ROOT/lmdb"
+run_dir="$DATA_ROOT/runs/${CONFIG#tm_}/<timestamp>"
+for o in ${overrides[@]+"${overrides[@]}"}; do
+  case "$o" in
+    data.root_dir=*|+data.root_dir=*|++data.root_dir=*) lmdb_root="${o#*data.root_dir=}" ;;
+    hydra.run.dir=*) run_dir="${o#hydra.run.dir=}" ;;
+  esac
+done
+for sub in train val; do
+  if [ ! -d "$lmdb_root/$sub" ]; then
+    echo "thiếu LMDB ở $lmdb_root/$sub — build LMDB trước (python -m trademark_ocr.build_lmdb)," \
+         "hoặc trỏ data.root_dir= tới thư mục chứa train/ và val/" >&2
+    exit 1
+  fi
+done
+
 echo "[05_train] model=$MODEL config=$CONFIG overrides: ${overrides[*]:-<none>}"
-echo "[05_train] PYTHON=$PYTHON  DATA_ROOT=$DATA_ROOT"
-echo "[05_train] checkpoint -> $DATA_ROOT/runs/${CONFIG#tm_}/<timestamp>/"
+echo "[05_train] PYTHON=$PYTHON  DATA_ROOT=$DATA_ROOT  LMDB=$lmdb_root"
+echo "[05_train] checkpoint -> $run_dir/"
 
 exec "$PYTHON" "$REPO_ROOT/third_party/parseq/train.py" \
   --config-dir "$REPO_ROOT/configs/hydra" \
