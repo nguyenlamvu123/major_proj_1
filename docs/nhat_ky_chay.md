@@ -150,8 +150,13 @@ Chạy đúng khi đủ cả ba điều sau:
 
 - dòng `[05_train] checkpoint -> …` trỏ đúng `RUN` cũ;
 - log có `Restored all states from the checkpoint at …`;
-- thanh tiến trình bắt đầu ở `Epoch <số epoch ô 1 in ra>/19`, không phải `Epoch 0/19`.
-  Lightning đếm epoch từ 0: `Epoch 8/19` là epoch thứ 9 trên 20.
+- thanh tiến trình hiện `Epoch <số epoch ô 1 in ra − 1>/20` trong vài phút rồi tới
+  `Epoch <số epoch ô 1 in ra>/20`. Thấy `Epoch 0/20` là sai, phải dừng ngay.
+  - Lightning đếm epoch từ 0, nên `Epoch 8/20` là epoch thứ 9.
+  - Mẫu số là 20 chứ không phải 19: TRBA có BatchNorm nên SWA cộng thêm một lượt (output ở A cũng
+    hiện `Epoch 7/20`).
+  - Vài phút đầu: Lightning 2.6 chấm val lại đúng bước vừa khôi phục, và ghi lại checkpoint
+    `epoch=<N−1>-…ckpt` của bước đó (thấy khi thử trên máy local).
 
 Không được đổi:
 
@@ -176,49 +181,134 @@ checkpoint.
 >
 > Các bước dưới đây dùng khi chuyển sang một tài khoản được phép dùng, ví dụ tài khoản có gói trả phí.
 
-Checkpoint và dữ liệu nằm trên Drive của tài khoản cũ (gọi là A). Colab chạy bằng tài khoản mới (B)
-chỉ mount được Drive của B, nên phải chép run sang Drive của B và **giữ nguyên đường dẫn**
-`MyDrive/trademark_data/runs/trba_ft/<giờ>/`. Lý do: `last.ckpt` lưu đường dẫn thư mục checkpoint.
-Nếu đường dẫn khác, Lightning cảnh báo "The dirpath has changed…" và lập lại danh sách top-3 từ
-rỗng: các file `epoch=…ckpt` cũ không bao giờ bị dọn, nên tốn thêm vài GB Drive. Kết quả train vẫn
-đúng.
+Checkpoint và dữ liệu nằm trên Drive của tài khoản cũ (gọi là A); Colab chạy bằng tài khoản mới (B)
+chỉ mount được Drive của B. Có hai cách. Cả hai đều giữ **đúng đường dẫn**
+`/content/drive/MyDrive/trademark_data/runs/trba_ft/<giờ>/` như lúc A train. Lý do: `last.ckpt` lưu
+đường dẫn thư mục checkpoint. Nếu đường dẫn khác, Lightning cảnh báo "The dirpath has changed…" và
+lập lại danh sách top-3 từ rỗng: các file `epoch=…ckpt` cũ không bao giờ bị dọn, tốn thêm vài GB
+Drive. Kết quả train vẫn đúng.
 
-Dung lượng: mỗi checkpoint TRBA chứa cả trạng thái optimizer (AdamW), cỡ 0,6 GB. Một run gồm
-`last.ckpt` và 3 file `epoch=…ckpt`, tức khoảng 2,4 GB (xem cột kích thước trên Drive). Drive miễn
-phí có 15 GB.
+Run `trba_ft` hiện có là `2026-11-05_08-28-47` (giờ UTC). Notebook đã ghi chú sẵn cho cách 1 nằm ở
+máy `vunl`: `~/Downloads/00_setup.ipynb`, bản gốc tải từ A là `~/Downloads/00_setup.A_goc.ipynb`.
 
-1. **[drive.google.com, tài khoản A]** Chuột phải thư mục `trademark_data` → Chia sẻ → nhập email
-   tài khoản B, chọn quyền **Người xem** → Gửi. B chỉ cần đọc. Quyền xem còn chặn việc lỡ ghi
-   checkpoint mới vào Drive của A: lỡ trỏ nhầm thì báo lỗi quyền truy cập, không ghi lẫn.
-2. **[drive.google.com, tài khoản B]** Vào "Được chia sẻ với tôi" → chuột phải `trademark_data` →
-   Sắp xếp → Thêm lối tắt → Drive của tôi. Sau đó đổi tên lối tắt thành `trademark_data_A` (chuột
-   phải → Đổi tên), để khỏi trùng tên với thư mục `trademark_data` của chính B.
-3. **[Colab, tài khoản B]** Chọn Runtime T4 GPU. Chạy 3 ô đầu `00_setup` với
-   `BRANCH = "16-fix-review"`; khi `drive.mount` hỏi thì chọn tài khoản B. Cell 1 tự tạo
-   `MyDrive/trademark_data/` của B.
-4. **[Colab B]** Chép run, chỉ làm một lần:
+Dung lượng: mỗi checkpoint TRBA chứa cả trạng thái optimizer (AdamW), **0,8 GB** (đo trên máy local).
+Một run gồm `last.ckpt` và 3 file `epoch=…ckpt`, tức khoảng 3,2 GB. Drive miễn phí có 15 GB.
+
+##### Cách 1 — không chép: lối tắt quyền chỉnh sửa, giữ nguyên tên (đang dùng)
+
+B làm việc thẳng trên thư mục của A. Checkpoint mới ghi vào Drive của A; file mới do B tạo thì tính
+vào dung lượng của B.
+
+1. **[drive.google.com, tài khoản A]** Mở `trademark_data/runs/trba_ft/<giờ>/checkpoints/`, tạo thư
+   mục `trademark_data/backup_trba_ft_8epoch/` và **di chuyển** (không sao chép) 3 file `epoch=…ckpt`
+   vào đó. **Để nguyên `last.ckpt`.** Lý do:
+   - Khi train ở B, Lightning xoá dần checkpoint cũ khỏi top-3. 3 file này thuộc sở hữu của A, mà
+     Drive thường chỉ cho chủ sở hữu xoá file: B xoá không được thì train dừng vì lỗi.
+   - Lightning kiểm file còn tồn tại trước khi xoá (`lightning_fabric/plugins/io/torch_io.py`,
+     `remove_checkpoint`), nên file đã chuyển đi thì nó bỏ qua.
+   - Đã thử trên máy local với trba_ft thu nhỏ: chuyển hết `epoch=…ckpt` đi, hạ điểm top-3 cũ trong
+     `last.ckpt` để epoch mới chắc chắn đẩy chúng ra (buộc Lightning xoá các file đã chuyển), rồi
+     train tiếp. Không lỗi; 3 checkpoint mới và `last.ckpt` đều được ghi.
+   - Trạng thái 8 epoch được giữ nguyên ở thư mục dự phòng.
+2. **[drive.google.com, tài khoản A]** Chuột phải thư mục `trademark_data` → Chia sẻ → email của B,
+   quyền **Người chỉnh sửa** → Gửi.
+3. **[drive.google.com, tài khoản B]** Trong "Drive của tôi" phải **chưa có** thư mục nào tên
+   `trademark_data` (có thì: trống → xoá; có dữ liệu → đổi tên). Rồi vào "Được chia sẻ với tôi" →
+   chuột phải `trademark_data` → Sắp xếp → Thêm lối tắt → Drive của tôi. **Giữ nguyên tên.**
+4. **[Colab, tài khoản B]** Mỗi phiên chạy theo thứ tự:
+   - mount Drive bằng tài khoản B, nhưng **không** `os.makedirs(DATA_ROOT)`: lối tắt chưa đồng bộ
+     thì lệnh đó âm thầm tạo một thư mục trống che mất lối tắt. Thay bằng kiểm
+     `{RUN}/checkpoints/last.ckpt` tồn tại;
+   - clone, cài thư viện, kiểm GPU (3 ô đầu `00_setup` + ô kiểm GPU);
+   - **kiểm quyền ghi** trước khi train:
+     - (a) **phiên đầu ở B:** `checkpoints/` không còn file `epoch=…` nào (cả 3 file của A đã chuyển
+       đi). Qua kiểm thì ghi file mốc `{RUN}/B_da_kiem_checkpoint.txt`; các phiên sau thấy mốc thì
+       bỏ qua (a). Không thể lọc theo số epoch, vì ngay khi train tiếp B tự ghi lại
+       `epoch=7-…ckpt`, trùng tên với file của A;
+     - (b) tạo được và xoá được một file của B trong thư mục run;
+     - (c) ghi đè được một file nhỏ của A (`hparams.yaml`, ghi lại đúng nội dung cũ) theo đúng cách
+       Lightning ghi đè `last.ckpt`: `fsspec` transaction, ghi ra file tạm rồi chuyển đè. Cần kiểm
+       (c) vì Lightning 2.6 nuốt `PermissionError` lúc lưu: hỏng ở đây thì train vẫn chạy mà
+       `last.ckpt` không được cập nhật;
+   - ô 1 + ô 2 của mục 3a. Riêng dòng train dùng đúng kiểu lệnh A đã chạy:
+     `DATA_ROOT=/content/lmdb_root bash scripts/05_train.sh trba_ft --max-epochs 20 --num-workers 2 hydra.run.dir={RUN} ckpt_path={RUN}/checkpoints/last.ckpt`.
+5. `last.ckpt` hỏng: chép file `epoch=…ckpt` có số epoch lớn nhất (phiên đầu: trong
+   `backup_trba_ft_8epoch/`) **vào** `{RUN}/checkpoints/` rồi dùng bản chép làm `ckpt_path`. Bản chép
+   phải nằm trong `{RUN}/checkpoints/`, vì `train.py` lấy thư mục run từ `ckpt_path` (lên 2 cấp).
+6. Không để A và B cùng train run này một lúc. Xong 20 epoch thì mang về máy local như dưới đây (tải
+   từ A hay B đều được); `backup_trba_ft_8epoch/` xoá được sau khi eval xong.
+
+Chưa kiểm chứng được trên Drive thật: việc ghi qua lối tắt trên Colab, và quyền xoá/ghi đè file của
+người khác. Vì vậy bước kiểm quyền ghi phải chạy trước khi train. Lỗi ở (b) hoặc (c) thì dùng cách 2.
+
+##### Cách 2 — chép run sang Drive của B
+
+Bản gốc ở A còn nguyên làm dự phòng. Không phụ thuộc quyền ghi qua lối tắt.
+
+1. **[drive.google.com, tài khoản A]** Chia sẻ thư mục `trademark_data` cho B với quyền **Người xem**.
+   Quyền xem còn chặn việc lỡ ghi checkpoint mới vào Drive của A: lỡ trỏ nhầm thì báo lỗi quyền truy
+   cập, không ghi lẫn.
+2. **[drive.google.com, tài khoản B]** "Được chia sẻ với tôi" → chuột phải `trademark_data` → Sắp xếp →
+   Thêm lối tắt → Drive của tôi, rồi đổi tên lối tắt thành `trademark_data_A`, để khỏi trùng với
+   thư mục `trademark_data` của chính B.
+3. **[Colab, tài khoản B]** Chạy 3 ô đầu `00_setup` (`BRANCH = "16-fix-review"`, mount bằng B). Cell 1
+   tự tạo `MyDrive/trademark_data/` của B.
+4. **[Colab B]** Chép run, chỉ làm một lần, có chốt chặn để không chép đè lên tiến độ đã train ở B:
 
    ```python
    SRC = "/content/drive/MyDrive/trademark_data_A"                    # lối tắt tới Drive của A (chỉ đọc)
-   GIO = "<giờ>"                                                        # tên thư mục run trba_ft bên A
+   GIO = "2026-11-05_08-28-47"                                          # tên thư mục run trba_ft bên A
    RUN = f"/content/drive/MyDrive/trademark_data/runs/trba_ft/{GIO}"   # Drive của B, cùng đường dẫn như A
-   !ls {SRC}/runs/trba_ft/                                              # phải thấy thư mục <giờ>
-   !mkdir -p /content/drive/MyDrive/trademark_data/runs/trba_ft
-   !cp -r {SRC}/runs/trba_ft/{GIO} /content/drive/MyDrive/trademark_data/runs/trba_ft/
-   !ls -la {RUN} {RUN}/checkpoints                                     # đủ file, cùng kích thước như bên A
+   !ls -la {SRC}/runs/trba_ft/{GIO}/checkpoints
+   !test -e {RUN} && echo "ĐÃ CÓ {RUN} — không chép đè" || (mkdir -p /content/drive/MyDrive/trademark_data/runs/trba_ft && cp -r {SRC}/runs/trba_ft/{GIO} /content/drive/MyDrive/trademark_data/runs/trba_ft/ && echo "chép xong")
+   !ls -la {RUN}/checkpoints                                           # cùng kích thước như bên A
    ```
 
    Nếu `/content/drive/MyDrive/` không có `trademark_data_A`: chờ vài phút cho lối tắt đồng bộ rồi
    chạy `drive.mount('/content/drive', force_remount=True)`. Vẫn không thấy thì tải thư mục run từ
-   Drive của A về máy, rồi tải lên Drive của B vào đúng
-   `MyDrive/trademark_data/runs/trba_ft/<giờ>/` bằng giao diện web.
-5. **[Colab B]** Chạy ô 1 và ô 2 của mục 3a với `RUN` ở bước 4. Riêng dòng `tar` thì đọc từ lối tắt,
-   khỏi chép 2,2 GB:
+   Drive của A về máy, rồi tải lên Drive của B vào đúng `MyDrive/trademark_data/runs/trba_ft/<giờ>/`.
+5. **[Colab B]** Ô 1 và ô 2 của mục 3a với `RUN` ở bước 4; dòng `tar` đọc từ lối tắt:
    `!mkdir -p /content/lmdb_root && tar -xf {SRC}/lmdb_trainval.tar -C /content/lmdb_root`.
-   Dòng `[05_train] checkpoint -> …` phải là `RUN` trên Drive của **B**, không phải đường dẫn chứa
-   `trademark_data_A`.
-6. Bị ngắt tiếp thì làm lại bước 3 và 5, không chép lại. Xong 20 epoch thì mang về máy local như dưới
-   đây, lấy từ Drive của **B**.
+   Dòng `[05_train] checkpoint -> …` phải là `RUN` trên Drive của **B**.
+6. Bị ngắt tiếp thì làm lại bước 3 và 5. Xong 20 epoch thì mang về từ Drive của **B**.
+
+#### 3c. Phiên 2 (và các phiên sau): sang tài khoản C, làm trên máy khác
+
+Theo cách 1, chỉ cần trình duyệt; máy khác không cần cài gì. Notebook dùng chung cho mọi phiên:
+[`docs/colab/train_tiep_trba_ft.ipynb`](colab/train_tiep_trba_ft.ipynb). Đây là bản `00_setup` tải
+từ A, đã ghi chú từng ô, ô train cũ đã vô hiệu hoá, có thêm ô B1 (kiểm quyền ghi) và B2 (train tiếp).
+Ước lượng thời gian: mỗi epoch ~33,5 phút trên T4, lượt SWA cuối ~30 phút, chuẩn bị mỗi phiên
+~15 phút. Phiên 1 (B, tối đa ~5 giờ) dự kiến tới khoảng epoch 16/20, phiên 2 còn ~2,5 giờ.
+
+1. **Dừng hẳn phiên trước.** Trên Colab của B: Runtime → Disconnect and delete runtime (nếu chưa tự
+   ngắt). Hai tài khoản không được cùng ghi vào một run.
+2. **[drive.google.com, tài khoản B]** Mở `trademark_data/runs/trba_ft/2026-11-05_08-28-47/checkpoints/`:
+   - nhìn giờ sửa của `last.ckpt` để biết phiên 1 lưu tới đâu;
+   - tạo thư mục `trademark_data/backup_trba_ft_phien_B/` rồi **di chuyển** mọi file `epoch=…ckpt`
+     đang có vào đó, để nguyên `last.ckpt`. Các file này do B tạo nên thuộc sở hữu của B, C không xoá
+     được. Lý do giống bước 1 của cách 1, chỉ khác người làm là B.
+3. **[drive.google.com, tài khoản A]** Chia sẻ `trademark_data` cho C, quyền **Người chỉnh sửa**.
+4. **[drive.google.com, tài khoản C]** "Drive của tôi" phải chưa có thư mục `trademark_data`. Rồi
+   "Được chia sẻ với tôi" → chuột phải `trademark_data` → Sắp xếp → Thêm lối tắt → Drive của tôi.
+   **Giữ nguyên tên.**
+5. **[Colab, tài khoản C]** Mở notebook:
+   - Tệp → Mở sổ tay → tab GitHub, dán link file trên GitHub (repo private: tick "Include private
+     repos" và cấp quyền);
+   - hoặc tải file `.ipynb` từ GitHub về máy, rồi Tệp → Tải sổ tay lên.
+
+   Chọn Runtime → Change runtime type → T4 GPU. **Ở ô 1 đổi `TK = "B"` thành `TK = "C"`**: mỗi tài
+   khoản cần một file mốc riêng ở ô B1, để B1 kiểm lại `checkpoints/` ở phiên đầu của C.
+6. **[Colab C]** Chạy 1 → 2 → 3 → 4 → B1 → 6 → B2, không bấm "Run all".
+   - B1 phải in đủ (a), (b), (c) OK. Nếu (a) dừng vì còn file `epoch=…` thì làm lại bước 2.
+   - Ô 6 in "đã xong N epoch", với `global_step` = N × 801. N là epoch mà phiên 1 đã lưu.
+   - B2: thanh tiến trình hiện `Epoch N−1/20` vài phút rồi `Epoch N/20`. Thấy `Epoch 0/20` thì dừng.
+   - Thời gian: (20 − N) × ~33,5 phút + ~30 phút cho SWA.
+7. **Xong** khi output B2 có `` `Trainer.fit` stopped: `max_epochs=21` reached `` (20 epoch cộng lượt
+   SWA của model có BatchNorm; svtrctc ở lần 2 cũng in `max_epochs=11` cho 10 epoch).
+   - Phiên 2 lại bị cắt giữa chừng: làm phiên 3 y như trên. Chủ của các file `epoch=…` lúc đó (C)
+     di chuyển chúng đi, tài khoản mới đặt `TK` là tên mới.
+8. Mang về máy `vunl` như mục dưới đây. Thư mục `backup_trba_ft_*` và các file
+   `*_da_kiem_checkpoint.txt` không cần tải. Xoá các thư mục backup sau khi đã eval xong ở `vunl`.
 
 **Mang về máy local:**
 
