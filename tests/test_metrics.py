@@ -142,3 +142,59 @@ def test_evaluate_end_to_end_on_real_lmdb(tmp_path):
     header = out.read_text(encoding="utf-8").splitlines()[0]
     for col in ("pred", "gt", "correct", "ned"):
         assert col in header
+
+
+# ------------------------ tính chất của edit distance ------------------------
+
+def _levenshtein_reference(a: str, b: str) -> int:
+    """Định nghĩa đệ quy (memo) — chậm nhưng hiển nhiên đúng, dùng để đối chiếu DP 2 hàng."""
+    from functools import lru_cache
+
+    @lru_cache(maxsize=None)
+    def d(i: int, j: int) -> int:
+        if i == 0 or j == 0:
+            return i + j
+        return min(d(i - 1, j) + 1, d(i, j - 1) + 1, d(i - 1, j - 1) + (a[i - 1] != b[j - 1]))
+
+    return d(len(a), len(b))
+
+
+def _random_strings(n: int, seed: int = 1111) -> list[str]:
+    import random
+
+    rnd = random.Random(seed)
+    alphabet = "AĂÂBĐEÊaăđ "                     # ít ký tự → nhiều trùng lặp, nhiều ca biên
+    return ["".join(rnd.choice(alphabet) for _ in range(rnd.randrange(0, 9))) for _ in range(n)]
+
+
+def test_edit_distance_matches_reference_definition():
+    words = _random_strings(40)
+    for a in words:
+        for b in words[:10]:
+            assert edit_distance(a, b) == _levenshtein_reference(a, b), (a, b)
+
+
+def test_edit_distance_is_a_metric():
+    words = _random_strings(15, seed=7)
+    for a in words:
+        assert edit_distance(a, a) == 0
+        for b in words:
+            assert edit_distance(a, b) == edit_distance(b, a)
+            for c in words:
+                assert edit_distance(a, c) <= edit_distance(a, b) + edit_distance(b, c)
+
+
+def test_ned_bounded_and_one_minus_ned_consistent():
+    words = _random_strings(30, seed=3)
+    preds, gts = words[:15], words[15:]
+    for p, g in zip(preds, gts):
+        assert 0.0 <= normalized_edit_distance(p, g) <= 1.0
+    m = evaluate_metrics(preds, gts)
+    assert m["one_minus_ned"] == pytest.approx(1.0 - m["ned"])
+    assert 0.0 <= m["accuracy"] <= 1.0
+
+
+def test_accuracy_is_strict_on_case_and_diacritics():
+    """Hành vi hiện tại (nhánh 10): accuracy so khớp tuyệt đối từng codepoint."""
+    m = evaluate_metrics(["ĐÔNG Á", "dong a", "DONG A"], ["ĐÔNG Á", "DONG A", "ĐÔNG Á"])
+    assert m["accuracy"] == pytest.approx(1 / 3)

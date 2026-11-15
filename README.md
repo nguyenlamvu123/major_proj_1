@@ -67,11 +67,12 @@ bash scripts/05_train.sh svtrctc   # SVTR-CTC (CTC transformer)
 bash scripts/06_eval.sh            # đánh giá trên test US + test VN
 ```
 
-## Nhánh Git (15 nhánh, merge tuần tự)
+## Nhánh Git (merge tuần tự)
 
 `00-init → 01-charset-vi → 02-fetch-uspto-meta → 03-fetch-uspto-images →
 04-clean-label → 05-split-build_data → 06-eda → 07-train-crnn →
 08-train-parseq → 09-train-svtrv2 → 10-eval-metrics → 11-fetch-vn →
-12-eval_domain_shift → 13-error-analysis → 14-demo-report`
+12-eval_domain_shift → 13-error-analysis → 14-demo-report →
+15-review-tests`
 
 Mỗi nhánh có lệnh nghiệm thu tương ứng trong `ACCEPTANCE.md`.
