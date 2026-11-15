@@ -1,0 +1,13 @@
+[
+  "[plan] setup            | skip   | đã xong (accelerator=cpu)",
+  "[plan] us_meta          | skip   | đã xong (rows=60000)",
+  "[plan] us_images        | skip   | đã xong (-)",
+  "[plan] clean            | skip   | đã xong (-)",
+  "[plan] split            | skip   | đã xong (seed=1111)",
+  "[plan] lmdb             | skip   | đã xong (-)",
+  "[plan] vn               | skip   | đã xong (limit=2000)",
+  "[plan] vn_lmdb          | run    | build_lmdb test_vn (đã duyệt tay: split_test_vn_verified.csv)",
+  "[plan] train:crnn_ft    | run    | từ đầu, 10 epoch, batch 64, cpu",
+  "[plan] train:parseq_ft  | run    | từ đầu, 10 epoch, batch 64, cpu",
+  "[plan] eval             | run    | 06_eval.sh --device cpu (mọi model có checkpoint) + báo cáo"
+]

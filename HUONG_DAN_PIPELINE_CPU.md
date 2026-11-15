@@ -1,118 +1,119 @@
-# Hướng dẫn chạy pipeline train/eval trên máy Ubuntu khác (CPU)
+# Hướng dẫn chạy toàn bộ đồ án trên một máy (`scripts/09_full_pipeline_cpu.sh`)
 
-File script: `scripts/09_full_pipeline_cpu.sh`
+Một lệnh chạy từ đầu tới cuối: dựng môi trường → tải dữ liệu US → làm sạch, chia tập, LMDB →
+crawl tập VN → train → đánh giá + báo cáo. Chạy được trên máy chỉ có CPU (tên "_cpu"), và tự
+dùng GPU nếu máy có `nvidia-smi` (`--accelerator auto`).
 
-## 1) Yêu cầu môi trường
+## 1. Yêu cầu
 
-- Ubuntu/Linux
-- Git, Python 3.10+, pip
-- Kết nối mạng
-- Dung lượng ổ: ~20–40GB (code + data + checkpoint)
-- RAM: khuyến nghị >= 16GB để train, nếu 8–12GB chỉ nên train 1 model với batch nhỏ
+- Linux, `git`, `python3` có module `venv` (Ubuntu: gói `python3-venv`). **Không cần** `pip`
+  hệ thống: script tự dựng `<repo>/.venv` và cài torch bản CPU (tránh ~2,5 GB thư viện CUDA).
+- Mạng tới USPTO (metadata + CDN ảnh), WIPO Publish (VN), GitHub (parseq + trọng số pretrained).
+- Ổ đĩa: dữ liệu ~6 GB (ảnh + LMDB) + checkpoint vài trăm MB mỗi model + venv ~2,2 GB.
+- RAM: ≥ 8 GB trống cho batch 64. Thiếu thì `--batch-size 32` (hoặc 16).
 
-## 2) Chuẩn bị
-
-Trên máy mới, mở terminal tại thư mục muốn lưu project:
-
-```bash
-# Tạo thư mục làm việc
-mkdir -p ~/projects
-cd ~/projects
-```
-
-Clone repo hoặc copy script này qua máy mới (có thể copy cả repo hiện tại).
-
-## 3) Cách chạy
-
-### Trường hợp A: Chưa có dữ liệu gì cả (tự tải từ đầu)
-
-Script sẽ tự clone repo nhánh `16-fix-review`, cài dependencies, tải meta + ảnh USPTO, clean/split, build LMDB, crawl VN, train, eval, sinh báo cáo.
+## 2. Lấy code
 
 ```bash
-cd /path/to/repo  # hoặc chạy từ nơi có script
-bash scripts/09_full_pipeline_cpu.sh \
-  --repo-url git@github.com:nguyenlamvu123/major_proj_1.git \
-  --branch 16-fix-review \
-  --data-root /home/$USER/data/trademark_data \
-  --work-dir ~/projects \
-  --models crnn \
-  --batch-size 8 \
-  --max-epochs 15
+git clone https://github.com/nguyenlamvu123/major_proj_1.git
+cd major_proj_1
+git switch 16-fix-review
 ```
 
-> **Lưu ý:** Tải ảnh USPTO có thể mất vài giờ. Trên CPU train cũng rất chậm.
+Script chạy ngay trong repo chứa nó — không tự clone thêm bản khác.
 
-### Trường hợp B: Đã copy dữ liệu từ máy cũ qua
-
-Nếu bạn đã copy toàn bộ `trademark_data/` (hoặc ít nhất `raw/`, `processed/`, `lmdb/`) sang máy mới, bỏ qua bước tải:
+## 3. Chạy
 
 ```bash
-bash scripts/09_full_pipeline_cpu.sh \
-  --branch 16-fix-review \
-  --data-root /path/to/trademark_data \
-  --skip-fetch \
-  --models crnn,parseq \
-  --batch-size 8 \
-  --max-epochs 20
+tmux new -s doan                                     # đóng terminal không làm chết tiến trình
+bash scripts/09_full_pipeline_cpu.sh --dry-run       # 1) xem kế hoạch, không chạy gì
+bash scripts/09_full_pipeline_cpu.sh --max-hours 3   # 2) chạy thật; Ctrl-b d để thoát ra
 ```
 
-### Trường hợp C: Đã có repo + data, chỉ muốn train/eval
+Sáng hôm sau: `tmux attach -t doan`, hoặc xem log `data/logs/pipeline_*.log` và báo cáo
+`reports/final_summary.md`.
 
-```bash
-bash scripts/09_full_pipeline_cpu.sh \
-  --data-root /path/to/trademark_data \
-  --skip-clone --skip-fetch --skip-build-lmdb \
-  --models crnn \
-  --batch-size 6 \
-  --num-workers 0 \
-  --max-epochs 10
-```
+Script tự giữ khoá chặn máy ngủ (`systemd-inhibit`) trong suốt lần chạy, nếu hệ thống cho phép.
 
-## 4) Các tham số quan trọng
+### Chạy lại an toàn
 
-| Tham số | Mặc định | Mô tả |
+Mỗi bước dữ liệu xong thì ghi một dấu vào `$DATA_ROOT/.pipeline/<bước>`. Chạy lại thì:
+
+- bước đã có dấu, cùng tham số, và các bước nó phụ thuộc không mới hơn → **bỏ qua**;
+- đổi tham số (vd `--us-rows`) hoặc bước phía trước chạy lại → bước đó và mọi bước phía sau chạy lại;
+- model đã train xong (`runs/<model>/<giờ>/DONE`) → bỏ qua; train dở (có `last.ckpt`, chưa
+  `DONE`) → **train tiếp** từ `last.ckpt`, giữ đúng số epoch/batch đã ghi trong
+  `runs/<model>/<giờ>/pipeline_train.env`;
+- tải ảnh dở → tải tiếp phần còn thiếu.
+
+Lỗi giữa chừng (mất mạng, mất điện) thì cứ chạy lại đúng lệnh cũ.
+
+## 4. Các cờ
+
+| Cờ | Mặc định | Ý nghĩa |
 |---|---|---|
-| `--branch` | `16-fix-review` | Nhánh code sử dụng |
-| `--repo-url` | SSH | URL repo |
-| `--data-root` | `/data/trademark_data` | Thư mục chứa dữ liệu |
-| `--work-dir` | `$HOME/projects` | Thư mục clone repo |
-| `--models` | `crnn,trba,parseq,svtrctc` | Danh sách model train |
-| `--batch-size` | `8` | Batch size (giảm xuống 4–6 nếu thiếu RAM) |
-| `--num-workers` | `0` | Số worker dataloader (0 an toàn nhất trên CPU/RAM ít) |
-| `--max-epochs` | `20` | Số epoch train |
-| `--skip-clone` | false | Bỏ qua clone repo |
-| `--skip-fetch` | false | Bỏ qua tải meta/ảnh USPTO + VN |
-| `--skip-build-lmdb` | false | Bỏ qua build LMDB |
-| `--skip-train` | false | Bỏ qua train |
-| `--skip-eval` | false | Bỏ qua eval |
+| `--dry-run` | | chỉ in kế hoạch (không gọi mạng, không tạo file) |
+| `--data-root DIR` | `$DATA_ROOT` hoặc `<repo>/data` | gốc dữ liệu |
+| `--venv DIR` | `<repo>/.venv` | môi trường Python tự dựng |
+| `--python PATH` | | dùng Python có sẵn, bỏ bước dựng venv |
+| `--us-rows N` | 60000 | số dòng metadata US (lọc xong còn ~97%) |
+| `--vn-limit N` | 2000 | số nhãn hiệu VN |
+| `--image-workers N` | 16 | luồng tải ảnh US |
+| `--models a,b` | `crnn_ft,parseq_ft` | model cần train (tên như `scripts/05_train.sh`) |
+| `--max-epochs N` | 10 | số epoch tối đa |
+| `--max-hours H` | không giới hạn | **ngân sách giờ cho MỖI model** (xem mục 5) |
+| `--batch-size N` | 64 | |
+| `--num-workers N` | 4 | worker dataloader |
+| `--accelerator X` | `auto` | `auto` / `cpu` / `gpu` |
+| `--from STEP` | | bỏ qua các bước trước STEP |
+| `--only a,b` | | chỉ chạy các bước này, ép chạy kể cả khi đã xong |
+| `--skip a,b` | | bỏ qua các bước này |
+| `--retrain` | | train lại từ đầu kể cả model đã `DONE` |
 
-## 5) Sau khi chạy xong
+Các bước: `setup us_meta us_images clean split lmdb vn vn_lmdb train eval`.
 
-Kết quả sẽ nằm ở:
+## 5. `--max-hours`: train theo ngân sách giờ
+
+Với mỗi model train mới, script **đo tốc độ thật** trên máy (vài batch train + val, đúng
+batch/worker/augment), rồi chọn số epoch lớn nhất (≤ `--max-epochs`) vừa 85% ngân sách
+(`runs/<model>/<giờ>/benchmark.json`). Nhờ vậy lịch learning rate (OneCycle) chạy trọn, thay vì
+bị cắt ngang ở LR còn cao.
+
+Trần cứng `max_time` của Lightning = 115% ngân sách — chỉ cắt khi máy chậm bất thường; khi đó
+model được đánh dấu "chưa đủ epoch" và chạy lại script sẽ train tiếp.
+
+Ước lượng tổng thời gian một đêm: dữ liệu ~1,5–2,5 giờ (phần lớn là tải ~60k ảnh) + số model ×
+`--max-hours` + eval ~0,5 giờ. Ví dụ 2 model, `--max-hours 3`: khoảng 8–9 giờ.
+
+## 6. Tập VN và duyệt tay
+
+Nhãn VN (`rs-MK` của WIPO Publish) là phần chữ được đăng ký, không phải bản chép lại ảnh. Lần
+chạy tự động dùng nhãn **chưa duyệt** (cuối log có cảnh báo). Để có số liệu đúng:
+
+```bash
+.venv/bin/python -m trademark_ocr.vn_review make --n 300   # sửa tay data/processed/review_vn.csv
+.venv/bin/python -m trademark_ocr.vn_review apply
+bash scripts/09_full_pipeline_cpu.sh --from vn_lmdb         # build lại test_vn + eval lại
+```
+
+Crawl VN lỗi (mạng, site đổi cấu trúc) **không** dừng train: eval chỉ có `test_us`, cuối log có cảnh báo.
+
+## 7. Kết quả
 
 ```text
-~/projects/major_proj_1/
-├── reports/
-│   ├── final_summary.md      # Báo cáo tổng hợp
-│   ├── <model>_us.csv
-│   ├── <model>_vn.csv
-│   └── domain_shift.csv
-└── runs/                     # Checkpoint
-    └── <model>/<timestamp>/checkpoints/last.ckpt
+<repo>/reports/final_summary.md        báo cáo tổng hợp (3 mức so khớp, phân tách độ sụt US→VN, theo drawing_kind)
+<repo>/reports/<model>_{us,vn}.csv     kết quả từng mẫu
+<DATA_ROOT>/runs/<model>/<giờ>/         checkpoints/last.ckpt, config/, pipeline_train.env, benchmark.json, DONE
+<DATA_ROOT>/logs/pipeline_<giờ>.log     log đầy đủ của lần chạy
 ```
 
-Xem báo cáo:
+Mang model sang máy khác: chép **cả thư mục run** (cần `config/config.yaml` để `evaluate` biết lớp model).
 
-```bash
-cat ~/projects/major_proj_1/reports/final_summary.md
-```
+## 8. Lưu ý
 
-## 6) Lời khuyên khi train trên CPU
-
-- **Bắt đầu với 1 model**: `--models crnn` thay vì train cả 4 cùng lúc
-- **Giảm batch size**: nếu RAM < 12GB dùng `--batch-size 4`
-- **Luôn dùng `--num-workers 0`**: tránh tăng RAM
-- **Build lại LMDB đầy đủ**: trên máy cũ train chỉ 500 mẫu, trên máy mới nên build lại từ `split_train.csv` (4356 mẫu) để có kết quả đúng
-- **Ưu tiên fine-tune**: nếu có pretrained, `parseq_ft` thường hội tụ nhanh hơn trên dữ liệu nhỏ
-- **Chạy nền**: có thể dùng `tmux` hoặc `screen` để train không bị ngắt khi mất kết nối SSH
-- **Kiểm tra RAM**: `htop` / `free -h` trong lúc train
+- Train trên CPU chậm hơn GPU nhiều lần; `--max-hours` là cách giữ cả đêm trong tầm kiểm soát.
+- `last.ckpt` là checkpoint top-3 (theo `val_accuracy`) **mới nhất**, không nhất thiết là epoch
+  cuối: với pytorch-lightning 2.6 + `save_top_k=3` của parseq, epoch không lọt top-3 thì không ghi
+  `last.ckpt`. Train tiếp sau khi bị cắt có thể làm lại vài epoch cuối.
+- Lỗi train một model (vd hết RAM) không dừng cả đêm: model kế vẫn train, eval vẫn chạy, cuối log
+  liệt kê model lỗi và script thoát mã 1.

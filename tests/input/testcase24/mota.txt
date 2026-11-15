@@ -1,0 +1,14 @@
+testcase24 — Số mẫu không chia hết batch: làm tròn lên
+======================================================
+
+MỤC ĐÍCH
+    Batch cuối thiếu mẫu vẫn là một batch (parseq không drop_last).
+
+ĐẦU VÀO
+    65 mẫu train, batch 64 → 2 batch; 1 mẫu val → 1 batch; ngân sách 36 s.
+
+KỲ VỌNG
+    train_batches_per_epoch = 2; 1 epoch = 25 s; floor(30.6 / 25) = 1 epoch, over_budget = false.
+
+VÌ SAO QUAN TRỌNG
+    Làm tròn xuống sẽ ước lượng thiếu thời gian, dễ vượt trần max_time.

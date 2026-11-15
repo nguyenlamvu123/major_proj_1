@@ -1173,3 +1173,42 @@ Test (`tests/test_repo_hygiene.py`, mới): không còn đường dẫn máy c�
 `05_train.sh` nhận `svtr`/`svtrctc`/`parseq_ft`; mọi lệnh `05_train.sh <tên>` trong README có
 trong script; clone parseq đúng SHA ghim; không còn `aiohttp`; 4 notebook Colab hợp lệ và chỉ
 trỏ tới script/module có thật.
+
+### 16.8 Chạy toàn bộ trên một máy: `scripts/09_full_pipeline_cpu.sh` (viết lại)
+
+Bản đầu (commit `da3964d`, viết cho máy khác) không chạy được từ đầu tới cuối: clone repo qua SSH
+vào `~/projects` (máy không có khoá GitHub), parseq không ghim commit, `pip install … || true`
+nuốt lỗi khi Python hệ thống không có pip, `01_get_meta.sh` không `--limit` (= tải cả 688 số
+gazette), có 1 ảnh là bỏ qua tải ảnh, `build_lmdb` thiếu `--subset` (argparse lỗi → `set -e` dừng),
+bỏ build khi `data.mdb` đã có (đúng lỗi "LMDB 500 mẫu"), hướng dẫn dùng `--num-workers` mà script
+không nhận, model có `last.ckpt` bất kỳ (kể cả smoke test) là bị coi đã train xong.
+
+**Thiết kế mới** — chạy ngay trong repo chứa script; 10 bước
+`setup us_meta us_images clean split lmdb vn vn_lmdb train eval`:
+
+| Cơ chế | Chi tiết |
+|---|---|
+| Kế hoạch trước, chạy sau | mọi quyết định chỉ dựa trên trạng thái file → `--dry-run` in đúng kế hoạch, không gọi mạng/Python, không tạo file |
+| Dấu bước | `$DATA_ROOT/.pipeline/<bước>` chứa tham số (vd `rows=60000`); chạy lại khi: thiếu dấu, tham số đổi, bước phụ thuộc mới hơn hoặc sẽ chạy lại lần này, hoặc `--only` |
+| Phụ thuộc | us_meta → us_images → clean → split → lmdb; vn → vn_lmdb (+ `split_test_vn_verified.csv` mới hơn); setup theo `<venv>/.pipeline_setup` (accelerator) và `requirements.txt` |
+| setup | `python3 -m venv`, torch từ index CPU khi không GPU, `requirements.txt`, `pip install -e .`; luôn `00_get_parseq.sh` |
+| Model | run mới nhất có `last.ckpt`: `DONE` → bỏ; chưa `DONE` → `ckpt_path=` train tiếp, **giữ** `max_epochs`/`batch_size` trong `<run>/pipeline_train.env` (lịch OneCycle khôi phục từ ckpt đã cố định tổng số bước); không có → run mới tại `hydra.run.dir` do script đặt |
+| `--max-hours H` | run mới: `train_utils --benchmark` đo giây/batch train+val thật → `epochs_for_budget` chọn số epoch ≤ `--max-epochs` vừa 85% ngân sách (`benchmark.json`); trần `+trainer.max_time` = 115% ngân sách (train tiếp: cộng thời gian đã train đọc từ Timer trong ckpt) |
+| `DONE` | đánh khi `05_train.sh` thoát 0 **và** (không có ngân sách hoặc tiến trình kết thúc trước 97% trần). Không dựa vào epoch trong `last.ckpt`: pytorch-lightning 2.6 chỉ ghi `last.ckpt` khi lượt đó có lưu top-k (parseq `save_top_k=3`), nên nó có thể đứng ở epoch cũ dù đã train đủ |
+| Lỗi không chặn cả đêm | train một model lỗi → ghi lại, model kế vẫn train, eval vẫn chạy, thoát 1 ở cuối; crawl/LMDB VN lỗi → cảnh báo, eval chỉ có `test_us` (`06_eval.sh` bỏ tập test thiếu LMDB) |
+| Chạy dài | log `$DATA_ROOT/logs/pipeline_<giờ>.log` (gồm cả kế hoạch); tự chạy lại dưới `systemd-inhibit --what=sleep:idle` nếu hệ thống cho phép |
+| Kiểm tham số | cờ/bước/model lạ, `--from` + `--only`, số sai định dạng → thoát 2 trước khi làm gì |
+
+`train_utils.py` thêm: `benchmark(cfg)` (đo cả thời gian chờ dataloader; tắt `init_from` để
+không tải mạng), `epochs_for_budget(...)`, `ckpt_progress(path)` (epoch, global_step, giây đã
+train theo Timer); CLI `--benchmark --budget-hours --max-epochs --json-out`, `--ckpt-info`.
+
+Test: golden-file `tests/test_golden.py` + `tests/{input,expect}/testcase1..27` (20 kế hoạch
+`--dry-run`, 4 phép tính ngân sách, 3 lần chạy `06_eval.sh` với Python giả; lệnh
+git/curl/wget/python bị thay bằng stub, dry-run gọi tới là fail); `tests/test_train_utils.py`
++4 (benchmark thật không tải mạng, `ckpt_progress` trên fit thật, `last.ckpt` không tiến khi
+không có top-k, override `max_time`).
+
+Phụ: `06_eval.sh` bỏ tập test thiếu LMDB thay vì dừng; viết lại `HUONG_DAN_PIPELINE_CPU.md`,
+sửa markdown hỏng trong `CACH_CHAY_TRAIN_CPU.md` và hai lỗi gõ trong
+`BAO_CAO_TONG_KET_DAT_LIEU_HUAN_LUYEN.md`; xoá `trademark_data_min.tar.gz` (file nén rỗng 45 byte).

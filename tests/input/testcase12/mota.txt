@@ -1,0 +1,14 @@
+testcase12 — --skip vn,vn_lmdb
+==============================
+
+MỤC ĐÍCH
+    --skip bỏ đúng các bước liệt kê, các bước khác giữ nguyên quyết định.
+
+ĐẦU VÀO
+    DATA_ROOT trống; --skip vn,vn_lmdb.
+
+KỲ VỌNG
+    vn, vn_lmdb 'skip' 'không chọn'; các bước còn lại 'run'.
+
+VÌ SAO QUAN TRỌNG
+    Khi WIPO Publish bảo trì, vẫn chạy được phần US + train.

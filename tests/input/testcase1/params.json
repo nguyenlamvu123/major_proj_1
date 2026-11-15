@@ -1,0 +1,9 @@
+{
+  "kind": "plan",
+  "desc": "Máy trống: mọi bước đều chạy",
+  "args": [
+    "--accelerator",
+    "cpu"
+  ],
+  "state": {}
+}

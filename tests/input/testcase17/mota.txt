@@ -1,0 +1,14 @@
+testcase17 — Cờ lạ: thoát 2
+===========================
+
+MỤC ĐÍCH
+    Cờ gõ sai phải dừng ngay, không chạy với mặc định.
+
+ĐẦU VÀO
+    --foo.
+
+KỲ VỌNG
+    Thoát mã 2, stderr có 'cờ lạ: --foo'.
+
+VÌ SAO QUAN TRỌNG
+    Bản đầu: hướng dẫn dùng --num-workers nhưng script không nhận cờ đó.

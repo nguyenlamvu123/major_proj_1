@@ -1,0 +1,14 @@
+testcase20 — --max-hours không phải số: thoát 2
+===============================================
+
+MỤC ĐÍCH
+    Ngân sách giờ sai định dạng phải bị từ chối ngay.
+
+ĐẦU VÀO
+    --max-hours ba.
+
+KỲ VỌNG
+    Thoát mã 2, stderr có '--max-hours phải là số'.
+
+VÌ SAO QUAN TRỌNG
+    Lỗi định dạng ở đây chỉ lộ ra khi train bắt đầu (sau phần tải dữ liệu).

@@ -331,6 +331,17 @@ thay bằng bản offline). Đã nghiệm thu: 236 pass trên venv torch 2.14.1+
 timm 1.0.30; thêm smoke train thật 2 batch CPU cho `svtr` và `parseq_ft` qua
 `scripts/05_train.sh` trên LMDB tổng hợp, rồi `evaluate` → `eval_domain_shift` → `report`.
 
+### 16.8 Chạy toàn bộ trên một máy
+
+```bash
+pytest -q tests/test_golden.py tests/test_train_utils.py
+bash scripts/09_full_pipeline_cpu.sh --dry-run                    # kế hoạch, không tạo file
+bash scripts/09_full_pipeline_cpu.sh --max-hours 3                # chạy thật (trong tmux)
+```
+**Pass khi**: test xanh (27 testcase golden); dry-run in 11 dòng `[plan]`; chạy thật kết thúc với
+`HẾT. Báo cáo: …/reports/final_summary.md`, mỗi model trong `--models` có `runs/<model>/<giờ>/DONE`
+(hoặc được liệt kê "chưa đủ epoch"), chạy lại cùng lệnh thì mọi bước dữ liệu `skip`.
+
 ---
 
 ## Ghi chú chung

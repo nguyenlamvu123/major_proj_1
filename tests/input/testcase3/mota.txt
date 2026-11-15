@@ -1,0 +1,14 @@
+testcase3 — Đổi --us-rows: chạy lại US và mọi bước phía sau, không đụng VN
+==========================================================================
+
+MỤC ĐÍCH
+    Đổi tham số của một bước phải kéo theo đúng các bước phụ thuộc.
+
+ĐẦU VÀO
+    Dấu us_meta ghi rows=60000; chạy với --us-rows 80000.
+
+KỲ VỌNG
+    us_meta, us_images, clean, split, lmdb 'run'; vn, vn_lmdb vẫn 'skip' (không phụ thuộc US).
+
+VÌ SAO QUAN TRỌNG
+    Nếu chỉ chạy lại us_meta, LMDB vẫn là dữ liệu cũ — đúng loại lỗi '500 mẫu' từng gặp trên máy kia.

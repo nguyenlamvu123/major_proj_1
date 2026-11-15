@@ -1,0 +1,13 @@
+{
+  "kind": "budget",
+  "desc": "Số mẫu không chia hết batch: làm tròn lên",
+  "inputs": {
+    "budget_hours": 0.01,
+    "max_epochs": 5,
+    "train_samples": 65,
+    "val_samples": 1,
+    "batch_size": 64,
+    "sec_per_train_batch": 10,
+    "sec_per_val_batch": 5
+  }
+}

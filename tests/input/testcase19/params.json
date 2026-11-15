@@ -1,0 +1,13 @@
+{
+  "kind": "plan",
+  "desc": "--from và --only cùng lúc: thoát 2",
+  "args": [
+    "--accelerator",
+    "cpu",
+    "--from",
+    "train",
+    "--only",
+    "eval"
+  ],
+  "state": {}
+}

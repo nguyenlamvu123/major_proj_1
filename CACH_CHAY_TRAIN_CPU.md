@@ -1,64 +1,57 @@
 # Có thể train trên CPU không? Chỉ chậm thôi đúng không?
 
-**Trả lời ngắn:** Đúng là *"chỉ chậm thôi"*, nhưng với cấu hình máy hiện tại **không thực tế để train đầy đủ**. Có thể chạy smoke-test, nhưng **không nên** chạy train toàn bộ để ra kết quả đồ án.
+**Trả lời ngắn:** Đúng là *"chỉ chậm thôi"* — chạy được, nhưng chậm hơn GPU nhiều lần. Muốn có
+kết quả đồ án trong một đêm trên CPU thì phải **giới hạn thời gian mỗi model**:
+`bash scripts/09_full_pipeline_cpu.sh --max-hours 3` (xem `HUONG_DAN_PIPELINE_CPU.md` mục 5).
 
-## 1) Tình trạng máy hiện tại
+## 1) Cấu hình các máy
 
-| Thông số | Giá trị | Nhận xét |
-|tag: th, td |---|---|
-| CPU | 8 nhân / 16 luồng (xem `nproc`) | Tạm ổn |
-| RAM | 7.6 GiB (available ~1.1 GiB lúc kiểm tra) | **Hạn chế nhiều** |
-| GPU | Không có (PyTorch `cuda.is_available() = False`) | Chỉ dùng CPU |
-| Ổ dữ liệu | `/media/zaibachkhoa/AC84-F995/` (~dung lượng còn trống đủ) | Ổn |
-| LMDB train hiện tại | `lmdb/train/trademark/` có **500 mẫu** (`num-samples = b'500'') | Rất nhỏ so với `split_train.csv` (4356 mẫu) |
-
-## 2) So sánh thời gian dự kiến
-
-| Mô hình | Colab T4 (GPU) | Máy local CPU (ước tính) | Ghi chú |
+| Thông số | Máy cũ (`zaibachkhoa`) | Máy hiện tại (`vunl`) | Nhận xét |
 |---|---|---|---|
-| **CRNN** | ~1–3 giờ/20–50 epoch | **10–30 giờ** (hoặc hơn) | Ít tham số nhất nhưng vẫn chậm trên CPU |
-| **TRBA** | ~2–4 giờ | **20–40 giờ** | Attention nặng hơn |
-| **PARSeq** | ~3–5 giờ | **30–60 giờ** | Transformer, chậm nhất |
-| **SVTR-CTC** | ~2–4 giờ | **20–40 giờ** | Sau khi sửa kiến trúc (nhánh 16.2) cần train lại từ đầu |
-| **Fine-tune `*_ft`** | ~1–2 giờ (ít epoch hơn) | **8–20 giờ** | Nhanh hơn train từ đầu, nhưng vẫn rất dài trên CPU |
+| CPU | 8 nhân / 16 luồng | Intel i5-10400, 6 nhân / 12 luồng | |
+| RAM | 7,6 GiB (lúc kiểm tra trống ~1,1 GiB) | 31 GiB (lúc kiểm tra trống ~8 GiB) | máy cũ dễ OOM với batch 64 |
+| GPU | không (`torch.cuda.is_available() = False`) | không (không có `nvidia-smi`) | chỉ dùng CPU |
+| Ổ dữ liệu | `/media/zaibachkhoa/AC84-F995/` | `/mnt/...` còn ~730 GB | đủ |
+| LMDB train | 500 mẫu (build với `--limit 500`) | chưa có | xem mục 3 |
 
-> Ước tính trên thực tế rất khó chính xác. Với batch-size nhỏ trên CPU, thời gian có thể dài gấp **10–20 lần** so với GPU.
+## 2) Thời gian dự kiến
 
-## 3) Các vấn đề thực tế trên máy này
+Chưa đo trên máy hiện tại. Các con số dưới đây chỉ là **ước lượng** (không phải số đo):
+
+| Mô hình | Colab T4 (GPU) | CPU (ước lượng) | Ghi chú |
+|---|---|---|---|
+| **CRNN** | ~1–3 giờ / 20–50 epoch | 10–30 giờ (hoặc hơn) | ít tham số nhất (8,4 M) |
+| **TRBA** | ~2–4 giờ | 20–40 giờ | 50 M tham số |
+| **PARSeq** | ~3–5 giờ | 30–60 giờ | Transformer 24 M tham số |
+| **SVTR-CTC** | ~2–4 giờ | 20–40 giờ | kiến trúc đã sửa (16.2), checkpoint cũ phải train lại |
+| **`*_ft`** | ~1–2 giờ (ít epoch hơn) | 8–20 giờ | hội tụ nhanh hơn train từ đầu |
+
+Thay vì đoán, `--max-hours` **đo tốc độ thật** trên máy (vài batch) rồi chọn số epoch vừa ngân
+sách, ghi vào `runs/<model>/<giờ>/benchmark.json` — sau lần chạy đầu sẽ có số đo thật để thay bảng trên.
+
+## 3) Các vấn đề thực tế
 
 | Vấn đề | Mức độ | Giải thích |
 |---|---|---|
-| **RAM 7.6GB** | Cao | PyTorch + Lightning + DataLoader với `num_workers` có thể dễ gây **OOM** (out of memory). Trước đây đã từng gặp `exit 137` (SIGKILL) khi dùng `batch-size 64`. |
-| **LMDB train chỉ 500 mẫu** | Cao | Nếu dùng đúng LMDB hiện tại, bạn **chỉ train với 500 mẫu** thay vì 4356 mẫu. Kết quả sẽ không đúng với toàn bộ dữ liệu US đã thu thập. Cần build lại LMDB đầy đủ từ `split_train.csv`. |
-| **SVTR cũ không tương thích** | Trung bình | Checkpoint `svtrctc` cũ không load được do thay đổi kiến trúc ở nhánh 16.2. Nếu muốn dùng SVTR, **phải train lại hoàn toàn**. |
-| **Thời gian liên tục** | Cao | Để train đủ, máy phải chạy liên tục hàng chục giờ (không tắt máy, không khóa màn hình quá mức). Điện, nhiệt độ máy cũng là vấn đề. |
-| **Cạnh tranh tài nguyên** | Trung bình | RAM hiện tại chỉ còn ~1.1GB khả dụng, rất dễ bị OOM khi mở nhiều ứng dụng khác. |
+| **RAM** | Cao (máy cũ) | PyTorch + Lightning + DataLoader nhiều worker dễ OOM (`exit 137`), từng gặp với `batch-size 64` trên máy 7,6 GiB. Giảm `--batch-size` / `--num-workers`. |
+| **LMDB train 500 mẫu (máy cũ)** | Cao | Build bằng `--limit 500` nên chỉ train trên 500/4356 mẫu. Script pipeline luôn build toàn bộ split (không `--limit`). |
+| **SVTR cũ không tương thích** | Trung bình | Checkpoint `svtrctc` cũ không nạp được sau khi sửa kiến trúc (16.2), phải train lại. |
+| **Chạy liên tục nhiều giờ** | Cao | Máy không được ngủ/tắt: script giữ khoá chặn ngủ (`systemd-inhibit`); nên chạy trong `tmux`. |
+| **Cạnh tranh tài nguyên** | Trung bình | Đóng bớt ứng dụng nặng trước khi chạy để còn RAM trống. |
 
-## 2/4? Thêm ví dụ lệnh</## 4) Lệnh có thể chạy (smoke-test, có thể thực tế)
-
-Trên máy này, **an toàn nhất** là chỉ chạy **smoke test** để kiểm chứng pipeline:
+## 4) Lệnh smoke-test (kiểm tra pipeline, vài phút)
 
 ```bash
-cd "/media/zaibachkhoa/education/GenAI 2025/đồ án chuyên ngành 1"
-export DATA_ROOT=/media/zaibachkhoa/AC84-F995/trademark_data
-export PYTHONPATH=$PWD/compat:$PWD/src:$PWD/third_party/parseq
-
-# Smoke test an toàn nhất (CPU + batch nhỏ + ít batch/epoch)
-bash scripts/05_train.sh crnn \
-  --accelerator cpu \
-  --devices 1 \
-  --batch-size 8 \
-  --num-workers 0 \
-  --limit-train-batches 2 \
-  --max-epochs 1
-}
-
-bash scripts/05_train.sh parseq \
-  --acceler
-...</div>
+export DATA_ROOT=<gốc dữ liệu đã có LMDB>
+bash scripts/05_train.sh crnn --accelerator cpu --devices 1 --batch-size 8 --num-workers 0 \
+  --limit-train-batches 2 --max-epochs 1
+bash scripts/05_train.sh parseq --accelerator cpu --devices 1 --batch-size 8 --num-workers 0 \
+  --limit-train-batches 2 --max-epochs 1
+```
 
 ## 5) Khuyến nghị
 
-- **Nếu chỉ muốn kiểm tra pipeline:** Chạy smoke-test như trên. Hoàn toàn khả thi.
-- **Nếu muốn train để có kết quả đồ án thực tế:** **Không khuyến nghị trên máy này**. Tốt nhất là đưa lên **Google Colab (T4)** hoặc máy có GPU.
-- **Trước khi train thật:** Phải build lại LMDB train đầy đủ (4356 mẫu) thay vì 500 mẫu hiện tại. Nếu không, mô hình chỉ học trên 1/9 dữ liệu.
+- **Chỉ kiểm tra pipeline:** smoke-test như trên.
+- **Cần kết quả đồ án trong một đêm trên CPU:** `scripts/09_full_pipeline_cpu.sh --max-hours <giờ>`
+  với 1–2 model `*_ft` (fine-tune hội tụ nhanh hơn trên dữ liệu nhỏ).
+- **Cần kết quả tốt nhất:** train trên GPU (Colab T4, `docs/colab/02_train.ipynb`).

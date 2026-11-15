@@ -69,6 +69,18 @@ nhánh 02); ảnh US lấy từ CDN USPTO, ảnh VN từ WIPO Publish. Kiểm tr
 `python -m trademark_ocr.vn_review make|apply` (DESIGN.md 16.5). Có thể tải bằng Colab:
 `docs/colab/01_download_data.ipynb`.
 
+## Chạy toàn bộ trên một máy (tải dữ liệu → train → eval → báo cáo)
+
+```bash
+bash scripts/09_full_pipeline_cpu.sh --dry-run       # xem kế hoạch, không chạy gì
+bash scripts/09_full_pipeline_cpu.sh --max-hours 3   # chạy thật (nên trong tmux); log ở data/logs/
+```
+
+Script tự dựng `.venv` (torch CPU nếu không có GPU), chạy lại an toàn (bước nào xong thì bỏ qua,
+model train dở thì train tiếp) và với `--max-hours` thì đo tốc độ thật để chọn số epoch vừa ngân
+sách mỗi model. Chi tiết: [HUONG_DAN_PIPELINE_CPU.md](HUONG_DAN_PIPELINE_CPU.md); train trên CPU
+nhanh/chậm thế nào: [CACH_CHAY_TRAIN_CPU.md](CACH_CHAY_TRAIN_CPU.md).
+
 ## Huấn luyện (Google Colab, GPU T4)
 
 ```bash

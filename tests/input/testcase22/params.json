@@ -1,0 +1,13 @@
+{
+  "kind": "budget",
+  "desc": "Ngân sách giới hạn số epoch",
+  "inputs": {
+    "budget_hours": 3,
+    "max_epochs": 10,
+    "train_samples": 54000,
+    "val_samples": 2700,
+    "batch_size": 64,
+    "sec_per_train_batch": 2.0,
+    "sec_per_val_batch": 0.7
+  }
+}
