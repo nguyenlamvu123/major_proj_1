@@ -11,6 +11,12 @@
 # bước nào đã có dấu, cùng tham số, và mọi bước nó phụ thuộc không mới hơn thì bỏ qua. Model
 # train dở (có last.ckpt, chưa có DONE) thì train tiếp từ last.ckpt.
 #
+# Trạng thái một run (thư mục runs/<model>/<giờ>/), do script này ghi sau khi train:
+#   DONE          train đủ epoch và học được (val_accuracy tốt nhất >= 1%)   -> bỏ qua
+#   UNDERTRAINED  train đủ epoch mà val_accuracy vẫn ~0 (ngân sách quá ít)   -> bỏ qua, eval
+#                 cũng bỏ; chỉ train lại khi có --retrain (thường kèm --max-hours lớn hơn)
+#   (không có)    bị cắt vì trần thời gian hoặc lỗi giữa chừng               -> train tiếp
+#
 # Tên giữ "_cpu" như bản đầu, nhưng --accelerator auto dùng GPU nếu máy có nvidia-smi.
 # =====================================================================
 set -euo pipefail
@@ -211,6 +217,9 @@ for m in ${MODELS//,/ }; do
   run_dir="${ck%/checkpoints/last.ckpt}"
   if [[ -n "$ck" && -f "$run_dir/DONE" && $RETRAIN -eq 0 ]]; then
     plan "train:$m" skip "đã xong (${run_dir#"$DATA_ROOT"/})"
+  elif [[ -n "$ck" && -f "$run_dir/UNDERTRAINED" && $RETRAIN -eq 0 ]]; then
+    # Không tự train lại: cùng ngân sách thì lại ra đúng kết quả đó, mất thêm một đêm.
+    plan "train:$m" skip "train xong nhưng CHƯA HỌC ĐƯỢC ($(head -1 "$run_dir/UNDERTRAINED"), ${run_dir#"$DATA_ROOT"/}) — thêm --retrain và tăng --max-hours để train lại"
   elif [[ -n "$ck" && $RETRAIN -eq 0 ]]; then
     TRAIN_MODE[$m]="$ck"; add "train:$m"
     e="$(env_val "$run_dir" max_epochs)"; b="$(env_val "$run_dir" batch_size)"
@@ -234,6 +243,9 @@ else plan eval skip "không chọn"; fi
 # =====================================================================
 export DATA_ROOT
 export PYTHON="$PY"
+# stdout của Python đi qua tee (pipe) thì bị gom theo khối: lần 04/11 log đứng im 13 phút ở
+# us_meta dù vẫn đang tải. Tắt đệm để log hiện tiến độ ngay.
+export PYTHONUNBUFFERED=1
 cd "$REPO_ROOT"
 stamp() { echo "$2" > "$STAMPS/$1"; }
 step() { echo; echo "[PIPELINE] $(date '+%Y-%m-%d %H:%M:%S') ===== $* ====="; }
@@ -303,7 +315,7 @@ max_time_arg() {
 }
 
 # Lỗi train một model (vd OOM) không dừng cả đêm: ghi lại, train model kế, vẫn eval.
-FAILED=(); PARTIAL=()
+FAILED=(); PARTIAL=(); FEW_EPOCHS=()
 for m in ${MODELS//,/ }; do
   will "train:$m" || continue
   step "train $m"
@@ -332,6 +344,10 @@ for m in ${MODELS//,/ }; do
            -o model.batch_size="$bs" -o data.num_workers="$NUM_WORKERS" -o trainer.accelerator="$ACCELERATOR"; then
         epochs="$(json_get "$run/benchmark.json" epochs)"
         echo "[PIPELINE] $m: $(json_get "$run/benchmark.json" epoch_minutes) phút/epoch -> train $epochs epoch (~$(json_get "$run/benchmark.json" estimated_hours)h)"
+        if [[ "$(json_get "$run/benchmark.json" too_few_epochs)" == True ]]; then
+          echo "[PIPELINE] [WARN] ngân sách ${MAX_HOURS}h chỉ đủ $epochs epoch cho $m — có thể chưa học được gì; tăng --max-hours hoặc train trên GPU"
+          FEW_EPOCHS+=("$m($epochs epoch)")
+        fi
       else
         echo "[PIPELINE] [WARN] đo tốc độ $m lỗi — giữ $epochs epoch, trần max_time vẫn cắt theo ngân sách"
       fi
@@ -353,7 +369,20 @@ for m in ${MODELS//,/ }; do
       echo "[PIPELINE] [WARN] $m chạm trần thời gian sau $((took/60)) phút — chạy lại script để train tiếp"
       PARTIAL+=("$m")
     else
-      touch "$run/DONE"; echo "[PIPELINE] $m: xong $epochs epoch sau $((took/60)) phút"
+      echo "[PIPELINE] $m: xong $epochs epoch sau $((took/60)) phút"
+      # Đủ epoch chưa chắc đã học được (04/11: parseq_ft 2 epoch, val_accuracy 0%). Không đọc
+      # được kết luận thì coi như xong — giữ hành vi cũ thay vì chặn model đang tốt.
+      verdict=unknown
+      if "$PY" -m trademark_ocr.train_utils --train-verdict "$run" --json-out "$run/verdict.json" >/dev/null; then
+        verdict="$(json_get "$run/verdict.json" verdict)"
+      fi
+      if [[ "$verdict" == undertrained ]]; then
+        best="$(json_get "$run/verdict.json" best_val_accuracy)"
+        echo "val_accuracy tốt nhất ${best}% sau $epochs epoch" > "$run/UNDERTRAINED"
+        echo "[PIPELINE] [WARN] $m CHƯA HỌC ĐƯỢC: val_accuracy tốt nhất ${best}% — ghi UNDERTRAINED, eval sẽ bỏ qua"
+      else
+        touch "$run/DONE"
+      fi
     fi
   else
     echo "[PIPELINE] [ERR] train $m lỗi — xem log; chạy lại script sẽ train tiếp từ last.ckpt (nếu đã có)"
@@ -373,4 +402,13 @@ if [[ "$VN_SRC" == unverified ]]; then
   echo "[PIPELINE] [WARN] tập VN CHƯA duyệt tay: chạy 'python -m trademark_ocr.vn_review make' / 'apply' rồi chạy lại script"
 fi
 [[ ${#PARTIAL[@]} -eq 0 ]] || echo "[PIPELINE] [WARN] model chưa đủ epoch: ${PARTIAL[*]}"
+[[ ${#FEW_EPOCHS[@]} -eq 0 ]] || echo "[PIPELINE] [WARN] ngân sách chỉ đủ rất ít epoch: ${FEW_EPOCHS[*]}"
+# Theo trạng thái file, không theo lần chạy này: model bị bỏ qua vì UNDERTRAINED từ lần trước
+# cũng phải được nhắc, nếu không báo cáo thiếu model mà không ai biết vì sao.
+for m in ${MODELS//,/ }; do
+  ck="$(latest_ckpt "$m")"; rd="${ck%/checkpoints/last.ckpt}"
+  if [[ -n "$ck" && -f "$rd/UNDERTRAINED" ]]; then
+    echo "[PIPELINE] [WARN] $m: lần train mới nhất chưa học được ($(head -1 "$rd/UNDERTRAINED")) — báo cáo dùng run cũ hơn nếu có, không thì thiếu model này; chạy lại với --models $m --retrain --max-hours <lớn hơn> hoặc train trên GPU"
+  fi
+done
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "[PIPELINE] [ERR] model lỗi: ${FAILED[*]}"; exit 1; fi

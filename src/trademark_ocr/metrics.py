@@ -6,7 +6,9 @@
 * **NED** — Normalized Edit Distance: trung bình `levenshtein(pred, gt) / max(|pred|, |gt|)`.
 * **1 − NED** — độ "gần đúng" trung bình (càng gần 1 càng tốt).
 * **CER** — Character Error Rate ở mức *corpus*: `Σ edit / Σ |gt|`.
-* **char_accuracy** — `1 − CER`.
+* **char_accuracy** — `max(0, 1 − CER)`. CER vượt 1 khi model đoán dài hơn nhãn (vd parseq chưa
+  học ký tự kết thúc, luôn sinh 26 ký tự cho nhãn ~11 ký tự -> CER 2,26), nên không chặn thì ra
+  số âm vô nghĩa; số CER gốc vẫn giữ ở cột ``cer``.
 
 Ba **mức so khớp** cho accuracy và 1 − NED (REVIEW.md §4.2):
 
@@ -137,7 +139,7 @@ def evaluate_metrics(preds: Sequence[str], gts: Sequence[str]) -> dict[str, floa
         "ned": ned,
         "one_minus_ned": 1.0 - ned,
         "cer": cer,
-        "char_accuracy": 1.0 - cer,
+        "char_accuracy": max(0.0, 1.0 - cer),
         "mean_label_len": sum_gt_len / n,
         "mean_pred_len": sum_pred_len / n,
     }

@@ -1,0 +1,8 @@
+{
+  "kind": "verdict",
+  "desc": "Đúng ngưỡng 1.0% -> ok (biên)",
+  "ckpts": [
+    "epoch=0-step=10-val_accuracy=0.5000-val_NED=10.0000.ckpt",
+    "epoch=1-step=20-val_accuracy=1.0000-val_NED=20.0000.ckpt"
+  ]
+}

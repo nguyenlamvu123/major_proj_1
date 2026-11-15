@@ -1,0 +1,14 @@
+testcase39 — --only crnn_ft: chỉ chuyển báo cáo của crnn_ft, giữ model khác
+===========================================================================
+
+MỤC ĐÍCH
+    Đánh giá lại một model không được xoá kết quả các model khác khỏi báo cáo.
+
+ĐẦU VÀO
+    --only crnn_ft; reports/ có file crnn_ft, parseq_ft, crnn (tên là tiền tố của crnn_ft) và final_summary.
+
+KỲ VỌNG
+    Chỉ crnn_ft_us.csv, crnn_ft_vn.summary.json vào archive; parseq_ft_us.csv, crnn_us.csv, final_summary.md ở lại.
+
+VÌ SAO QUAN TRỌNG
+    crnn_us.csv không được khớp nhầm mẫu của crnn_ft; mất file model khác thì báo cáo tổng hợp thiếu cột.

@@ -12,11 +12,19 @@ kết quả đồ án trong một đêm trên CPU thì phải **giới hạn th�
 | RAM | 7,6 GiB (lúc kiểm tra trống ~1,1 GiB) | 31 GiB (lúc kiểm tra trống ~8 GiB) | máy cũ dễ OOM với batch 64 |
 | GPU | không (`torch.cuda.is_available() = False`) | không (không có `nvidia-smi`) | chỉ dùng CPU |
 | Ổ dữ liệu | `/media/zaibachkhoa/AC84-F995/` | `/mnt/...` còn ~730 GB | đủ |
-| LMDB train | 500 mẫu (build với `--limit 500`) | chưa có | xem mục 3 |
+| LMDB train | 500 mẫu (build với `--limit 500`) | 51.230 mẫu (val 2.846, test_us 2.847) | xem mục 3 |
 
-## 2) Thời gian dự kiến
+## 2) Thời gian
 
-Chưa đo trên máy hiện tại. Các con số dưới đây chỉ là **ước lượng** (không phải số đo):
+**Số đo thật trên máy `vunl`** (lần chạy 04/11, batch 64, 4 worker — chi tiết `docs/nhat_ky_chay.md`):
+
+| Mô hình | giây/batch train | phút/epoch | Ngân sách 3h cho | Kết quả |
+|---|---|---|---|---|
+| `crnn_ft` | 1,25 | 17,1 | 8 epoch | val acc 74,1%, test US 73,0% |
+| `parseq_ft` | 4,17 | 57,1 | 2 epoch | **0%** — chưa học được, cần ≥ 8–9 giờ hoặc GPU |
+| `trba_ft`, `svtr` | chưa đo | | | |
+
+Bảng dưới là **ước lượng** cũ (không phải số đo), giữ để so với GPU:
 
 | Mô hình | Colab T4 (GPU) | CPU (ước lượng) | Ghi chú |
 |---|---|---|---|
@@ -53,5 +61,6 @@ bash scripts/05_train.sh parseq --accelerator cpu --devices 1 --batch-size 8 --n
 
 - **Chỉ kiểm tra pipeline:** smoke-test như trên.
 - **Cần kết quả đồ án trong một đêm trên CPU:** `scripts/09_full_pipeline_cpu.sh --max-hours <giờ>`
-  với 1–2 model `*_ft` (fine-tune hội tụ nhanh hơn trên dữ liệu nhỏ).
+  với **một** model nặng mỗi đêm. `crnn_ft` vừa 3h; `parseq_ft` cần cả đêm
+  (`--models parseq_ft --retrain --max-hours 9` ≈ 8 epoch); TRBA (50 M tham số) nên train trên GPU.
 - **Cần kết quả tốt nhất:** train trên GPU (Colab T4, `docs/colab/02_train.ipynb`).

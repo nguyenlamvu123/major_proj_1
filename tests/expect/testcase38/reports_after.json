@@ -1,0 +1,7 @@
+[
+  "archive/<TS>/crnn_ft_us.csv",
+  "archive/<TS>/crnn_us.csv",
+  "archive/<TS>/crnn_us.summary.json",
+  "archive/<TS>/domain_shift.csv",
+  "archive/<TS>/final_summary.md"
+]

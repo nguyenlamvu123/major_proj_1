@@ -1,0 +1,14 @@
+testcase38 — Eval đầy đủ: chuyển mọi báo cáo cũ (kể cả crnn 16/10) vào archive
+==============================================================================
+
+MỤC ĐÍCH
+    Tái hiện lỗi dòng 'crnn' 200 mẫu (file 16/10) lẫn vào final_summary 05/11.
+
+ĐẦU VÀO
+    reports/ có file cũ của crnn (không còn checkpoint) + báo cáo lần trước; crnn_ft có checkpoint.
+
+KỲ VỌNG
+    Mọi file cũ nằm ở archive/<TS>/, reports/ gốc chỉ còn file do lần này sinh; evaluate chỉ gọi cho crnn_ft.
+
+VÌ SAO QUAN TRỌNG
+    report.py gom mọi reports/*.csv: không dọn thì số liệu của máy/lần chạy khác xuất hiện như kết quả hiện tại.

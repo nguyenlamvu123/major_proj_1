@@ -1,0 +1,14 @@
+{
+  "n": 2.0,
+  "accuracy": 0.5,
+  "ned": 0.1,
+  "one_minus_ned": 0.9,
+  "cer": 0.1,
+  "char_accuracy": 0.9,
+  "mean_label_len": 5.0,
+  "mean_pred_len": 4.5,
+  "accuracy_nocase": 0.5,
+  "one_minus_ned_nocase": 0.9,
+  "accuracy_base": 0.5,
+  "one_minus_ned_base": 0.9
+}

@@ -1,0 +1,14 @@
+testcase33 — Chỉ có last.ckpt, không có val_accuracy trong tên -> unknown
+=========================================================================
+
+MỤC ĐÍCH
+    Không đủ căn cứ thì không kết luận.
+
+ĐẦU VÀO
+    Thư mục checkpoints chỉ có last.ckpt.
+
+KỲ VỌNG
+    verdict 'unknown', best_val_accuracy null; pipeline sẽ ghi DONE như trước.
+
+VÌ SAO QUAN TRỌNG
+    Đổi mẫu tên checkpoint (hoặc run chép từ nơi khác) không được làm mọi model bị chặn khỏi báo cáo.

@@ -1,0 +1,25 @@
+{
+  "kind": "eval_sh",
+  "desc": "Eval đầy đủ: chuyển mọi báo cáo cũ (kể cả crnn 16/10) vào archive",
+  "args": [],
+  "state": {
+    "runs": [
+      {
+        "model": "crnn_ft",
+        "ts": "2026-11-04_21-58-41",
+        "ckpt_age": 10
+      }
+    ],
+    "files": {
+      "lmdb/test/test_us/data.mdb": 10,
+      "lmdb/test/test_vn/data.mdb": 10
+    },
+    "reports": {
+      "crnn_us.csv": 1000,
+      "crnn_us.summary.json": 1000,
+      "crnn_ft_us.csv": 100,
+      "domain_shift.csv": 100,
+      "final_summary.md": 100
+    }
+  }
+}

@@ -44,6 +44,9 @@ Mỗi bước dữ liệu xong thì ghi một dấu vào `$DATA_ROOT/.pipeline/<
 - model đã train xong (`runs/<model>/<giờ>/DONE`) → bỏ qua; train dở (có `last.ckpt`, chưa
   `DONE`) → **train tiếp** từ `last.ckpt`, giữ đúng số epoch/batch đã ghi trong
   `runs/<model>/<giờ>/pipeline_train.env`;
+- model train đủ epoch mà **chưa học được** (`val_accuracy` tốt nhất < 1%, file
+  `runs/<model>/<giờ>/UNDERTRAINED`) → bỏ qua, eval cũng bỏ; muốn train lại thì thêm `--retrain`
+  và **tăng `--max-hours`** (cùng ngân sách sẽ ra cùng kết quả);
 - tải ảnh dở → tải tiếp phần còn thiếu.
 
 Lỗi giữa chừng (mất mạng, mất điện) thì cứ chạy lại đúng lệnh cũ.
@@ -68,7 +71,7 @@ Lỗi giữa chừng (mất mạng, mất điện) thì cứ chạy lại đúng
 | `--from STEP` | | bỏ qua các bước trước STEP |
 | `--only a,b` | | chỉ chạy các bước này, ép chạy kể cả khi đã xong |
 | `--skip a,b` | | bỏ qua các bước này |
-| `--retrain` | | train lại từ đầu kể cả model đã `DONE` |
+| `--retrain` | | train lại từ đầu kể cả model đã `DONE` hoặc `UNDERTRAINED` |
 
 Các bước: `setup us_meta us_images clean split lmdb vn vn_lmdb train eval`.
 
@@ -82,8 +85,18 @@ bị cắt ngang ở LR còn cao.
 Trần cứng `max_time` của Lightning = 115% ngân sách — chỉ cắt khi máy chậm bất thường; khi đó
 model được đánh dấu "chưa đủ epoch" và chạy lại script sẽ train tiếp.
 
-Ước lượng tổng thời gian một đêm: dữ liệu ~1,5–2,5 giờ (phần lớn là tải ~60k ảnh) + số model ×
-`--max-hours` + eval ~0,5 giờ. Ví dụ 2 model, `--max-hours 3`: khoảng 8–9 giờ.
+Ngân sách chỉ đủ **dưới 3 epoch** thì script in `[WARN] ngân sách … chỉ đủ N epoch` ngay sau khi
+đo tốc độ và nhắc lại ở cuối log: fine-tune khởi tạo lại lớp ra theo bảng 217 ký tự, nên epoch đầu
+gần như luôn 0% (crnn_ft 04/11: 0% sau epoch 1, 60,9% sau epoch 2).
+
+Số đo thật (máy i5-10400, CPU, batch 64, lần chạy 04/11 — `docs/nhat_ky_chay.md`):
+
+| Phần | Thời gian |
+|---|---|
+| dữ liệu lần đầu (60k metadata + ảnh US, LMDB, crawl 2.000 VN) | ~1 giờ |
+| `crnn_ft` | 17,1 phút/epoch (1,25 s/batch) |
+| `parseq_ft` | 57,1 phút/epoch (4,17 s/batch) → 3h chỉ đủ 2 epoch, **chưa học được** |
+| eval 2 model + báo cáo | 3 phút |
 
 ## 6. Tập VN và duyệt tay
 
@@ -103,7 +116,9 @@ Crawl VN lỗi (mạng, site đổi cấu trúc) **không** dừng train: eval c
 ```text
 <repo>/reports/final_summary.md        báo cáo tổng hợp (3 mức so khớp, phân tách độ sụt US→VN, theo drawing_kind)
 <repo>/reports/<model>_{us,vn}.csv     kết quả từng mẫu
-<DATA_ROOT>/runs/<model>/<giờ>/         checkpoints/last.ckpt, config/, pipeline_train.env, benchmark.json, DONE
+<repo>/reports/archive/<giờ>/           báo cáo của các lần eval trước (eval đầy đủ chuyển hết vào đây trước khi chạy)
+<DATA_ROOT>/runs/<model>/<giờ>/         checkpoints/last.ckpt, config/, pipeline_train.env, benchmark.json,
+                                        verdict.json, DONE hoặc UNDERTRAINED
 <DATA_ROOT>/logs/pipeline_<giờ>.log     log đầy đủ của lần chạy
 ```
 
@@ -117,3 +132,6 @@ Mang model sang máy khác: chép **cả thư mục run** (cần `config/config.
   `last.ckpt`. Train tiếp sau khi bị cắt có thể làm lại vài epoch cuối.
 - Lỗi train một model (vd hết RAM) không dừng cả đêm: model kế vẫn train, eval vẫn chạy, cuối log
   liệt kê model lỗi và script thoát mã 1.
+- Eval đầy đủ chuyển **mọi** file trong `reports/` vào `reports/archive/<giờ>/` trước khi chạy, để
+  báo cáo chỉ gồm model đang có checkpoint. Chép báo cáo từ Colab về thì chép **cả thư mục run**
+  (để eval lại), đừng chỉ chép file CSV vào `reports/`.

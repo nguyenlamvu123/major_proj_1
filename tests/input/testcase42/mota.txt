@@ -1,0 +1,14 @@
+testcase42 — Không model nào dùng được: thoát 1, báo cáo cũ giữ nguyên
+======================================================================
+
+MỤC ĐÍCH
+    Thoát lỗi trước khi đụng tới báo cáo.
+
+ĐẦU VÀO
+    Chỉ có run UNDERTRAINED; reports/ có final_summary.md và crnn_ft_us.csv.
+
+KỲ VỌNG
+    Thoát 1 'không tìm thấy checkpoint nào'; reports/ giữ nguyên hai file, không tạo archive/.
+
+VÌ SAO QUAN TRỌNG
+    Dọn báo cáo rồi mới thất bại thì người dùng mất báo cáo đang có mà không được bản mới.

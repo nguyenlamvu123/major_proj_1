@@ -1,0 +1,7 @@
+[
+  "-m trademark_ocr.evaluate --ckpt <DATA_ROOT>/runs/parseq_ft/2026-11-01_00-00-00/checkpoints/last.ckpt --subset test_us --out <WORK>/reports/parseq_ft_us.csv --device cpu --batch-size 8 --num-workers 0",
+  "-m trademark_ocr.evaluate --ckpt <DATA_ROOT>/runs/parseq_ft/2026-11-01_00-00-00/checkpoints/last.ckpt --subset test_vn --out <WORK>/reports/parseq_ft_vn.csv --device cpu --batch-size 8 --num-workers 0",
+  "-m trademark_ocr.eval_domain_shift --reports <WORK>/reports/ --out <WORK>/reports/domain_shift.csv",
+  "-m trademark_ocr.error_analysis --reports <WORK>/reports/ --out-dir <DATA_ROOT>/processed/eda_figures",
+  "-m trademark_ocr.report --reports <WORK>/reports/ --out <WORK>/reports/final_summary.md"
+]

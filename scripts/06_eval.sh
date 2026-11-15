@@ -9,6 +9,14 @@
 #
 # Sản phẩm: reports/<model>_{us,vn}.csv, reports/domain_shift.csv,
 #           reports/final_summary.md, $DATA_ROOT/processed/eda_figures/err_*.png
+#
+# Báo cáo cũ được CHUYỂN vào reports/archive/<giờ>/ trước khi đánh giá (report.py gom mọi
+# reports/*.csv, nên file của lần chạy khác — model nay không còn checkpoint — sẽ lẫn vào bảng):
+#   không --only: chuyển mọi file báo cáo -> bộ báo cáo mới hoàn toàn từ checkpoint hiện có;
+#   có --only:    chỉ chuyển file của các model được đánh giá lại, giữ nguyên model khác.
+# Run có file UNDERTRAINED (train xong mà không học được, xem 09_full_pipeline_cpu.sh) bị bỏ
+# qua; dùng checkpoint của run cũ hơn nếu có.
+# REPORTS_DIR (mặc định <repo>/reports) đổi được thư mục báo cáo — test dùng để khỏi đụng repo.
 # =====================================================================
 set -euo pipefail
 
@@ -36,15 +44,53 @@ IFS=, read -ra SEL <<< "${ONLY:-$(IFS=,; echo "${MODELS[*]}")}"
 COMMON=(--device "$DEVICE" --batch-size "$BATCH" --num-workers "$WORKERS")
 [[ "$LIMIT" -gt 0 ]] && COMMON+=(--limit "$LIMIT")
 
-mkdir -p "$REPO_ROOT/reports"
-found=0
+REPORTS="${REPORTS_DIR:-$REPO_ROOT/reports}"
+mkdir -p "$REPORTS"
+
+# Chọn checkpoint TRƯỚC khi đụng vào báo cáo: không có model nào thì thoát mà báo cáo cũ còn nguyên.
+declare -A CKPT=()
+EVAL_MODELS=()
 for m in "${SEL[@]}"; do
-  ckpt="$(ls -dt "$DATA_ROOT/runs/$m"/*/checkpoints/last.ckpt 2>/dev/null | head -1 || true)"
+  ckpt=""; skipped=""
+  # mới nhất trước; run UNDERTRAINED thì lùi về run cũ hơn
+  while IFS= read -r c; do
+    [[ -n "$c" ]] || continue
+    if [[ -f "${c%/checkpoints/last.ckpt}/UNDERTRAINED" ]]; then skipped="${skipped:-${c%/checkpoints/last.ckpt}}"; continue; fi
+    ckpt="$c"; break
+  done < <(ls -dt "$DATA_ROOT/runs/$m"/*/checkpoints/last.ckpt 2>/dev/null || true)
   if [[ -z "$ckpt" ]]; then
-    echo "[06_eval] bỏ qua $m (chưa có checkpoint trong $DATA_ROOT/runs/$m/)"
+    if [[ -n "$skipped" ]]; then
+      echo "[06_eval] bỏ qua $m (train xong nhưng chưa học được: $skipped/UNDERTRAINED)"
+    else
+      echo "[06_eval] bỏ qua $m (chưa có checkpoint trong $DATA_ROOT/runs/$m/)"
+    fi
     continue
   fi
-  found=1
+  CKPT[$m]="$ckpt"; EVAL_MODELS+=("$m")
+done
+
+if [[ ${#EVAL_MODELS[@]} -eq 0 ]]; then
+  echo "[06_eval] không tìm thấy checkpoint nào — train trước (scripts/05_train.sh)." >&2
+  exit 1
+fi
+
+shopt -s nullglob
+old=()
+if [[ -z "$ONLY" ]]; then
+  for f in "$REPORTS"/*; do [[ -f "$f" ]] && old+=("$f"); done     # glob bỏ qua .gitkeep, archive/
+else
+  for m in "${EVAL_MODELS[@]}"; do old+=("$REPORTS/${m}"_us.* "$REPORTS/${m}"_vn.*); done
+fi
+shopt -u nullglob
+if [[ ${#old[@]} -gt 0 ]]; then
+  arch="$REPORTS/archive/$(date +%Y-%m-%d_%H-%M-%S)"
+  mkdir -p "$arch"
+  mv "${old[@]}" "$arch/"
+  echo "[06_eval] chuyển ${#old[@]} file báo cáo cũ -> $arch/"
+fi
+
+for m in "${EVAL_MODELS[@]}"; do
+  ckpt="${CKPT[$m]}"
   echo "[06_eval] $m -> $ckpt"
   for sub in test_us test_vn; do
     dom="${sub#test_}"   # us | vn
@@ -55,25 +101,20 @@ for m in "${SEL[@]}"; do
     fi
     echo "[06_eval]   $m / $sub"
     "$PYTHON" -m trademark_ocr.evaluate --ckpt "$ckpt" --subset "$sub" \
-      --out "$REPO_ROOT/reports/${m}_${dom}.csv" "${COMMON[@]}"
+      --out "$REPORTS/${m}_${dom}.csv" "${COMMON[@]}"
   done
 done
 
-if [[ "$found" -eq 0 ]]; then
-  echo "[06_eval] không tìm thấy checkpoint nào — train trước (scripts/05_train.sh)." >&2
-  exit 1
-fi
-
 echo "[06_eval] bảng domain shift"
-"$PYTHON" -m trademark_ocr.eval_domain_shift --reports "$REPO_ROOT/reports/" \
-  --out "$REPO_ROOT/reports/domain_shift.csv"
+"$PYTHON" -m trademark_ocr.eval_domain_shift --reports "$REPORTS/" \
+  --out "$REPORTS/domain_shift.csv"
 
 echo "[06_eval] phân tích lỗi -> $DATA_ROOT/processed/eda_figures/"
-"$PYTHON" -m trademark_ocr.error_analysis --reports "$REPO_ROOT/reports/" \
+"$PYTHON" -m trademark_ocr.error_analysis --reports "$REPORTS/" \
   --out-dir "$DATA_ROOT/processed/eda_figures"
 
 echo "[06_eval] báo cáo tổng hợp"
-"$PYTHON" -m trademark_ocr.report --reports "$REPO_ROOT/reports/" \
-  --out "$REPO_ROOT/reports/final_summary.md"
+"$PYTHON" -m trademark_ocr.report --reports "$REPORTS/" \
+  --out "$REPORTS/final_summary.md"
 
-echo "[06_eval] xong. Xem $REPO_ROOT/reports/final_summary.md"
+echo "[06_eval] xong. Xem $REPORTS/final_summary.md"

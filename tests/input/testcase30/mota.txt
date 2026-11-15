@@ -1,0 +1,14 @@
+testcase30 — Run cũ UNDERTRAINED, run mới hơn train dở: train tiếp run mới
+==========================================================================
+
+MỤC ĐÍCH
+    UNDERTRAINED chỉ xét run mới nhất; run cũ hơn không chặn run đang train dở.
+
+ĐẦU VÀO
+    parseq_ft có run cũ UNDERTRAINED và run mới hơn có last.ckpt + pipeline_train.env (8 epoch), chưa DONE.
+
+KỲ VỌNG
+    train:parseq_ft 'resume' run 2026-11-06_21-00-00, giữ 8 epoch, batch 64.
+
+VÌ SAO QUAN TRỌNG
+    Sau khi --retrain bị cắt giữa chừng (mất điện, trần thời gian), chạy lại phải train tiếp run mới chứ không dừng vì UNDERTRAINED của run cũ.

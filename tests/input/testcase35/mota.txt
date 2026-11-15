@@ -1,0 +1,14 @@
+testcase35 — Ngưỡng tuỳ chỉnh qua tham số min_val_accuracy
+==========================================================
+
+MỤC ĐÍCH
+    Tham số ngưỡng có tác dụng thật, không bị hằng số ghi đè.
+
+ĐẦU VÀO
+    Checkpoint crnn_ft (tốt nhất 74,07%), min_val_accuracy=80.
+
+KỲ VỌNG
+    verdict 'undertrained', min_val_accuracy 80.0 trong kết quả.
+
+VÌ SAO QUAN TRỌNG
+    Muốn siết ngưỡng sau này (vd yêu cầu tối thiểu cho báo cáo) chỉ cần đổi tham số.

@@ -1,0 +1,14 @@
+testcase28 — Run mới nhất UNDERTRAINED: bỏ qua, gợi ý --retrain
+===============================================================
+
+MỤC ĐÍCH
+    Chạy lại đúng lệnh đêm 04/11 sau khi parseq_ft bị đánh dấu UNDERTRAINED.
+
+ĐẦU VÀO
+    crnn_ft có DONE; parseq_ft có last.ckpt + UNDERTRAINED (0% sau 2 epoch); dữ liệu đã xong; --max-hours 3.
+
+KỲ VỌNG
+    train:parseq_ft 'skip', ghi rõ CHƯA HỌC ĐƯỢC + gợi ý --retrain và tăng --max-hours; không 'resume'.
+
+VÌ SAO QUAN TRỌNG
+    Không có nhánh này thì run không DONE bị coi là train dở -> 'train tiếp' một run đã chạy đủ epoch, hoặc tự train lại cùng ngân sách và lại ra 0% sau một đêm.
