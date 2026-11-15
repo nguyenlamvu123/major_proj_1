@@ -1,0 +1,12 @@
+[
+  "[plan] setup            | skip   | không chọn",
+  "[plan] us_meta          | skip   | không chọn",
+  "[plan] us_images        | skip   | không chọn",
+  "[plan] clean            | skip   | không chọn",
+  "[plan] split            | skip   | không chọn",
+  "[plan] lmdb             | skip   | không chọn",
+  "[plan] vn               | skip   | không chọn",
+  "[plan] vn_lmdb          | skip   | không chọn",
+  "[plan] train:crnn_ft    | resume | tiếp từ runs/crnn_ft/2026-11-06_08-00-00/checkpoints/last.ckpt, giữ 12 epoch, batch 64",
+  "[plan] eval             | run    | 06_eval.sh --device cpu (mọi model có checkpoint) + báo cáo"
+]

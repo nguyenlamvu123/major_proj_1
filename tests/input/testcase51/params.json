@@ -1,0 +1,64 @@
+{
+  "kind": "curves",
+  "desc": "Run 3 epoch: gom loss train theo epoch, epoch đánh số từ 1",
+  "runs": [
+    {
+      "model": "crnn_ft",
+      "ts": "2026-11-04_21-58-41",
+      "files": {
+        "DONE": ""
+      },
+      "max_epochs": 3,
+      "events": [
+        {
+          "name": "events.out.tfevents.1000.h.1.0",
+          "steps_per_epoch": 4,
+          "epochs": [
+            {
+              "e": 0,
+              "loss": [
+                6,
+                5,
+                4,
+                3
+              ],
+              "val": [
+                2.0,
+                10.0,
+                50.0
+              ]
+            },
+            {
+              "e": 1,
+              "loss": [
+                2,
+                2,
+                1.5,
+                1.5
+              ],
+              "val": [
+                1.0,
+                50.0,
+                80.0
+              ]
+            },
+            {
+              "e": 2,
+              "loss": [
+                1.2,
+                1.0,
+                1.0,
+                0.8
+              ],
+              "val": [
+                0.8,
+                60.0,
+                85.0
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

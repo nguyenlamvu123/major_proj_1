@@ -1,0 +1,13 @@
+[
+  "data/.pipeline/clean",
+  "data/.pipeline/lmdb",
+  "data/.pipeline/split",
+  "data/.pipeline/us_images",
+  "data/.pipeline/us_meta",
+  "data/.pipeline/vn",
+  "data/.pipeline/vn_lmdb",
+  "data/runs/crnn_ft/2026-10-16_00-51-24/DONE",
+  "data/runs/crnn_ft/2026-10-16_00-51-24/checkpoints/last.ckpt",
+  "venv/.pipeline_setup",
+  "venv/bin/python"
+]

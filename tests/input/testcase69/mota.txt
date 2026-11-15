@@ -1,0 +1,14 @@
+testcase69 — last.ckpt là lượt SWA (epoch = max_epochs): vẫn tính 8 epoch đã train, không phải 9
+================================================================================================
+
+MỤC ĐÍCH
+    Lượt SWA chỉ tính lại BatchNorm; nếu nó lọt top-3 thì last.ckpt mang epoch=8 dù run chỉ train 8 epoch (0..7). Gặp thật khi chạy thử 05/11.
+
+ĐẦU VÀO
+    crnn_ft DONE, max_epochs 8, checkpoint epoch=6,7,8 (epoch=8 là lượt SWA); --continue --max-epochs 20.
+
+KỲ VỌNG
+    'continue', đã train 8 epoch, thêm 12 (không phải 9 và 11).
+
+VÌ SAO QUAN TRỌNG
+    Đếm lượt SWA là một epoch thì tổng sai một và đợt train tiếp thiếu một epoch so với lệnh.

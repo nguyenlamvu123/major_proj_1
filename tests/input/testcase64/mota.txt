@@ -1,0 +1,14 @@
+testcase64 — parseq_ft UNDERTRAINED 2 epoch + --continue: train thêm, không phải từ đầu
+=======================================================================================
+
+MỤC ĐÍCH
+    Run 'chưa học được' vì ít epoch vẫn có 2 epoch (~2 giờ CPU) đáng giữ.
+
+ĐẦU VÀO
+    parseq_ft UNDERTRAINED, checkpoint epoch=0,1; --continue --max-epochs 10.
+
+KỲ VỌNG
+    train:parseq_ft 'continue', đã train 2 epoch, thêm 8 epoch (tổng ≤ 10).
+
+VÌ SAO QUAN TRỌNG
+    Trước đây chỉ có --retrain: bỏ 2 giờ đã train và bắt đầu lại từ trọng số pretrained.

@@ -30,6 +30,14 @@ kind = "verdict"  trademark_ocr.train_utils.train_verdict trên một run dir c�
                   tên params["ckpts"] (file rỗng); params["kwargs"] -> result.json
 kind = "metrics"  trademark_ocr.metrics.evaluate_metrics(params["preds"], params["gts"]),
                   làm tròn 6 chữ số -> result.json
+kind = "curves"   trademark_ocr.train_curves.build trên <WORK>/runs dựng từ params["runs"]:
+                  [{"model", "ts", "env": {...}, "files": {tên: nội dung}, "max_epochs": N
+                    (-> config/config.yaml), "events": [{"name": tên file events,
+                    "steps_per_epoch": N, "epochs": [{"e": epoch 0-based, "loss": [mỗi bước],
+                    "val": [val_loss, val_accuracy, val_NED]}]}]}]
+                  bước của loss thứ i trong epoch e = e·N + i; val ghi ở bước e·N + N − 1 (như
+                  Lightning: validate ở bước cuối epoch). params["models"], params["plot"].
+                  -> result.json, files.json (file trong out-dir), md.json (các dòng train_curves.md)
 
 MỌI lệnh bash chạy với REPORTS_DIR=<WORK>/reports: 06_eval.sh chuyển báo cáo cũ vào archive,
 để mặc định thì test sẽ dọn reports/ THẬT của repo (đã xảy ra một lần khi viết tính năng này).
@@ -225,9 +233,57 @@ def run_case(name: str) -> Path:
         res = evaluate_metrics(params["preds"], params["gts"])
         dump(out / "result.json", {k: round(v, 6) for k, v in res.items()})
 
+    elif kind == "curves":
+        from trademark_ocr.train_curves import build
+        runs_root = out / "work" / "runs"
+        for run in params["runs"]:
+            rd = runs_root / run["model"] / run["ts"]
+            rd.mkdir(parents=True, exist_ok=True)
+            if run.get("env"):
+                (rd / "pipeline_train.env").write_text(
+                    "".join(f"{k}={v}\n" for k, v in run["env"].items()), encoding="utf-8")
+            for fname, content in run.get("files", {}).items():
+                (rd / fname).parent.mkdir(parents=True, exist_ok=True)
+                (rd / fname).write_text(content, encoding="utf-8")
+            if run.get("max_epochs") is not None:
+                (rd / "config").mkdir(exist_ok=True)
+                (rd / "config" / "config.yaml").write_text(
+                    f"trainer:\n  max_epochs: {run['max_epochs']}\n", encoding="utf-8")
+            for ev in run.get("events", []):
+                write_events(rd, ev)
+        out_dir = out / "work" / "figures"
+        res = build(runs_root, out_dir, params.get("models"), plot=params.get("plot", False))
+        dump(out / "result.json", res)
+        dump(out / "files.json", sorted(p.name for p in out_dir.iterdir()))
+        dump(out / "md.json", (out_dir / "train_curves.md").read_text(encoding="utf-8").splitlines())
+
     else:
         raise ValueError(f"{name}: kind lạ {kind!r}")
     return out
+
+
+def write_events(run_dir: Path, ev: dict) -> None:
+    """Một file events TensorBoard đúng tên ``ev["name"]`` (thứ tự file theo tên quyết định
+    run nào "train tiếp" sau), cùng bố cục bước như parseq/Lightning ghi thật."""
+    import tempfile
+    from torch.utils.tensorboard import SummaryWriter
+
+    n = ev["steps_per_epoch"]
+    with tempfile.TemporaryDirectory(dir=run_dir) as tmp:
+        w = SummaryWriter(log_dir=tmp)
+        for row in ev["epochs"]:
+            e = row["e"]
+            for i, loss in enumerate(row.get("loss", [])):
+                w.add_scalar("loss", loss, e * n + i)
+                w.add_scalar("epoch", e, e * n + i)
+            if row.get("val"):
+                step = e * n + n - 1
+                for tag, v in zip(("val_loss", "val_accuracy", "val_NED"), row["val"]):
+                    w.add_scalar(tag, v, step)
+                w.add_scalar("epoch", e, step)
+        w.close()
+        (written,) = Path(tmp).glob("events.out.tfevents.*")
+        written.rename(run_dir / ev["name"])
 
 
 def compare(tc: unittest.TestCase, name: str, exp: Path, act: Path) -> None:

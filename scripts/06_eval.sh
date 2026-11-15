@@ -8,7 +8,8 @@
 #   bash scripts/06_eval.sh --device cpu --batch-size 8 --num-workers 0
 #
 # Sản phẩm: reports/<model>_{us,vn}.csv, reports/domain_shift.csv,
-#           reports/final_summary.md, $DATA_ROOT/processed/eda_figures/err_*.png
+#           reports/final_summary.md, $DATA_ROOT/processed/eda_figures/err_*.png,
+#           reports/figures/train_curves_<model>.png + train_curves.{md,json} (đồ thị train)
 #
 # Báo cáo cũ được CHUYỂN vào reports/archive/<giờ>/ trước khi đánh giá (report.py gom mọi
 # reports/*.csv, nên file của lần chạy khác — model nay không còn checkpoint — sẽ lẫn vào bảng):
@@ -117,4 +118,12 @@ echo "[06_eval] báo cáo tổng hợp"
 "$PYTHON" -m trademark_ocr.report --reports "$REPORTS/" \
   --out "$REPORTS/final_summary.md"
 
-echo "[06_eval] xong. Xem $REPORTS/final_summary.md"
+# Đồ thị train (loss train / val_loss / val_accuracy theo epoch) từ log TensorBoard của run mới
+# nhất mỗi model. reports/figures/ là thư mục con nên bước chuyển báo cáo cũ vào archive/ ở trên
+# không đụng tới; BAO_CAO_TONG_KET_DAT_LIEU_HUAN_LUYEN.md trỏ thẳng vào các PNG ở đây.
+# Lỗi vẽ không được làm hỏng một lần eval đã xong.
+echo "[06_eval] đồ thị train -> $REPORTS/figures/"
+"$PYTHON" -m trademark_ocr.train_curves --runs "$DATA_ROOT/runs" --out-dir "$REPORTS/figures" \
+  || echo "[06_eval] [WARN] không vẽ được đồ thị train (xem lỗi ở trên); báo cáo eval vẫn dùng được"
+
+echo "[06_eval] xong. Xem $REPORTS/final_summary.md và $REPORTS/figures/train_curves.md"

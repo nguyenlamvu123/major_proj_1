@@ -1,0 +1,14 @@
+testcase58 — Run mới nhất không có log (chép từ Colab thiếu events): dùng run cũ hơn; model không có log: bỏ qua
+================================================================================================================
+
+MỤC ĐÍCH
+    Chọn run để vẽ khi có run không mang theo log TensorBoard.
+
+ĐẦU VÀO
+    crnn_ft: run 04/11 có events, run 06/11 (mới hơn) chỉ có checkpoint; trba_ft: một run không có events; --models crnn_ft,trba_ft.
+
+KỲ VỌNG
+    crnn_ft vẽ từ run 2026-11-04_21-58-41; trba_ft nằm trong 'skipped' với lý do thiếu events; không lỗi.
+
+VÌ SAO QUAN TRỌNG
+    Hướng dẫn cũ bảo chép từ Colab chỉ last.ckpt/config/hparams: thiếu events phải được báo rõ, không được làm hỏng cả lượt vẽ.

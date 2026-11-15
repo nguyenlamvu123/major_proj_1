@@ -1,0 +1,69 @@
+{
+  "kind": "plan",
+  "desc": "svtr (train từ đầu, thư mục runs/svtrctc) + --continue",
+  "args": [
+    "--from",
+    "train",
+    "--models",
+    "svtr",
+    "--continue",
+    "--max-epochs",
+    "30",
+    "--accelerator",
+    "cpu"
+  ],
+  "state": {
+    "stamps": {
+      "us_meta": [
+        "rows=60000",
+        600
+      ],
+      "us_images": [
+        "-",
+        500
+      ],
+      "clean": [
+        "-",
+        400
+      ],
+      "split": [
+        "seed=1111",
+        300
+      ],
+      "lmdb": [
+        "-",
+        200
+      ],
+      "vn": [
+        "limit=2000",
+        150
+      ],
+      "vn_lmdb": [
+        "split=unverified",
+        100
+      ]
+    },
+    "venv": {
+      "python": true,
+      "stamp": [
+        "accelerator=cpu",
+        0
+      ]
+    },
+    "runs": [
+      {
+        "model": "svtrctc",
+        "ts": "2026-11-06_05-00-00",
+        "ckpt_age": 60,
+        "done": true,
+        "env": {
+          "max_epochs": 5,
+          "batch_size": 64
+        },
+        "files": {
+          "checkpoints/epoch=4-step=4005-val_accuracy=30.0-val_NED=60.0.ckpt": ""
+        }
+      }
+    ]
+  }
+}

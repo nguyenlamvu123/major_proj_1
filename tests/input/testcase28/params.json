@@ -1,6 +1,6 @@
 {
   "kind": "plan",
-  "desc": "Run mới nhất UNDERTRAINED: bỏ qua, gợi ý --retrain",
+  "desc": "Run mới nhất UNDERTRAINED: bỏ qua, gợi ý --continue hoặc --retrain",
   "args": [
     "--accelerator",
     "cpu",

@@ -17,6 +17,14 @@
 #                 cũng bỏ; chỉ train lại khi có --retrain (thường kèm --max-hours lớn hơn)
 #   (không có)    bị cắt vì trần thời gian hoặc lỗi giữa chừng               -> train tiếp
 #
+# Train THÊM epoch cho model đã DONE/UNDERTRAINED (vd crnn_ft 8 -> 20 epoch):
+#   bash scripts/09_full_pipeline_cpu.sh --from train --models crnn_ft --continue --max-epochs 20
+# --max-epochs là TỔNG số epoch muốn đạt (tính dồn từ run gốc). Tạo run MỚI, nạp toàn bộ trọng số
+# từ last.ckpt của run cũ, lịch LR OneCycle mới cho phần còn thiếu (không thể nối lịch cũ: nó đã
+# chạy hết và đã chuyển sang SWA). Chạy lại đúng lệnh đó: đủ tổng thì bỏ qua, run mới bị cắt thì
+# train tiếp run mới. pipeline_train.env của run mới ghi continue_from / init_epoch / epoch_offset
+# để trademark_ocr.train_curves nối đồ thị hai run (DESIGN.md 16.12).
+#
 # Tên giữ "_cpu" như bản đầu, nhưng --accelerator auto dùng GPU nếu máy có nvidia-smi.
 # =====================================================================
 set -euo pipefail
@@ -38,7 +46,7 @@ BATCH_SIZE=64
 NUM_WORKERS=4
 ACCELERATOR=auto
 FROM=""; ONLY=""; SKIP=""
-RETRAIN=0; DRY_RUN=0
+RETRAIN=0; CONTINUE=0; DRY_RUN=0
 
 usage() {
   cat <<'EOF'
@@ -57,6 +65,8 @@ Cờ:
   --only a,b           chỉ chạy các bước này (BẮT BUỘC chạy, kể cả khi đã xong)
   --skip a,b           bỏ qua các bước này
   --retrain            train lại model kể cả khi đã có DONE
+  --continue           train THÊM từ run đã DONE/UNDERTRAINED (nạp trọng số last.ckpt) tới tổng
+                       --max-epochs epoch; run mới, lịch LR mới
   --dry-run            chỉ in kế hoạch
 Bước: setup us_meta us_images clean split lmdb vn vn_lmdb train eval
 EOF
@@ -80,6 +90,7 @@ while [[ $# -gt 0 ]]; do
     --only)          ONLY="$2"; shift 2 ;;
     --skip)          SKIP="$2"; shift 2 ;;
     --retrain)       RETRAIN=1; shift ;;
+    --continue)      CONTINUE=1; shift ;;
     --dry-run)       DRY_RUN=1; shift ;;
     -h|--help)       usage; exit 0 ;;
     *) echo "[ERR] cờ lạ: $1" >&2; usage >&2; exit 2 ;;
@@ -94,6 +105,7 @@ for s in ${FROM:+$FROM} ${ONLY//,/ } ${SKIP//,/ }; do
   in_list "$s" "$(IFS=,; echo "${STEPS[*]}")" || die "bước lạ: $s"
 done
 [[ -z "$FROM" || -z "$ONLY" ]] || die "--from và --only không dùng cùng nhau"
+[[ $CONTINUE -eq 0 || $RETRAIN -eq 0 ]] || die "--continue (train thêm từ run cũ) và --retrain (train lại từ đầu) không dùng cùng nhau"
 for m in ${MODELS//,/ }; do
   in_list "$m" "crnn,trba,parseq,svtr,svtrctc,crnn_ft,trba_ft,parseq_ft" || die "model lạ: $m"
 done
@@ -207,19 +219,62 @@ fi
 # đúng hai số đó, vì lịch LR OneCycle khôi phục từ checkpoint đã cố định tổng số bước.
 model_dir() { case "$1" in svtr|svtrctc) echo svtrctc ;; *) echo "$1" ;; esac; }
 model_config() { case "$1" in svtr|svtrctc) echo tm_svtrctc ;; *) echo "tm_$1" ;; esac; }
+# Lớp system của từng model (giống model._target_/model.target trong configs/hydra/tm_*.yaml).
+model_class() {
+  case "$1" in
+    crnn|crnn_ft)     echo strhub.models.crnn.system.CRNN ;;
+    trba|trba_ft)     echo strhub.models.trba.system.TRBA ;;
+    parseq|parseq_ft) echo strhub.models.parseq.system.PARSeq ;;
+    svtr|svtrctc)     echo trademark_ocr.svtr_ctc.SVTRCTC ;;
+  esac
+}
 latest_ckpt() { ls -dt "$DATA_ROOT/runs/$(model_dir "$1")"/*/checkpoints/last.ckpt 2>/dev/null | head -1 || true; }
 # Thiếu file (run cũ) phải trả rỗng: để sed lỗi thì pipefail + set -e giết script không một lời.
 env_val() { [[ -f "$1/pipeline_train.env" ]] || return 0; sed -n "s/^$2=//p" "$1/pipeline_train.env" | head -1; }
-declare -A TRAIN_MODE=()
+# Epoch (0-based) của last.ckpt, đọc từ TÊN file (dry-run không được gọi python): Lightning chỉ
+# ghi last.ckpt cùng lúc với một checkpoint top-k "epoch=E-step=…ckpt", nên last.ckpt là bản
+# top-k mới nhất = E lớn nhất còn trong checkpoints/ (bản top-k cũ hơn bị xoá khi rớt hạng).
+ckpt_epoch() { ls "$1/checkpoints" 2>/dev/null | sed -n 's/^epoch=\([0-9][0-9]*\)-.*\.ckpt$/\1/p' | sort -n | tail -1 || true; }
+declare -A TRAIN_MODE=() CONT_CK=() CONT_EPOCH=() CONT_TOTAL=()
 for m in ${MODELS//,/ }; do
   if ! selected train; then plan "train:$m" skip "không chọn"; continue; fi
   ck="$(latest_ckpt "$m")"
   run_dir="${ck%/checkpoints/last.ckpt}"
+  # --continue chỉ đổi cách xử lý run ĐÃ XONG (DONE/UNDERTRAINED). Run mới nhất bị cắt giữa chừng
+  # (kể cả chính run --continue lần trước) rơi xuống nhánh "train tiếp" bên dưới như thường.
+  if [[ $CONTINUE -eq 1 && -z "$ck" ]]; then
+    plan "train:$m" skip "chưa có run nào có checkpoint để train tiếp — bỏ --continue để train từ đầu"
+    continue
+  fi
+  if [[ $CONTINUE -eq 1 && ( -f "$run_dir/DONE" || -f "$run_dir/UNDERTRAINED" ) ]]; then
+    e="$(ckpt_epoch "$run_dir")"
+    if [[ -z "$e" ]]; then
+      plan "train:$m" skip "không biết last.ckpt ở epoch nào (${run_dir#"$DATA_ROOT"/}/checkpoints/ không có file epoch=…ckpt)"
+      continue
+    fi
+    # Tổng epoch đã train trên ĐƯỜNG TRỌNG SỐ này = epoch của các run trước (epoch_offset, nếu run
+    # cũ cũng là run --continue) + epoch 0..e của run cũ. Model có BatchNorm (CRNN): Lightning
+    # chạy thêm một lượt SWA ở epoch = max_epochs (chỉ tính lại BatchNorm, không train); lượt đó
+    # lọt top-3 thì last.ckpt mang epoch = max_epochs — vẫn chỉ là max_epochs epoch đã train.
+    off="$(env_val "$run_dir" epoch_offset)"; me="$(env_val "$run_dir" max_epochs)"
+    n=$(( e + 1 )); [[ -n "$me" ]] && (( n > me )) && n=$me
+    total=$(( ${off:-0} + n ))
+    if (( total >= MAX_EPOCHS )); then
+      plan "train:$m" skip "đã train $total epoch (${run_dir#"$DATA_ROOT"/}) >= --max-epochs $MAX_EPOCHS — tăng --max-epochs để train thêm"
+      continue
+    fi
+    TRAIN_MODE[$m]=continue; CONT_CK[$m]="$ck"; CONT_EPOCH[$m]="$e"; CONT_TOTAL[$m]="$total"
+    add "train:$m"
+    if [[ -n "$MAX_HOURS" ]]; then more="ngân sách ${MAX_HOURS}h: đo tốc độ rồi chọn ≤ $((MAX_EPOCHS - total)) epoch"
+    else more="thêm $((MAX_EPOCHS - total)) epoch"; fi
+    plan "train:$m" continue "run MỚI nạp trọng số ${ck#"$DATA_ROOT"/} (đã train $total epoch), $more (tổng ≤ $MAX_EPOCHS), lịch LR mới, batch $BATCH_SIZE, $ACCELERATOR"
+    continue
+  fi
   if [[ -n "$ck" && -f "$run_dir/DONE" && $RETRAIN -eq 0 ]]; then
     plan "train:$m" skip "đã xong (${run_dir#"$DATA_ROOT"/})"
   elif [[ -n "$ck" && -f "$run_dir/UNDERTRAINED" && $RETRAIN -eq 0 ]]; then
     # Không tự train lại: cùng ngân sách thì lại ra đúng kết quả đó, mất thêm một đêm.
-    plan "train:$m" skip "train xong nhưng CHƯA HỌC ĐƯỢC ($(head -1 "$run_dir/UNDERTRAINED"), ${run_dir#"$DATA_ROOT"/}) — thêm --retrain và tăng --max-hours để train lại"
+    plan "train:$m" skip "train xong nhưng CHƯA HỌC ĐƯỢC ($(head -1 "$run_dir/UNDERTRAINED"), ${run_dir#"$DATA_ROOT"/}) — thêm --continue để train thêm từ run này, hoặc --retrain để train lại từ đầu, kèm --max-hours lớn hơn"
   elif [[ -n "$ck" && $RETRAIN -eq 0 ]]; then
     TRAIN_MODE[$m]="$ck"; add "train:$m"
     e="$(env_val "$run_dir" max_epochs)"; b="$(env_val "$run_dir" batch_size)"
@@ -319,9 +374,10 @@ FAILED=(); PARTIAL=(); FEW_EPOCHS=()
 for m in ${MODELS//,/ }; do
   will "train:$m" || continue
   step "train $m"
-  ck="${TRAIN_MODE[$m]}"
+  mode="${TRAIN_MODE[$m]}"
   extra=()
-  if [[ -n "$ck" ]]; then
+  if [[ -n "$mode" && "$mode" != continue ]]; then
+    ck="$mode"
     run="${ck%/checkpoints/last.ckpt}"
     epochs="$(env_val "$run" max_epochs)"; bs="$(env_val "$run" batch_size)"
     epochs="${epochs:-$MAX_EPOCHS}"; bs="${bs:-$BATCH_SIZE}"
@@ -337,10 +393,13 @@ for m in ${MODELS//,/ }; do
   else
     run="$DATA_ROOT/runs/$(model_dir "$m")/$(date +%Y-%m-%d_%H-%M-%S)"
     mkdir -p "$run"
-    epochs="$MAX_EPOCHS"; bs="$BATCH_SIZE"
+    # Run --continue: chỉ train phần còn thiếu tới tổng --max-epochs.
+    want="$MAX_EPOCHS"
+    [[ "$mode" == continue ]] && want=$(( MAX_EPOCHS - ${CONT_TOTAL[$m]} ))
+    epochs="$want"; bs="$BATCH_SIZE"
     if [[ -n "$MAX_HOURS" ]]; then
       if "$PY" -m trademark_ocr.train_utils --config "$(model_config "$m")" --benchmark \
-           --budget-hours "$MAX_HOURS" --max-epochs "$MAX_EPOCHS" --json-out "$run/benchmark.json" \
+           --budget-hours "$MAX_HOURS" --max-epochs "$want" --json-out "$run/benchmark.json" \
            -o model.batch_size="$bs" -o data.num_workers="$NUM_WORKERS" -o trainer.accelerator="$ACCELERATOR"; then
         epochs="$(json_get "$run/benchmark.json" epochs)"
         echo "[PIPELINE] $m: $(json_get "$run/benchmark.json" epoch_minutes) phút/epoch -> train $epochs epoch (~$(json_get "$run/benchmark.json" estimated_hours)h)"
@@ -354,6 +413,23 @@ for m in ${MODELS//,/ }; do
       extra+=("$(max_time_arg 0)")
     fi
     printf 'max_epochs=%s\nbatch_size=%s\n' "$epochs" "$bs" > "$run/pipeline_train.env"
+    if [[ "$mode" == continue ]]; then
+      base_ck="${CONT_CK[$m]}"; base="${base_ck%/checkpoints/last.ckpt}"
+      # continue_from tương đối $DATA_ROOT/runs: mang cả hai run sang máy khác vẫn nối được đồ thị.
+      printf 'continue_from=%s\ninit_epoch=%s\nepoch_offset=%s\ninit_ckpt=%s\n' \
+        "${base#"$DATA_ROOT/runs/"}" "${CONT_EPOCH[$m]}" "${CONT_TOTAL[$m]}" "$base_ck" >> "$run/pipeline_train.env"
+      # Nạp trọng số qua factory trademark_ocr.pretrained.finetune (nạp mọi tensor trùng tên +
+      # kích thước — cùng kiến trúc, cùng charset nên là toàn bộ). Config *_ft đã dùng factory, chỉ
+      # đổi init_from; config train từ đầu thì chuyển _target_ sang factory, lớp thật vào model.target
+      # (evaluate.py đọc model.target khi _target_ là factory).
+      if [[ "$m" == *_ft ]]; then
+        extra+=("model.init_from=$base_ck")
+      else
+        extra+=("model._target_=trademark_ocr.pretrained.finetune" "+model.target=$(model_class "$m")"
+                "+model.init_from=$base_ck")
+      fi
+      echo "[PIPELINE] $m: train tiếp từ $base_ck (đã train ${CONT_TOTAL[$m]} epoch) thêm $epochs epoch"
+    fi
   fi
   # hydra.run.dir cố định = run đã chọn: train tiếp ghi vào ĐÚNG thư mục cũ, không đẻ run rỗng
   extra+=("hydra.run.dir=$run")
@@ -408,7 +484,7 @@ fi
 for m in ${MODELS//,/ }; do
   ck="$(latest_ckpt "$m")"; rd="${ck%/checkpoints/last.ckpt}"
   if [[ -n "$ck" && -f "$rd/UNDERTRAINED" ]]; then
-    echo "[PIPELINE] [WARN] $m: lần train mới nhất chưa học được ($(head -1 "$rd/UNDERTRAINED")) — báo cáo dùng run cũ hơn nếu có, không thì thiếu model này; chạy lại với --models $m --retrain --max-hours <lớn hơn> hoặc train trên GPU"
+    echo "[PIPELINE] [WARN] $m: lần train mới nhất chưa học được ($(head -1 "$rd/UNDERTRAINED")) — báo cáo dùng run cũ hơn nếu có, không thì thiếu model này; chạy lại với --models $m --continue --max-epochs <tổng lớn hơn> (train thêm từ run này) hoặc --retrain --max-hours <lớn hơn>, hoặc train trên GPU"
   fi
 done
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "[PIPELINE] [ERR] model lỗi: ${FAILED[*]}"; exit 1; fi

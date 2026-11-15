@@ -63,4 +63,7 @@ bash scripts/05_train.sh parseq --accelerator cpu --devices 1 --batch-size 8 --n
 - **Cần kết quả đồ án trong một đêm trên CPU:** `scripts/09_full_pipeline_cpu.sh --max-hours <giờ>`
   với **một** model nặng mỗi đêm. `crnn_ft` vừa 3h; `parseq_ft` cần cả đêm
   (`--models parseq_ft --retrain --max-hours 9` ≈ 8 epoch); TRBA (50 M tham số) nên train trên GPU.
+- **Một đêm không đủ epoch:** đêm sau `--from train --models <m> --continue --max-epochs <tổng>
+  --max-hours <giờ>` train thêm từ checkpoint đêm trước thay vì làm lại (HUONG_DAN_PIPELINE_CPU.md
+  mục 5). Máy yếu cứ chạy lại đúng lệnh đó mỗi đêm cho tới khi đủ tổng.
 - **Cần kết quả tốt nhất:** train trên GPU (Colab T4, `docs/colab/02_train.ipynb`).

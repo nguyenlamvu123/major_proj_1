@@ -1,0 +1,89 @@
+{
+  "kind": "plan",
+  "desc": "Chạy lại cùng lệnh --continue sau khi đã đủ 20 epoch: bỏ qua",
+  "args": [
+    "--from",
+    "train",
+    "--models",
+    "crnn_ft",
+    "--continue",
+    "--accelerator",
+    "cpu",
+    "--max-epochs",
+    "20"
+  ],
+  "state": {
+    "stamps": {
+      "us_meta": [
+        "rows=60000",
+        600
+      ],
+      "us_images": [
+        "-",
+        500
+      ],
+      "clean": [
+        "-",
+        400
+      ],
+      "split": [
+        "seed=1111",
+        300
+      ],
+      "lmdb": [
+        "-",
+        200
+      ],
+      "vn": [
+        "limit=2000",
+        150
+      ],
+      "vn_lmdb": [
+        "split=unverified",
+        100
+      ]
+    },
+    "venv": {
+      "python": true,
+      "stamp": [
+        "accelerator=cpu",
+        0
+      ]
+    },
+    "runs": [
+      {
+        "model": "crnn_ft",
+        "ts": "2026-11-04_21-58-41",
+        "ckpt_age": 600,
+        "done": true,
+        "env": {
+          "max_epochs": 8,
+          "batch_size": 64
+        },
+        "files": {
+          "checkpoints/epoch=5-step=4806-val_accuracy=72.6283-val_NED=89.0782.ckpt": "",
+          "checkpoints/epoch=6-step=5607-val_accuracy=73.0499-val_NED=89.3472.ckpt": "",
+          "checkpoints/epoch=7-step=6408-val_accuracy=74.0689-val_NED=89.5194.ckpt": ""
+        }
+      },
+      {
+        "model": "crnn_ft",
+        "ts": "2026-11-06_08-00-00",
+        "ckpt_age": 60,
+        "done": true,
+        "env": {
+          "max_epochs": 12,
+          "batch_size": 64,
+          "continue_from": "crnn_ft/2026-11-04_21-58-41",
+          "init_epoch": 7,
+          "epoch_offset": 8
+        },
+        "files": {
+          "checkpoints/epoch=9-step=8010-val_accuracy=75.0-val_NED=90.0.ckpt": "",
+          "checkpoints/epoch=10-step=8811-val_accuracy=75.5-val_NED=90.1.ckpt": "",
+          "checkpoints/epoch=11-step=9612-val_accuracy=76.0-val_NED=90.2.ckpt": ""
+        }
+      }
+    ]
+  }
+}

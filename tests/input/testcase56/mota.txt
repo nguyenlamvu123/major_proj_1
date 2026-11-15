@@ -1,0 +1,14 @@
+testcase56 — val_loss đi ngang sau đáy (+2%) -> 'di_ngang', không kết luận overfit
+==================================================================================
+
+MỤC ĐÍCH
+    Biên của luật overfit: val_loss nhích nhẹ là nhiễu, không phải overfit.
+
+ĐẦU VÀO
+    val_loss thấp nhất 0,6 ở epoch 3, ba epoch sau 0,605/0,61/0,612 (+2%, dưới ngưỡng 5%).
+
+KỲ VỌNG
+    verdict 'di_ngang' (gần bão hoà), không phải 'co_dau_hieu'.
+
+VÌ SAO QUAN TRỌNG
+    Ngưỡng quá nhạy sẽ gắn nhãn overfit cho mọi model đã hội tụ.

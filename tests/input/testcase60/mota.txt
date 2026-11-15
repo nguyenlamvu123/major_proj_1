@@ -1,0 +1,14 @@
+testcase60 — crnn_ft DONE 8 epoch + --continue --max-epochs 20: run mới thêm 12 epoch
+=====================================================================================
+
+MỤC ĐÍCH
+    Lệnh chính của hướng dẫn: train thêm crnn_ft từ checkpoint 8 epoch lên tổng 20.
+
+ĐẦU VÀO
+    crnn_ft DONE, checkpoints epoch=5,6,7 + last.ckpt; --from train --models crnn_ft --continue --max-epochs 20.
+
+KỲ VỌNG
+    train:crnn_ft 'continue': run MỚI nạp runs/crnn_ft/2026-11-04_21-58-41/checkpoints/last.ckpt, đã train 8 epoch, thêm 12 (tổng ≤ 20); không bước dữ liệu nào chạy.
+
+VÌ SAO QUAN TRỌNG
+    Không có --continue thì run DONE bị bỏ qua, chỉ còn cách --retrain (mất 8 epoch đã train).

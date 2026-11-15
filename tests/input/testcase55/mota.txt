@@ -1,0 +1,14 @@
+testcase55 — val_loss quay đầu tăng khi loss train vẫn giảm -> có dấu hiệu overfit
+==================================================================================
+
+MỤC ĐÍCH
+    Kiểm luật phát hiện overfit — câu trả lời chính mà đồ thị phải cho người đọc.
+
+ĐẦU VÀO
+    6 epoch: loss train 1,5 → 0,4 giảm đều; val_loss thấp nhất 0,6 ở epoch 3 rồi tăng tới 0,70 (+17%).
+
+KỲ VỌNG
+    verdict 'co_dau_hieu', best_val_loss_epoch 3, câu kết luận nêu số; val_accuracy tốt nhất epoch 4 = 61%.
+
+VÌ SAO QUAN TRỌNG
+    Nếu luật sai, báo cáo nói 'chưa overfit' trong khi model đã học thuộc tập train (hoặc ngược lại).
